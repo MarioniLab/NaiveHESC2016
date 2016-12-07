@@ -49,21 +49,23 @@ cell.prol <- intersect(ensembl_ids, cell.prol$ENSEMBL)
 DNA.meth <- intersect(ensembl_ids, DNA.meth$ENSEMBL)
 embryo.implant <- intersect(ensembl_ids, embryo.implant$ENSEMBL)
 
-gene.function <- data.frame("Factor"=rep(1, length(ensembl_ids)), row.names = ensembl_ids)
-gene.function[cell.prol,1] <- 2
-gene.function[DNA.meth,1] <- 3
-gene.function[embryo.implant,1] <- 4
+gene.function <- data.frame("Color"=rep(1, length(ensembl_ids)), row.names = ensembl_ids)
+gene.function[cell.prol,1] <- "coral"
+gene.function[DNA.meth,1] <- "darkgoldenrod1"
+gene.function[embryo.implant,1] <- "deepskyblue"
 
 pdf(file="~/Documents/vMeyenn/paper_files/figures/figure3b.pdf")
 par(bty='l', las = 1, mar = c(5.1, 5.5, 4.1, 2.1))
 plot(hvg.out_naive[shared_genes,]$bio, hvg.out_primed[shared_genes,]$bio, xlim=c(0.5,9), ylim=c(0.5,9), 
-     pch = 19, cex = 0.5,  ylab = "Biological Variance [Primed]", col=gene.function[,1],
+     pch = 19, cex = 0.5,  ylab = "Biological Variance [Primed]", col=gene.function[,1], 
+     labels = c("Cell proliferation", "DNA methylation", "Embyo implantation"),
      xlab = "Biological Variance [Naive]", cex.lab=1.3)
 abline(0,1, col = "indianred2", lty = 1)
 #text(hvg.out_naive[top_genes,]$bio+0.5, hvg.out_primed[top_genes,]$bio, labels = top_genes)
 dev.off()
 
-
+NO leftover: cultured very long, every cell at some point has fullfilled the naive criteria, many passages
+primed cells would not survive long in the medium and by division 
 
 
 
