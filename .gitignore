@@ -1,1 +1,4 @@
 *.html
+.DS_Store
+objects
+output
