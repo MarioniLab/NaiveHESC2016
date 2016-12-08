@@ -1,10 +1,14 @@
+# Create figure directory and specifiy path of necessary R-objects
+dir.create(file.path("./figures"), showWarnings = F)
+objectpath <- file.path("./objects/")
+
 # Figure 4a
 library("viridis")
 stages <- c("E3", "E4", "E4.late","E5.early", "E5", "E6", "E7")
-nums <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/nums.petro")
+nums <- readRDS(file = paste0(objectpath, "nums.petro"))
 nums <- nums*100
 
-pdf(file = "~/Documents/vMeyenn/paper_files/figures/figure4a.pdf", width = 25, height = 12)
+pdf(file = "./figures/figure4a.pdf", width = 25, height = 12)
 
 par(bty='n', mar = c(4.1, 4.1, 5.1, 0.2),  las = 1)
 layout(matrix(1:15,ncol=5, byrow = TRUE), width = c(1,5,5,5,5), heights = c(5,5,1))
@@ -33,7 +37,7 @@ for (stage in stages){
   abline(0,1, col = "indianred2", lty=1, cex=2)
 }
 
-mtext("Proportion of naive henes [%]", side=1, padj=-2, outer=TRUE, cex = 2.5)
+mtext("Proportion of naive genes [%]", side=1, padj=-2, outer=TRUE, cex = 2.5)
 
 par(las = 0)
 mtext("  Proportion of primed genes [%]", line = -2, side=2, padj=2, outer=TRUE, cex = 2.5)
@@ -50,12 +54,12 @@ dev.off()
 # Figure 4b
 
 
-stages <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/stages.mouse")
-nums <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/nums.mouse")
+stages <- readRDS(file = paste0(objectpath, "stages.mouse"))
+nums <- readRDS(file =  paste0(objectpath, "nums.mouse"))
 nums <- nums*100
 
 
-pdf(file = "~/Documents/vMeyenn/paper_files/figures/figure4b.pdf", width = 25, height = 6)
+pdf(file = "./figures/figure4b.pdf", width = 25, height = 6)
 
 par(bty='n', mar = c(8.1, 4.1, 3.1, 0.2),  las = 1)
 layout(matrix(1:7,ncol=7), width = c(1,5,5,5,5,5,2))
@@ -95,10 +99,10 @@ dev.off()
 
 # Figure 4 C
 
-stages <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/stages.monkey")
-nums <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/nums.monkey")
+stages <- readRDS(file =  paste0(objectpath, "stages.monkey"))
+nums <- readRDS(file =  paste0(objectpath, "nums.monkey"))
 nums <- nums*100
-pdf(file = "~/Documents/vMeyenn/paper_files/figures/figure4c.pdf", width = 25, height = 12)
+pdf(file = "./figures/figure4c.pdf", width = 25, height = 12)
 
 par(bty='n', mar = c(2.1, 4.1, 5.1, 0.2),  las = 1)
 layout(matrix(c(1:11, 6, 12:17),ncol=6, byrow = TRUE), width = c(1,5,5,5,5,2), heights = c(5,5,1))
@@ -142,18 +146,16 @@ mtext("Proportion of naive genes [%]", side=1, padj=-2, outer=TRUE, cex = 2.5)
 par(las = 0)
 mtext("  Proportion of primed genes [%]", line = -2, side=2, padj=2, outer=TRUE, cex = 2.5)
 
-
 dev.off()
 
+# 4 Supplements
 
-# 4 Supplementary
+all_markers <- readRDS(file =  paste0(objectpath, "markers.map"))
+naive_markers <- readRDS(file =  paste0(objectpath, "n.markers.map"))
+primed_markers <- readRDS(file =  paste0(objectpath, "p.markers.map"))
+sce_trans <- readRDS(file =  paste0(objectpath, "new_sce_trans"))
 
-all_markers <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/markers.map")
-naive_markers <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/n.markers.map")
-primed_markers <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/p.markers.map")
-sce_trans <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/new_sce_trans")
-
-pdf(file = "~/Documents/vMeyenn/paper_files/figures/sup.figure4a.pdf", width = 25, height = 6)
+pdf(file = "./figures/sup.figure4a.pdf", width = 25, height = 6)
 
 par(bty='n', mar = c(8.1, 4.1, 3.1, 0.2),  las = 1)
 layout(matrix(1:5,ncol=5), width = c(1,5,5,5,2))

@@ -1,21 +1,21 @@
+# Create figure directory and specifiy path of necessary R-objects
+dir.create(file.path("./figures"), showWarnings = F)
+objectpath <- file.path("./objects/")
+
+# Load colours
+primed.col <- readRDS(file = paste0(objectpath, "primed.col"))
+naive.col <- readRDS(file = paste0(objectpath, "naive.col"))
+trans.col <- readRDS(file = paste0(objectpath, "trans.col"))
+
 # Figure 2
 
-# Colors
-
-primed.col <- "#0072B2"
-saveRDS(primed.col, file = "~/Documents/vMeyenn/paper_files/objects/primed.col")
-naive.col <- "#e79f00"
-saveRDS(naive.col, file = "~/Documents/vMeyenn/paper_files/objects/naive.col")
-trans.col <- "#009E73"
-saveRDS(trans.col, file = "~/Documents/vMeyenn/paper_files/objects/trans.col")
-  
 # A
 
 library("pheatmap")
 library("gridExtra")
 library("grid")
-heat.vals <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/heat.vals")
-re.pheno <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/pheno")
+heat.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
+re.pheno <- readRDS(file = paste0(objectpath, "pheno"))
 
 # upper two thirs
 heat.vals[heat.vals < -5] <- -5
@@ -41,7 +41,7 @@ colnames(gene.type) <- "Transition vs"
 rownames(gene.type) <- rownames(heat.vals)
 
 # lower third
-shared.vals <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/heat.vals")
+shared.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
 shared.vals[shared.vals < -5] <- -5
 shared.vals[shared.vals > 5] <- 5
 shared.vals <- shared.vals[which(duplicated(rownames(shared.vals))),]
@@ -54,7 +54,7 @@ rownames(genes.shared) <- rownames(shared.vals)
   
 # Create three new heatmaps with only the stuff additionally to this one
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure2a.pdf", onefile = FALSE, width = 10, height = 15)
+pdf(file="./figures/figure2a.pdf", onefile = FALSE, width = 10, height = 15)
 # naive vs trans and primed vs trans
 p1 <- pheatmap(heat.vals[,which(re.pheno == "naive")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
                annotation_row = gene.type, cluster_rows = FALSE, gaps_row = 80,
@@ -154,7 +154,7 @@ dev.off()
 
 
 # Legend 2A
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure2a_legend.pdf", width = 10, height = 5)
+pdf(file="./figures/figure2a_legend.pdf", width = 10, height = 5)
 plot.new()
 par(mar=c(1.1,1.1,1.1,1.1))
 legend("left", legend = c("Naive", "Primed", "Transition"), fill=c(naive.col, primed.col, trans.col), 
@@ -165,7 +165,7 @@ dev.off()
 
 # B
 library("edgeR")
-res_all <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/res_all")
+res_all <- readRDS(file = paste0(objectpath, "res_all"))
 top.genes <- topTags(res_all, n=Inf)$table
 top.genes <- head(rownames(top.genes[top.genes$PValue<0.05,]), n=10)
 sce_trans <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/new_sce_trans")
@@ -173,7 +173,7 @@ chosen <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/chosen1")
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 sce_trans$Phenotype <- sce_trans$phenotype
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure2b.pdf", width = 10, height = 15)
+pdf(file="./figures/figure2b.pdf", width = 10, height = 15)
 
 par(las=1, mar = c(3.1, 2.1, 1.1, 0.5))
 layout(matrix(c(5,5,5,1,2,3,4,4,4), ncol=3), width = c(1,9,2))
@@ -200,7 +200,7 @@ mtext("Expression [log(exprs)]", line = -2, side=2, padj=2, outer=TRUE, cex = 1.
 dev.off()
 
 # C
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure2c.pdf", width = 10)
+pdf(file="./figures/figure2c.pdf", width = 10)
 
 ugly.plot <- plotPCA(sce_trans, exprs_values="exprs", colour_by="Phenotype", feature_set = chosen) + 
   fontsize + theme(legend.title = element_text(size=15), legend.text = element_text(size=12))
@@ -216,3 +216,4 @@ plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = plot_data$data[[2]]$fil
 par(xpd=TRUE)
 legend(23.7,10.37, title = "Population",  legend = c("Primed", "Naive", "Transition"), pch=16, cex=1.25, col=c(primed.col, naive.col, trans.col), bty='n')
 
+dev.off()

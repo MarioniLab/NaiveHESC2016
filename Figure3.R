@@ -1,15 +1,18 @@
-# Figure 3
+# Create figure directory and specifiy path of necessary R-objects
+dir.create(file.path("./figures"), showWarnings = F)
+objectpath <- file.path("./objects/")
 
 # Load Colors 
+primed.col <- readRDS(file = paste0(objectpath, "primed.col"))
+naive.col <- readRDS(file = paste0(objectpath, "naive.col"))
 
-primed.col <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/primed.col")
-naive.col <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/naive.col")
+# Figure 3
 
 # A
-hvg.matrix <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/hvg.matrix")
+hvg.matrix <- readRDS(file = paste0(objectpath, "hvg.matrix"))
 colnames(hvg.matrix) <- c("Primed", "Naive")
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure3a.pdf", width = 4)
+pdf(file="./figures/figure3a.pdf", width = 4)
 par(mar = c(5.1, 5.5, 4.1, 2.1), las = 1)
 plot <- barplot(hvg.matrix, ylab="Highly Variable Genes",
               ylim = c(0,7500), col = c(primed.col, naive.col), beside = TRUE,
@@ -22,11 +25,11 @@ dev.off()
 # B
 library("org.Hs.eg.db")
 library("limma")
-hvg.out_naive <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/hvg.naive")
-hvg.out_primed <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/hvg.primed")
+hvg.out_naive <- readRDS(file = paste0(objectpath, "hvg.naive"))
+hvg.out_primed <- readRDS(file = paste0(objectpath, "hvg.primed"))
 shared_genes <- intersect(rownames(hvg.out_naive), rownames(hvg.out_primed))
 
-ensembl <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/ensemblGenes")
+ensembl <- readRDS(file = paste0(objectpath, "ensemblGenes"))
 
 entrez <- ensemblGenes[match(shared_genes, ensemblGenes$external_gene_name),]
 shared_genes <- shared_genes[-which(is.na(entrez$entrezgene))]
@@ -56,7 +59,7 @@ gene.function[DNA.meth,1] <- "darkgoldenrod1"
 gene.function[embryo.implant,1] <- "deepskyblue"
 
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure3b.pdf")
+pdf(file="./figures/figure3b.pdf")
 par(bty='l', las = 1, mar = c(5.1, 5.5, 4.1, 2.1))
 plot(hvg.out_naive[shared_genes,]$bio, hvg.out_primed[shared_genes,]$bio, xlim=c(0.5,9), ylim=c(0.5,9), 
      pch = 16, cex = 1,  ylab = "Biological Variance [Primed]", col=gene.function[,1], 
@@ -78,7 +81,7 @@ data <- cbind(data$primed, data$naive)
 data <- as.data.frame(data)
 colnames(data) <- c("Primed", "Naive")
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure3c.pdf", width = 4)
+pdf(file="./figures/figure3c.pdf", width = 4)
 par(bty='n', las = 1, mar = c(3.1, 5.5, 4.1, 2.1))
 boxplot(data, col = c(primed.col, naive.col), boxwex = 0.5, ylim = c(-1,10), cex.lab = 1.3,
         outline=FALSE, ylab = "Biological Variance", xaxt = "n")
@@ -88,24 +91,26 @@ dev.off()
 
 # Supplements
 
-sce_primed <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/new_sce_primed_object") 
-sce_naive <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/new_sce_naive_object") 
+sce_primed <- readRDS(file = paste0(objectpath, "new_sce_primed_object"))
+sce_naive <- readRDS(file = paste0(objectpath, "new_sce_naive_object"))
 
 # A
 
 par(mfrow=c(1,1))
 primed.phases <- table(sce_primed$phase)
 naive.phases <- table(sce_naive$phase)
-pdf(file="~/Documents/vMeyenn/paper_files/figures/sup.figure3a.pdf")
+
+pdf(file="./figures/sup.figure3a.pdf")
 barplot(rbind(primed.phases, naive.phases), beside = TRUE, col = c(primed.col, naive.col), ylab="Number of cells")
-legend("top", legend = c("primed", "naive"), fill = c("#0072B2", "#e79f00"), bty="n", cex=1.5)
+legend("top", legend = c("Primed", "Naive"), fill = c(primed.col, naive.col), bty="n", cex=1.5)
 dev.off()
 
 # B
 
 naive.means <- log(rowMeans(counts(sce_naive)))
 primed.means <- log(rowMeans(counts(sce_primed)))
-pdf(file="~/Documents/vMeyenn/paper_files/figures/sup.figure3b.pdf")
+
+pdf(file="./figures/sup.figure3b.pdf")
 par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 0.1))
 hist(primed.means, xlim = c(0,11), breaks = 100, col=primed.col, xlab="log Mean", main="Primed")
 hist(naive.means, xlim = c(0,11), breaks = 100, col=naive.col, xlab="log Mean", main="Naive")
@@ -119,9 +124,10 @@ shared <- length(intersect(rownames(sce_naive[naive.means >1,]), rownames(sce_pr
 
 num.matrix <- cbind(primed.genenum, naive.genenum, shared)
 colnames(num.matrix) <- c("Primed", "Naive", "Shared")
-pdf(file="~/Documents/vMeyenn/paper_files/figures/sup.figure3c.pdf")
+
+pdf(file="./figures/sup.figure3c.pdf")
 par(mfrow=c(1,1), mar = c(5.1, 5.5, 4.1, 2.1), las = 1)
-plot <- barplot(num.matrix, col = c("#0072B2", "#e79f00", "#CC79A7"), beside = TRUE, names.arg = c("Primed", "Naive", "Shared"), 
+plot <- barplot(num.matrix, col = c(primed.col, naive.col, "#CC79A7"), beside = TRUE, names.arg = c("Primed", "Naive", "Shared"), 
                 ylab="Number of expressed genes", xlim = c(0,3), width = 0.3, space = c(0,.5),
                 cex.axis = .75, cex.lab = 1.3, cex.names = 1., ylim=c(0,14700))
 text(x = plot, y = num.matrix, label = num.matrix, cex = 0.75, pos = 3)
@@ -131,12 +137,9 @@ dev.off()
 
 naive.size <- sce_naive$size_factor
 primed.size <- sce_primed$size_factor
-pdf(file="~/Documents/vMeyenn/paper_files/figures/sup.figure3d.pdf")
 
+pdf(file="./figures/sup.figure3d.pdf")
 par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 1), las=1)
 hist(primed.size, xlim = c(0,8), breaks = 50, col=primed.col, xlab="Size Factor", main="Primed")
 hist(naive.size, xlim = c(0,8), breaks = 50, col=naive.col, xlab="Size Factor", main="Naive", ylab = "")
 dev.off()
-
-
-

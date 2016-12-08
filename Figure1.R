@@ -1,11 +1,24 @@
-# Figure 1
+# Create figure directory and specifiy path of necessary R-objects
+dir.create(file.path("./figures"), showWarnings = F)
+objectpath <- file.path("./objects/")
 
+# Set colors
+
+primed.col <- "#0072B2"
+saveRDS(primed.col, file = paste0(objectpath, "primed.col"))
+naive.col <- "#e79f00"
+saveRDS(naive.col, file = paste0(objectpath, "naive.col"))
+trans.col <- "#009E73"
+saveRDS(trans.col, file = paste0(objectpath, "trans.col"))
+
+# Figure 1
+  
 # B
-sce <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/sce_new_object")
-chosen <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/chosen1")
+sce <- readRDS(file = paste0(objectpath, "sce_new_object"))
+chosen <- readRDS(file = paste0(objectpath, "chosen1"))
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure1b.pdf", width=10)
+pdf(file="./figures/figure1b.pdf", width=10)
 
 ugly.plot <- plotPCA(sce, exprs_values="exprs", colour_by="KLF4", 
                      feature_set = chosen) + fontsize + theme(legend.title = element_text(colour="black", 
@@ -25,19 +38,16 @@ grid.draw(legend)
 dev.off()
 
 # C
-primed.col <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/primed.col")
-naive.col <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/naive.col")
 
-res <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/res_all")
-is.de <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/is.de_all")
-
+res <- readRDS(file = paste0(objectpath, "res_all"))
+is.de <- readRDS(file = paste0(objectpath, "is.de_all"))
 
 main.col <- "grey10"
 
 naive.genes <- c("KLF4", "KLF17", "DPPA3", "DNMT3L", "DPPA5")
 primed.genes <- c("DUSP6", "THY1")
 
-pdf(file="~/Documents/vMeyenn/paper_files/figures/figure1c.pdf")
+pdf(file="./figures/figure1c.pdf")
 
  par(mar = c(5.1, 5.1, 4.1, 2.1), las=1)
 plot(log2(rowMeans(counts(sce)[is.de==0,])), res$table$logFC[is.de==0], cex=0.3, ylim=c(-22.5, 22.5), pch = 16, 
