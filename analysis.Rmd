@@ -15,10 +15,12 @@ output:
 ```{r, echo=FALSE, results="hide"}
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
 #set date:
-date <- "2016_12_06"
-dir.create(file.path("~/Documents/vMeyenn/paper_files/output", date), showWarnings = FALSE)
-output <- file.path("~/Documents/vMeyenn/paper_files/output", date)
-setwd(file.path("~/Documents/vMeyenn/paper_files/output", date))
+setwd(file.path("~/Documents/vMeyenn/NaiveHESC2016/"))
+dir.create(file.path("./output"), showWarnings = F)
+output <- file.path("./output/")
+input <- file.path("~/Documents/vMeyenn/data/")
+dir.create(file.path("./objects"), showWarnings = F)
+objectpath <- file.path("./objects/")
 ```
 
 # Data Preparation 
@@ -46,7 +48,7 @@ Before reading in the sequencing data, its quality can be estimated by using met
 ```{r, qualitySum}
 quality <- list()
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){  
-  qual_control <- read.table(file = paste("~/Documents/vMeyenn/data/my_qual_", sample, ".tsv", sep = ""), 
+  qual_control <- read.table(file = paste(input, "my_qual_", sample, ".tsv", sep = ""), 
                              sep = "\t", header = TRUE, row.names=1)
   total <- rowSums(qual_control)
   readsassigned <- qual_control$Assigned
@@ -68,7 +70,7 @@ gene.names <- NULL
 gene.length <- NULL
 
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
-  path <- paste("~/Documents/vMeyenn/data/genic_counts_", sample, ".tsv", sep = "")
+  path <- paste(input, "genic_counts_", sample, ".tsv", sep = "")
   current_counts <- read.table(file = path , sep = "\t", header = TRUE, row.names=1)
   #save gene names and length
   if (is.null(gene.names)){
@@ -106,7 +108,7 @@ Next, additional information like gene Ids, gene names, chromosomes or gene biot
 ensembl <- useMart("ensembl", dataset="hsapiens_gene_ensembl")
 ensemblGenes <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 'external_gene_name', 
                                    'entrezgene'), filters="ensembl_gene_id", values=gene.names, mart=ensembl) 
-saveRDS(ensemblGenes, file = "~/Documents/vMeyenn/paper_files/objects/ensemblGenes")
+saveRDS(ensemblGenes, file = paste0(objectpath, "ensemblGenes"))
 # Match gene IDS with BiomaRt attributes
 features <- ensemblGenes[match(gene.names, ensemblGenes$ensembl_gene_id),]
 features$ensembl_gene_id <- gene.names
@@ -147,7 +149,7 @@ We now want to create a scater object to be able to process the data before anal
 ```{r, newSCESet}
 sce <- newSCESet(countData=combined.counts, featureData = AnnotatedDataFrame(features), phenoData = AnnotatedDataFrame(pheno))
 dim(sce)
-saveRDS(sce, file="~/Documents/vMeyenn/paper_files/objects/sce_new_raw")
+saveRDS(sce, file=paste0(objectpath, "sce_new_raw"))
 ```
 
 ### **QC**: Only high quality cells
@@ -310,7 +312,7 @@ To get a first impression of the data, expression profiles of typical ESC marker
 ```{r, explot, fig.cap="**Figure 8:** Violin plots of ESC marker genes."}
 set.seed(100)
 sce <- sce[,sample(ncol(sce))]
-saveRDS(sce, file = "~/Documents/vMeyenn/paper_files/objects/sce_new_object")
+saveRDS(sce, file = paste0(objectpath, "sce_new_object"))
 plotExpression(sce, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
                colour_by="phenotype", shape_by = "batch", show_violin = FALSE)
 ```
@@ -340,7 +342,7 @@ hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),]
 dim(hvg.out)
 
 # Write HVG genes in a table
-write.table(file = paste0(output, "/esc_hvg.tsv"), hvg.out, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file = paste0(output, "esc_hvg.tsv"), hvg.out, sep="\t", quote=FALSE, col.names = NA) 
 head(hvg.out)
 ```
 
@@ -356,9 +358,7 @@ Next, we correlate the genes to each other to identify gene clusters and write t
 ```{r, correlation}
 set.seed(100) 
 var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)[1:1000]) 
-gz_all <- gzfile("./var.cor.gz", "w")
-write.table(var.cor, gz_all, sep="\t", quote=FALSE, row.names=FALSE) 
-close(gz_all)
+write.table(var.cor, file= gzfile(paste0(output, "var.cor.gz")), sep="\t", quote=FALSE, row.names=FALSE) 
 head(var.cor)
 dim(var.cor)
 ```
@@ -374,7 +374,7 @@ Then we save the most correlated genes in a a new subset to be able to plot thes
 
 ```{r, chosen}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
-saveRDS(chosen, file = "~/Documents/vMeyenn/paper_files/objects/chosen1")
+saveRDS(chosen, file = paste0(objectpath, "chosen1"))
 top.hvg <- rownames(hvg.out)[1] 
 ```
 
@@ -421,8 +421,8 @@ con_all <- makeContrasts(ptypeprimed - ptypenaive, levels = design_pheno)
 res_all <- glmLRT(fit_all, contrast=con_all)
 DEmarkers <- topTags(res_all, n=Inf)$table
 DEmarkers <- DEmarkers[DEmarkers$PValue<0.05,]
-write.table(DEmarkers, file=paste0(output, "/DEmarkers.tsv"), sep="\t", quote=FALSE, col.names=NA) 
-saveRDS(res_all, file = "~/Documents/vMeyenn/paper_files/objects/res_all")
+write.table(DEmarkers, file=paste0(output, "DEmarkers.tsv"), sep="\t", quote=FALSE, col.names=NA) 
+saveRDS(res_all, file = paste0(objectpath, "objects/res_all"))
 ```
 
 ```{r, DEplot, fig.cap="**Figure 13:** Expression profiles of most differentially expressed genes between naive and primed subpopulation."}
@@ -433,7 +433,7 @@ By setting a p.value threshold, we can see how many of the total genes are diffe
 
 ```{r, DEpval}
 is.de_all <- decideTestsDGE(res_all, p.value=0.001)
-saveRDS(is.de_all, file = "~/Documents/vMeyenn/paper_files/objects/is.de_all")
+saveRDS(is.de_all, file = paste0(objectpath, "is.de_all"))
 summary(is.de_all)
 ```
 
@@ -489,8 +489,8 @@ The variance can again be used to identify highly variable genes within the naiv
 hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
 hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
 dim(hvg.out_naive)
-write.table(file=paste0(output, "/esc_naive_hvg.tsv"), hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
-saveRDS(hvg.out_naive, file = "~/Documents/vMeyenn/paper_files/objects/hvg.naive")
+write.table(file=paste0(output, "esc_naive_hvg.tsv"), hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
+saveRDS(hvg.out_naive, file = paste0(objectpath, "hvg.naive"))
 head(hvg.out_naive)
 ```
 
@@ -505,9 +505,7 @@ As already carried out for the whole dataset, we also assess the correlations be
 ```{r, cor.naive}
 set.seed(100) 
 var.cor_naive <- correlatePairs(sce_naive, design = design_naive, subset.row=rownames(hvg.out_naive)) 
-gz_naive <- gzfile("var.cor_naive.gz", "w")
-write.table(var.cor_naive, gz_naive, sep="\t", quote=FALSE, row.names=FALSE) 
-close(gz_naive)
+write.table(var.cor_naive, file= gzfile(paste0(output, "var.cor_naive.gz")), sep="\t", quote=FALSE, row.names=FALSE) 
 head(var.cor_naive)
 dim(var.cor_naive)
 ```
@@ -611,7 +609,7 @@ marker.set_naive <- data.frame(Top=min.rank_naive, Gene=rownames(y_naive),
     logFC=do.call(cbind, result.logFC_naive), stringsAsFactors=FALSE)
 marker.set_naive <- marker.set_naive[order(marker.set_naive$Top),]
 
-write.table(marker.set_naive, file=paste0(output, "/marker_naive_", clust.num_naive, ".tsv"), sep="\t", quote=FALSE, col.names=NA) 
+write.table(marker.set_naive, file=paste0(output, "marker_naive_", clust.num_naive, ".tsv"), sep="\t", quote=FALSE, col.names=NA) 
 top.markers_naive <- marker.set_naive$Gene[marker.set_naive$Top <= 10]
 top.exprs_naive <- norm_exprs(sce_naive)[top.markers_naive,,drop=FALSE]
 heat.vals_naive <- top.exprs_naive - rowMeans(top.exprs_naive)
@@ -627,7 +625,7 @@ sce_trans <- sce
 trans_cells <- colnames(sce_naive)[cluster_naive == "3"]
 pData(sce_trans)$phenotype <- factor(pData(sce_trans)$phenotype, levels = c(levels(pData(sce_trans)$phenotype), "transition"))
 pData(sce_trans)[trans_cells, ]$phenotype <- "transition"
-saveRDS(sce_trans, file = "~/Documents/vMeyenn/paper_files/objects/new_sce_trans")
+saveRDS(sce_trans, file = paste0(objectpath, "new_sce_trans"))
 
 pca_trans1 <- plotPCA(sce_trans, exprs_values="exprs", colour_by="KLF4", feature_set = chosen) + fontsize
 pca_trans2 <- plotPCA(sce_trans, exprs_values="exprs", colour_by="phenotype", feature_set = chosen) + fontsize
@@ -677,13 +675,13 @@ marker_nt <- cbind(unlist(result.logFC["vs.naive"]), unlist(result.PValue["vs.na
 rownames(marker_nt) <- rownames(y)
 colnames(marker_nt) <- c("logFC", "PValue")
 marker_nt <- marker_nt[order(marker_nt[,"PValue"]),]
-write.table(file=paste0(output, "/nvst.marker.tsv"), marker_nt, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=paste0(output, "nvst.marker.tsv"), marker_nt, sep="\t", quote=FALSE, col.names = NA) 
 
 marker_tp <- cbind(unlist(result.logFC["vs.primed"]), unlist(result.PValue["vs.primed"]))
 rownames(marker_tp) <- rownames(y)
 colnames(marker_tp) <- c("logFC", "PValue")
 marker_tp <- marker_tp[order(marker_tp[,"PValue"]),]
-write.table(file=paste0(output, "/pvst_marker.tsv"), marker_tp, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=paste0(output, "pvst_marker.tsv"), marker_tp, sep="\t", quote=FALSE, col.names = NA) 
 
 markerset.nt <- marker_nt[order(marker_nt[1:200,"logFC"], decreasing = TRUE),]
 markerset.tp <- marker_tp[order(marker_tp[1:200,"logFC"], decreasing = TRUE),]
@@ -693,9 +691,9 @@ use.markers <- rownames(all.markers)
 o <- order(all.pheno)
 top.exprs <- exprs(sce)[use.markers,o,drop=FALSE]
 re.pheno <- all.pheno[o]
-saveRDS(re.pheno, file = "~/Documents/vMeyenn/paper_files/objects/pheno")
+saveRDS(re.pheno, file = paste0(objectpath, "pheno"))
 heat.vals <- top.exprs - rowMeans(top.exprs)
-saveRDS(heat.vals, file = "~/Documents/vMeyenn/paper_files/objects/heat.vals")
+saveRDS(heat.vals, file = paste0(objectpath, "heat.vals"))
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, breaks = seq(-7,7, 1),  
           Colv=FALSE, ColSideColors=heat.colors(3)[re.pheno], dendrogram='row')
 legend("topright", col=heat.colors(3), legend=levels(all.pheno), pch=16)
@@ -712,7 +710,7 @@ PvsT <- markerset.tp[DE_shared,]
 PvsT[,"logFC"] <- PvsT[,"logFC"]*-1   # Because above, comparison was between PvsT instead of TvsP
 comparedDE <- cbind(NvsP, NvsT, PvsT)[,-c(2,3,4,5,6,9)]
 colnames(comparedDE) <- c("Naive vs Primed LogFC", "Naive vs Trans LogFC", "Trans vs Primed LogFC")
-write.table(file=paste0(output, "/DE_comparison.tsv"), comparedDE, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=paste0(output, "DE_comparison.tsv"), comparedDE, sep="\t", quote=FALSE, col.names = NA)
 head(comparedDE, n = 20)
 ```
 
@@ -731,11 +729,13 @@ rownames(DEmarker.entrez) <- entrez$entrezgene
 #Gene ontology
 go <- goana(rownames(DEmarker.entrez), species = "Hs")
 go <- go[which(go$N >100),]
-write.table(file=paste0(output, "/Goana.tsv"), go, sep="\t", quote=FALSE, col.names = NA) 
+topgo <- topGO(go, n=2000, ontology = "BP") 
+write.table(file=paste0(output, "Goana.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 topGO(go, n=15, ontology = "BP") 
 # KEGG 
 kegg <- kegga(rownames(DEmarker.entrez), species = "Hs")
-write.table(file=paste0(output, "/KEGG.tsv"), kegg, sep="\t", quote=FALSE, col.names = NA) 
+topkegg <- topKEGG(kegg, n=2000)
+write.table(file=paste0(output, "KEGG.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 topKEGG(kegg, n=15)
 ```
 
@@ -774,7 +774,7 @@ The variance is again used to identify highly variable genes within the naive G1
 hvg.out_naive_g1 <- var.out_naive_g1[which(var.out_naive_g1$FDR <= 0.05 & var.out_naive_g1$bio >= 0.5),]
 hvg.out_naive_g1 <- hvg.out_naive_g1[order(hvg.out_naive_g1$bio, decreasing=TRUE),]
 head(hvg.out_naive_g1)
-write.table(file=paste0(output, "/esc_naive_G1_hvg.tsv"), hvg.out_naive_g1, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=paste0(output, "esc_naive_G1_hvg.tsv"), hvg.out_naive_g1, sep="\t", quote=FALSE, col.names = NA) 
 dim(hvg.out_naive_g1)
 ```
 
@@ -874,7 +874,7 @@ min.rank_naive_g1 <- do.call(pmin, collected.ranks_naive_g1)
 marker.set_naive_g1 <- data.frame(Top=min.rank_naive_g1, Gene=rownames(y_naive_g1),
     logFC=do.call(cbind, result.logFC_naive_g1), stringsAsFactors=FALSE)
 marker.set_naive_g1 <- marker.set_naive_g1[order(marker.set_naive_g1$Top),]
-write.table(marker.set_naive, file=paste0(output, "/marker_naive_G1_", clust.num_naive, ".tsv"), sep="\t", quote=FALSE, col.names=NA) 
+write.table(marker.set_naive, file=paste0(output, "marker_naive_G1_", clust.num_naive, ".tsv"), sep="\t", quote=FALSE, col.names=NA) 
 top.markers_naive_g1 <- marker.set_naive_g1$Gene[marker.set_naive_g1$Top <= 10]
 top.exprs_naive_g1 <- norm_exprs(sce_naive_g1)[top.markers_naive_g1,,drop=FALSE]
 heat.vals_naive_g1 <- top.exprs_naive_g1 - rowMeans(top.exprs_naive_g1)
@@ -908,12 +908,14 @@ rownames(hvg_naive_entrez_g1) <- entrez_naive_g1$entrezgene
 #Gene ontology
 go_naive_g1 <- goana(rownames(hvg_naive_entrez_g1), species = "Hs")
 go_naive_g1 <- go_naive_g1[which(go_naive_g1$N >100),]
-write.table(file=paste0(output, "/Goana_naive_g1.tsv"), go_naive_g1, sep="\t", quote=FALSE, col.names = NA) 
-topGO(go_naive_g1, n=15, ontology = "BP") 
+topgo_naive_g1 <- topGO(go_naive_g1, n=2000, ontology = "BP")
+write.table(file=paste0(output, "Goana_naive_g1.tsv"), topgo_naive_g1, sep="\t", quote=FALSE, col.names = NA) 
+topGO(go_naive_g1, n=10, ontology = "BP") 
 # KEGG 
 kegg_naive_g1 <- kegga(rownames(hvg_naive_entrez_g1), species = "Hs")
-write.table(file=paste0(output, "/KEGG_naive_g1.tsv"), kegg_naive_g1, sep="\t", quote=FALSE, col.names = NA) 
-topKEGG(kegg_naive_g1, n=15)
+topkegg_naive_g1 <- topKEGG(kegg_naive_g1, n=2000)
+write.table(file=paste0(output, "KEGG_naive_g1.tsv"), topkegg_naive_g1, sep="\t", quote=FALSE, col.names = NA) 
+topKEGG(kegg_naive_g1, n=10)
 ```
 
 ## Primed ESCs
@@ -956,8 +958,8 @@ We use the variance to identify highly variable genes.
 hvg.out_primed <- var.out_primed[which(var.out_primed$FDR <= 0.05 & var.out_primed$bio >= 0.5),]
 hvg.out_primed <- hvg.out_primed[order(hvg.out_primed$bio, decreasing=TRUE),]
 dim(hvg.out_primed)
-write.table(file=paste0(output, "/esc_primed_hvg.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
-saveRDS(hvg.out_primed, file = "~/Documents/vMeyenn/paper_files/objects/hvg.primed")
+write.table(file=paste0(output, "esc_primed_hvg.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
+saveRDS(hvg.out_primed, file = paste0(objectpath, "hvg.primed"))
 head(hvg.out_primed)
 ```
 
@@ -972,9 +974,7 @@ Next, we assess the correlations between genes of cells in the primed subpopulat
 ```{r, cor.primed}
 set.seed(100)
 var.cor_primed <- correlatePairs(sce_primed, design = design_primed, subset.row=rownames(hvg.out_primed)) 
-gz_primed <- gzfile("var.cor_primed.gz", "w")
-write.table(var.cor_primed, gz_primed, sep="\t", quote=FALSE, row.names=FALSE) 
-close(gz_primed)
+write.table(var.cor_primed, file= gzfile(paste0(output, "var.cor_primed.gz")), sep="\t", quote=FALSE, row.names=FALSE) 
 head(var.cor_primed)
 dim(var.cor_primed)
 ```
@@ -1048,7 +1048,7 @@ summary(y_primed$tagwise.dispersion)
 We then creat the pdf containing a list of DE-genes and heatmaps for every cluster.
 
 ```{r}
-pdf(file=paste0(output,"/primed_clusters_heatmaps.pdf"), title = "Heatmaps of clusters within primed subpopulation")
+pdf(file=paste0(output,"primed_clusters_heatmaps.pdf"), title = "Heatmaps of clusters within primed subpopulation")
 for (cluster.num in levels(cluster_primed)){
   result.logFC_primed <- result.PValue_primed <- list()
   chosen.clust_primed <- which(levels(cluster_primed)==cluster.num) 
@@ -1090,7 +1090,7 @@ To compare the general variabilty of the subpopulations, we compare the amount o
 ```{r, fig.cap="**Figure 42:** Number of HVG for each subpopulation."}
 hvg.matrix <- matrix(c(nrow(hvg.out_primed), nrow(hvg.out_naive)), ncol = 2)
 colnames(hvg.matrix) <- c("primed", "naive")
-saveRDS(hvg.matrix,file = "~/Documents/vMeyenn/paper_files/objects/hvg.matrix")
+saveRDS(hvg.matrix,file = paste0(objectpath, "hvg.matrix"))
 plot <- barplot(hvg.matrix,  xlab="Subpopulation", ylab="Number of HVG", ylim = c(0,7500))
 text(x = plot, y = hvg.matrix, label = hvg.matrix, cex = 0.8, pos = 3,  col = "red")
 ```
@@ -1100,7 +1100,7 @@ The biological variability values of the HVG genes that are both in the primed H
 ```{r, variabPlot, fig.cap="**Figure 43:** Comparison of variability within naive and primed subpopulation."}
 shared_genes <- intersect(rownames(hvg.out_naive), rownames(hvg.out_primed))
 plot(hvg.out_naive[shared_genes,]$bio, hvg.out_primed[shared_genes,]$bio, xlim=c(0,8), ylim=c(0,8), 
-     pch = 19, cex = 0.5, main = "Gene expression of shared HVG genes",  ylab = "Biological Variability of Primed Subpopulation", 
+     pch = 16, cex = 0.5, main = "Gene expression of shared HVG genes",  ylab = "Biological Variability of Primed Subpopulation", 
      xlab = "Biological Variability of Naive Subpopulation")
 abline(0,1, col = "red")
 ```
@@ -1242,9 +1242,9 @@ for (object in c(sce_trans, sce_trans[,pData(sce_trans)$phenotype=="naive"],
   abline(0,1, col = "red")
 }
 
-saveRDS(all_markers, file = "~/Documents/vMeyenn/paper_files/objects/markers.map")
-saveRDS(naive_markers, file = "~/Documents/vMeyenn/paper_files/objects/n.markers.map")
-saveRDS(primed_markers, file = "~/Documents/vMeyenn/paper_files/objects/p.markers.map")
+saveRDS(all_markers, file = paste0(objectpath, "markers.map"))
+saveRDS(naive_markers, file = paste0(objectpath, "n.markers.map"))
+saveRDS(primed_markers, file = paste0(objectpath, "p.markers.map"))
 ```
 
 ## Mapping of Petropoulos ESCs
@@ -1252,7 +1252,7 @@ saveRDS(primed_markers, file = "~/Documents/vMeyenn/paper_files/objects/p.marker
 First, the counts for Petropoulos ESCs are read in. We start with the raw expression values of the data set by filtering out only the genes that were previoulsy identified as DE between naive and primed. 
 
 ```{r, map2}
-count_data <- read.table("~/Documents/vMeyenn/petropoulos/counts.txt")
+count_data <- read.table(paste0(input, "petro.counts.txt"))
 colnames(count_data) <- sub("(\\.([0-9]|\\_)*\\.[0-9]*$|\\.[0-9]\\.([0-9]|\\_)*\\.[0-9]*$)", "", colnames(count_data))
 count_data <- count_data[,order(colnames(count_data))]
 dim(count_data)
@@ -1302,9 +1302,8 @@ for (stage in stages){
   abline(0,1, col = "red")
 }
 
-saveRDS(stages, file = "~/Documents/vMeyenn/paper_files/objects/stages.petro")
-saveRDS(nums, file = "~/Documents/vMeyenn/paper_files/objects/nums.petro")
-
+saveRDS(stages, file = paste0(objectpath, "stages.petro"))
+saveRDS(nums, file = paste0(objectpath, "nums.petro"))
 ```
 
 ## Mapping of Mouse ESCs
@@ -1326,7 +1325,7 @@ rownames(all_markers) <- mouse_genes$mouseGene
 Next, we read in the mouse ESC data, customized the cell names and chose only those genes that were present in both the DE-markers and the mouse ESCs by matching up the gene names. 
 
 ```{r, mousecounts}
-mouse_counts <- raw_mouse_counts <- read.table("~/Documents/vMeyenn/mouse/RawCounts_CellsFilt.txt", sep = "\t", header = TRUE)
+mouse_counts <- raw_mouse_counts <- read.table(paste0(input, "mouse.counts.txt"), sep = "\t", header = TRUE)
 colnames(mouse_counts) <- sub("_([a-z]|[A-Z]).*", "", colnames(mouse_counts))
 ensembl_mouse <- useMart("ensembl", dataset="mmusculus_gene_ensembl")
 ensembl_mouseGenes <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'ensembl_peptide_id'), 
@@ -1374,8 +1373,8 @@ nums <- cbind(naive_num, primed_num)
 stages <- unique(sub("(E.\\.[0-9]*)\\..*", "\\1" ,rownames(nums)))
 rownames(nums) <- sub("(E.\\.[0-9]*)\\..*", "\\1" ,rownames(nums))
 
-saveRDS(stages, file = "~/Documents/vMeyenn/paper_files/objects/stages.mouse")
-saveRDS(nums, file = "~/Documents/vMeyenn/paper_files/objects/nums.mouse")
+saveRDS(stages, file = paste0(objectpath, "stages.mouse"))
+saveRDS(nums, file = paste0(objectpath, "nums.mouse"))
 
 for (stage in stages){
   current_nums <- subset(nums, rownames(nums)==stage)
@@ -1397,7 +1396,7 @@ all_markers <- all_markers[c(rownames(naive_markers), rownames(primed_markers)),
 ```
 
 ```{r}
-monkey_counts  <- raw_monkey_counts <- read.table("~/Documents/vMeyenn/monkey/SC3seq_Cy_ProcessedData.txt", sep = "\t", header = TRUE)
+monkey_counts  <- raw_monkey_counts <- read.table(paste0(input, "monkey.counts.txt"), sep = "\t", header = TRUE)
 shared_markers <- intersect(rownames(all_markers), monkey_counts$macFas5_gene_symbol)
 monkey_counts <- monkey_counts[!is.na(match(monkey_counts$macFas5_gene_symbol, shared_markers)),]
 rownames(monkey_counts) <- monkey_counts$macFas5_gene_symbol
@@ -1428,8 +1427,8 @@ nums <- cbind(naive_num, primed_num)
 stages <- unique(sub("(E..)\\..*", "\\1" ,rownames(nums)))
 rownames(nums) <- sub("(E..)\\..*", "\\1", rownames(nums))
 
-saveRDS(stages, file = "~/Documents/vMeyenn/paper_files/objects/stages.monkey")
-saveRDS(nums, file = "~/Documents/vMeyenn/paper_files/objects/nums.monkey")
+saveRDS(stages, file = paste0(objectpath, "stages.monkey"))
+saveRDS(nums, file = paste0(objectpath, "nums.monkey"))
 
 par(mfrow=c(2,4))
 for (stage in stages){
@@ -1438,16 +1437,14 @@ for (stage in stages){
        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
   abline(0,1, col = "red")
 }
-
 ```
 
 ---
 
 ```{r}
+saveRDS(sce_primed, file=paste0(objectpath, "new_sce_primed_object"))
+saveRDS(sce_naive, file=paste0(objectpath, "new_sce_naive_object"))
 sessionInfo()
-saveRDS(sce, file="~/Documents/vMeyenn/paper_files/objects/new_sce_all_object")
-saveRDS(sce_primed, file="~/Documents/vMeyenn/paper_files/objects/new_sce_primed_object")
-saveRDS(sce_naive, file="~/Documents/vMeyenn/paper_files/objects/new_sce_naive_object")
 ```
 
 
