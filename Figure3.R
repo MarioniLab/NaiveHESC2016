@@ -106,17 +106,8 @@ legend("top", legend = c("Primed", "Naive"), fill = c(primed.col, naive.col), bt
 dev.off()
 
 # B
-
 naive.means <- log(rowMeans(counts(sce_naive)))
 primed.means <- log(rowMeans(counts(sce_primed)))
-
-pdf(file="./figures/sup.figure3b.pdf")
-par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 0.1))
-hist(primed.means, xlim = c(0,11), breaks = 100, col=primed.col, xlab="log Mean", main="Primed")
-hist(naive.means, xlim = c(0,11), breaks = 100, col=naive.col, xlab="log Mean", main="Naive")
-dev.off()
-
-# C
 
 naive.genenum <- table(naive.means > 1)["TRUE"]
 primed.genenum <- table(primed.means > 1)["TRUE"]
@@ -125,12 +116,20 @@ shared <- length(intersect(rownames(sce_naive[naive.means >1,]), rownames(sce_pr
 num.matrix <- cbind(primed.genenum, naive.genenum, shared)
 colnames(num.matrix) <- c("Primed", "Naive", "Shared")
 
-pdf(file="./figures/sup.figure3c.pdf")
+pdf(file="./figures/sup.figure3b.pdf")
 par(mfrow=c(1,1), mar = c(5.1, 5.5, 4.1, 2.1), las = 1)
 plot <- barplot(num.matrix, col = c(primed.col, naive.col, "#CC79A7"), beside = TRUE, names.arg = c("Primed", "Naive", "Shared"), 
                 ylab="Number of expressed genes", xlim = c(0,3), width = 0.3, space = c(0,.5),
                 cex.axis = .75, cex.lab = 1.3, cex.names = 1., ylim=c(0,14700))
 text(x = plot, y = num.matrix, label = num.matrix, cex = 0.75, pos = 3)
+dev.off()
+
+# C
+
+pdf(file="./figures/sup.figure3c.pdf")
+par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 0.1))
+hist(primed.means, xlim = c(0,11), breaks = 100, col=primed.col, xlab="log Mean", main="Primed")
+hist(naive.means, xlim = c(0,11), breaks = 100, col=naive.col, xlab="log Mean", main="Naive")
 dev.off()
 
 # D
