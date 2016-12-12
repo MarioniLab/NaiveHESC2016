@@ -1440,7 +1440,67 @@ for (stage in stages){
 }
 ```
 
----
+# X-Chromosome inactivation
+
+Read in all SNP calls and calculate proportions for heterozygous SNPs on X and for heterzugous SNP calls on X.
+
+```{r}
+library(VariantAnnotation)
+
+all.props <- list()
+for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
+  path <- paste0(input, "xchrom/real-", sample, "_20161024/")
+  current.props <- list()
+  for (file in list.files(path = path, pattern = "*.vcf.gz", full.names = T)){
+  
+  blah <- readVcf(file)
+  is.x <- as.logical(seqnames(blah)=="chrX")
+  is.het <- geno(blah)$GT=="0/1"
+  het <- sum(is.het & is.x)/sum(is.het) # Proportion of hets on X
+  snpcalls <- sum(is.het & is.x)/sum(is.x) # Proportion of X SNP calls that are het
+  current.props[[file]] <- c(het = het, snpcalls = snpcalls)
+  } 
+  
+  current.props <- as.data.frame(current.props)
+  cellname <- colnames(current.props)
+  cellname <- gsub("^.*?_36", "36", cellname)
+  cellname <- gsub("_L00._.*$", "", cellname)
+  colnames(current.props) <- paste0(cellname, "_" , sample)
+  current.props <- sumTechReps(current.props)
+    
+  all.props[[sample]] <- current.props
+}
+
+combined.props <- do.call(cbind, all.props)
+
+# Take technical replicates and merge them
+prop.names <- colnames(combined.props)
+colnames(combined.props) <- sub("(.*)_2.*", "\\1", prop.names)
+combined.props <- sumTechReps(combined.props)
+colnames(combined.props) <- prop.names[match(colnames(combined.props), gsub("(.*)_2.*", "\\1", prop.names))]
+dim(combined.props)
+```
+
+Visualisation of the proportions.
+
+```{r}
+sample <- sub(".*_([0-9]+)$", "\\1", colnames(combined.props))
+naive.props <- combined.props[,sample %in% c("2383", "2677", "2678")]
+primed.props <- combined.props[,sample %in% c("2384", "2739", "2740")]
+
+par(mfrow=c(2,2))
+plot(density(naive.props["het",], na.rm = T), main = "Naive", xlab = "Proportion of hets on X", xlim = c(0, 0.12))
+mtext(text = paste0("mean: ", round(mean(naive.props["het",], na.rm = T), digits = 3)), c(3))
+plot(density(primed.props["het",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12))
+mtext(text = paste0("mean: ", round(mean(primed.props["het",], na.rm = T), digits = 3)), c(3))
+
+plot(density(naive.props["snpcalls",], na.rm = T), main="", xlab = "Proportion of het X SNP calls", xlim = c(0, 0.12))
+mtext(text = paste0("mean: ", round(mean(naive.props["snpcalls",], na.rm = T), digits = 3)), c(3))
+plot(density(primed.props["snpcalls",], na.rm = T), main="", xlab = "Proportion of het X SNP calls", xlim = c(0, 0.12))
+mtext(text = paste0("mean: ", round(mean(primed.props["snpcalls",], na.rm = T), digits = 3)), c(3))
+```
+
+***
 
 ```{r}
 saveRDS(sce_primed, file=paste0(objectpath, "new_sce_primed_object"))
