@@ -1487,18 +1487,72 @@ Visualisation of the proportions.
 sample <- sub(".*_([0-9]+)$", "\\1", colnames(combined.props))
 naive.props <- combined.props[,sample %in% c("2383", "2677", "2678")]
 primed.props <- combined.props[,sample %in% c("2384", "2739", "2740")]
+```
+
+```{r}
+new.props <- list()
+for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
+  path <- paste0(input, "xchrom/real-", sample, "_20161024/")
+  current.props <- list()
+  for (file in list.files(path = path, pattern = "*.vcf.gz", full.names = T)){
+  
+  blah <- readVcf(file)
+  is.x <- as.logical(!seqnames(blah)=="chrX")
+  is.het <- geno(blah)$GT=="0/1"
+  het <- sum(is.het & is.x)/sum(is.het) # Proportion of hets on X
+  snpcalls <- sum(is.het & is.x)/sum(is.x) # Proportion of X SNP calls that are het
+  current.props[[file]] <- c(het = het, snpcalls = snpcalls)
+  } 
+  
+  current.props <- as.data.frame(current.props)
+  cellname <- colnames(current.props)
+  cellname <- gsub("^.*?_36", "36", cellname)
+  cellname <- gsub("_L00._.*$", "", cellname)
+  colnames(current.props) <- paste0(cellname, "_" , sample)
+  current.props <- sumTechReps(current.props)
+    
+  new.props[[sample]] <- current.props
+}
+
+autosome.props <- do.call(cbind, new.props)
+
+# Take technical replicates and merge them
+auto.names <- colnames(autosome.props)
+colnames(autosome.props) <- sub("(.*)_2.*", "\\1", auto.names)
+autosome.props <- sumTechReps(autosome.props)
+colnames(autosome.props) <- prop.names[match(colnames(autosome.props), gsub("(.*)_2.*", "\\1", auto.names))]
+dim(autosome.props)
+```
+
+```{r}
+sample <- sub(".*_([0-9]+)$", "\\1", colnames(combined.props))
+naive.auto <- autosome.props[,sample %in% c("2383", "2677", "2678")]
+primed.auto <- autosome.props[,sample %in% c("2384", "2739", "2740")]
 
 par(mfrow=c(2,2))
-plot(density(naive.props["het",], na.rm = T), main = "Naive", xlab = "Proportion of hets on X", xlim = c(0, 0.12))
-mtext(text = paste0("mean: ", round(mean(naive.props["het",], na.rm = T), digits = 3)), c(3))
-plot(density(primed.props["het",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12))
-mtext(text = paste0("mean: ", round(mean(primed.props["het",], na.rm = T), digits = 3)), c(3))
+plot(density(naive.props["het",], na.rm = T), main = "Allosome", xlab = "Proportion of hets on X", xlim = c(0, 0.1), col = "#e79f00")
+mtext(text = paste0("mean naive: ", round(mean(naive.props["het",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.props["het",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.props["het",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
 
-plot(density(naive.props["snpcalls",], na.rm = T), main="", xlab = "Proportion of het X SNP calls", xlim = c(0, 0.12))
-mtext(text = paste0("mean: ", round(mean(naive.props["snpcalls",], na.rm = T), digits = 3)), c(3))
-plot(density(primed.props["snpcalls",], na.rm = T), main="", xlab = "Proportion of het X SNP calls", xlim = c(0, 0.12))
-mtext(text = paste0("mean: ", round(mean(primed.props["snpcalls",], na.rm = T), digits = 3)), c(3))
+plot(density(naive.props["snpcalls",], na.rm = T), main = "Allosome", xlab = "Proportion of hets on X", xlim = c(0, 0.13), col = "#e79f00", ylim = c(0,20))
+mtext(text = paste0("mean naive: ", round(mean(naive.props["snpcalls",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.props["snpcalls",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.props["snpcalls",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
+
+plot(density(naive.auto["het",], na.rm = T), main = "Autosome", xlab = "Proportion of hets on X", col = "#e79f00")
+mtext(text = paste0("mean naive: ", round(mean(naive.auto["het",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.auto["het",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.auto["het",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
+
+plot(density(naive.auto["snpcalls",], na.rm = T), main = "Autosome", xlab = "Proportion of hets on X", col = "#e79f00", ylim = c(0,15))
+mtext(text = paste0("mean naive: ", round(mean(naive.auto["snpcalls",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.auto["snpcalls",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.auto["snpcalls",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
 ```
+
+
+
 
 ***
 
