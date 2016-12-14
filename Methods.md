@@ -27,7 +27,7 @@ Additionally, obtained clusters were examined for their expression of specific m
 Finally, identified cells in the most prominent cluster were visualised along with the original subpopulations in a PCA plot that was coloured accordingly and functional enrichment analysis was performed to assess the GO functions of DE genes between the cluster and the residual naïve subpopulation.
 ### Primed subpopulation characterisation and variability analysisWe repeated all the steps that were conducted for the naïve subpopulation for the primed cells.  
 Additionally, we compared the genetic heterogeneity of the naïve and the primed ESCs.
-Therefore, we examined the sheer number of HVGs as well as the variance of log expression for genes that were found highly variable in both phenotypes and uniquely for each phenotype. (Figure 3)
+Therefore, we examined the overall number of HVGs as well as the variance of log expression for genes that were found highly variable in both phenotypes and uniquely for each phenotype. (Figure 3)
 To exclude potential technical sources for gene expression variability, we counted the number of naïve and primed cells in each cell cycle and the total number of expressed genes in each population.
 Besides, we compared the mean expression and the distribution of size factors of the HVGs between both conditions (Supp. Figure 3).
 ## External temporal trajectories on naïve/primed map 
