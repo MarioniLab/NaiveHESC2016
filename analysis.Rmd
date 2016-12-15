@@ -648,49 +648,56 @@ plotExpression(sce_nt, features = c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG"
 
 Heatmap Naive vs Trans vs Primed with overlapping DEmarkers.
 
-```{r, heatNvPvT, fig.cap = "**Figure 27:** Heatmap of DE-expressed genes of transition subpopulation against naive and primed subpopulation, respectively.", fig.height=30, fig.width=10}
+```{r}
 transition_clust <- unname(cutree(my.tree_naive, k = 3))=="3"
 all.pheno <- as.character(sce$phenotype)
 all.pheno[match(colnames(sce_naive)[transition_clust], colnames(sce))] <- "transition"
 all.pheno <- factor(all.pheno, levels = c("naive", "transition", "primed"))
 
-y <- convertTo(sce, type="edgeR")
-design <- model.matrix(~0 + all.pheno + sce$batch)
-y <- estimateDisp(y, design)
-fit <- glmFit(y, design)
+naive.pheno <- factor(all.pheno[!all.pheno=="primed"], levels=c("naive", "transition"))
+e.y.vs.n <- exprs(sce)[!isSpike(sce),all.pheno!="primed"]
+batch.vs.n <- sce[,!all.pheno=="primed"]$batch
+design.vs.n <- model.matrix(~0 + naive.pheno + batch.vs.n)
+fit <- lmFit(e.y.vs.n, design.vs.n)
+con <- makeContrasts(naive.phenotransition - naive.phenonaive, levels=design.vs.n)
+fit2 <- contrasts.fit(fit, con)
+fit2 <- eBayes(fit2, robust=TRUE, trend=TRUE)
+res <- topTable(fit2, n=Inf, sort.by="p")
 
-chosen.pheno <- which(levels(all.pheno)=="transition")
-result.logFC <- result.PValue <- list()
-for (pheno in seq_len(nlevels(all.pheno))) {
-    if (pheno==chosen.pheno) { next }
-    contrast <- numeric(ncol(design))
-    contrast[chosen.pheno] <- 1
-    contrast[pheno] <- -1
-    res <- glmLRT(fit, contrast=contrast)
-    con.name <- paste0('vs.', levels(all.pheno)[pheno]) 
-    result.logFC[[con.name]] <- res$table$logFC 
-    result.PValue[[con.name]] <- res$table$PValue
-}
-
-marker_nt <- cbind(unlist(result.logFC["vs.naive"]), unlist(result.PValue["vs.naive"]))
-rownames(marker_nt) <- rownames(y)
+marker_nt <- cbind(res$logFC, res$P.Value)
+rownames(marker_nt) <- rownames(res)
 colnames(marker_nt) <- c("logFC", "PValue")
 marker_nt <- marker_nt[order(marker_nt[,"PValue"]),]
 write.table(file=paste0(output, "nvst.marker.tsv"), marker_nt, sep="\t", quote=FALSE, col.names = NA) 
 
-marker_tp <- cbind(unlist(result.logFC["vs.primed"]), unlist(result.PValue["vs.primed"]))
-rownames(marker_tp) <- rownames(y)
+```
+Primed vs Trans
+```{r}
+primed.pheno <- factor(all.pheno[!all.pheno=="naive"], levels=c("primed", "transition"))
+e.y.vs.p <- exprs(sce)[!isSpike(sce),all.pheno!="naive"]
+batch.vs.p <- sce[,!all.pheno=="naive"]$batch
+design.vs.p <- model.matrix(~0 + primed.pheno + batch.vs.p)
+fit <- lmFit(e.y.vs.p, design.vs.p)
+con <- makeContrasts(primed.phenotransition - primed.phenoprimed, levels=design.vs.p)
+fit2 <- contrasts.fit(fit, con)
+fit2 <- eBayes(fit2, robust=TRUE, trend=TRUE)
+res <- topTable(fit2, n=Inf, sort.by="p")
+
+marker_tp <- cbind(res$logFC, res$P.Value)
+rownames(marker_tp) <- rownames(res)
 colnames(marker_tp) <- c("logFC", "PValue")
 marker_tp <- marker_tp[order(marker_tp[,"PValue"]),]
 write.table(file=paste0(output, "pvst_marker.tsv"), marker_tp, sep="\t", quote=FALSE, col.names = NA) 
+```
 
-markerset.nt <- marker_nt[order(marker_nt[1:200,"logFC"], decreasing = TRUE),]
-markerset.tp <- marker_tp[order(marker_tp[1:200,"logFC"], decreasing = TRUE),]
+```{r, heatNvPvT, fig.cap = "**Figure 27:** Heatmap of DE-expressed genes of transition subpopulation against naive and primed subpopulation, respectively.", fig.height=30, fig.width=10}
+markerset.nt <- marker_nt[order(marker_nt[1:100,"logFC"], decreasing = TRUE),]
+markerset.tp <- marker_tp[order(marker_tp[1:100,"logFC"], decreasing = TRUE),]
 all.markers <- rbind(markerset.nt, markerset.tp)
 use.markers <- rownames(all.markers)
 
 o <- order(all.pheno)
-top.exprs <- exprs(sce)[rownames(markerset.nt),o,drop=FALSE]
+top.exprs <- exprs(sce)[use.markers,o,drop=FALSE]
 re.pheno <- all.pheno[o]
 saveRDS(re.pheno, file = paste0(objectpath, "pheno"))
 heat.vals <- top.exprs - rowMeans(top.exprs)
