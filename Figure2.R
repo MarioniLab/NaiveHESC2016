@@ -14,10 +14,23 @@ trans.col <- readRDS(file = paste0(objectpath, "trans.col"))
 library("pheatmap")
 library("gridExtra")
 library("grid")
-heat.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
+
 re.pheno <- readRDS(file = paste0(objectpath, "pheno"))
 
+# lower third
+shared.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
+shared.vals[shared.vals < -5] <- -5
+shared.vals[shared.vals > 5] <- 5
+shared.vals <- shared.vals[which(duplicated(rownames(shared.vals))),]
+
+genes.shared <- rep("shared",nrow(shared.vals))
+genes.shared <- factor(genes.shared, levels = "shared")
+genes.shared <- as.data.frame(genes.shared)
+colnames(genes.shared) <- "Gene Type"
+rownames(genes.shared) <- rownames(shared.vals)
+
 # upper two thirs
+heat.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
 heat.vals[heat.vals < -5] <- -5
 heat.vals[heat.vals > 5] <- 5
 
@@ -32,45 +45,36 @@ rownames(primed) <- colnames(heat.vals[,which(re.pheno == "primed")])
 trans <- as.data.frame(trans)
 rownames(trans) <- colnames(heat.vals[,which(re.pheno == "transition")])
 
-heat.vals <- heat.vals[c(201:280, 1:80),]
-
-gene.type <- c(rep("primed",80), rep("naive", 80))
+gene.type <- c(rep("primed", nrow(heat.vals)/2), rep("naive", nrow(heat.vals)/2))
+gene.type <- gene.type[-which(rownames(heat.vals) %in% rownames(shared.vals))]
 gene.type <- factor(gene.type, levels = c( "primed", "naive"))
 gene.type <- as.data.frame(gene.type)
+gene.type <- as.data.frame(gene.type)
+
+heat.vals <- heat.vals[-which(rownames(heat.vals) %in% rownames(shared.vals)),]
 colnames(gene.type) <- "Transition vs"
 rownames(gene.type) <- rownames(heat.vals)
 
-# lower third
-shared.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
-shared.vals[shared.vals < -5] <- -5
-shared.vals[shared.vals > 5] <- 5
-shared.vals <- shared.vals[which(duplicated(rownames(shared.vals))),]
 
-genes.shared <- rep("shared",23)
-genes.shared <- factor(genes.shared, levels = "shared")
-genes.shared <- as.data.frame(genes.shared)
-colnames(genes.shared) <- "Gene Type"
-rownames(genes.shared) <- rownames(shared.vals)
-  
 # Create three new heatmaps with only the stuff additionally to this one
 
 pdf(file="./figures/figure2a.pdf", onefile = FALSE, width = 10, height = 15)
 # naive vs trans and primed vs trans
 p1 <- pheatmap(heat.vals[,which(re.pheno == "naive")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = gene.type, cluster_rows = FALSE, gaps_row = 80,
+               annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")),
                show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col =naive, show_rownames = FALSE,
                annotation_colors = list("naive" = c("naive" = naive.col), "Transition vs" = c(primed = "grey20", naive ="grey60")),
                annotation_legend = FALSE, annotation_names_row = FALSE)
 
 
 p2 <- pheatmap(heat.vals[,which(re.pheno == "primed")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = gene.type, cluster_rows = FALSE, gaps_row = 80, 
+               annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")), 
                show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = primed, show_rownames = FALSE,
                annotation_colors = list("primed" = c("primed" = primed.col), "Transition vs" = c(primed = "grey20", naive ="grey60")),
                annotation_legend = FALSE, annotation_names_row = FALSE)
 
 p3 <-  pheatmap(heat.vals[,which(re.pheno == "transition")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-                annotation_row = gene.type, cluster_rows = FALSE, gaps_row = 80,
+                annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")),
                 show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = trans, show_rownames = FALSE,
                 annotation_colors = list("trans" = c("transition" = trans.col), "Transition vs" = c(primed = "grey20", naive ="grey60")),
                 annotation_legend = FALSE, annotation_names_row = FALSE)
@@ -159,7 +163,7 @@ plot.new()
 par(mar=c(1.1,1.1,1.1,1.1))
 legend("left", legend = c("Naive", "Primed", "Transition"), fill=c(naive.col, primed.col, trans.col), 
        title = "Population", bty="n", horiz = T)
-legend("right", legend = c("Trans vs Primed", "Trans vs Naive", "Shared"), fill=c("grey20", "grey60", "grey80"), title = "DE Genes", bty="n", horiz = T)
+legend("right", legend = c("Trans vs Naive", "Trans vs Primed", "Shared"), fill=c("grey20", "grey60", "grey80"), title = "DE Genes", bty="n", horiz = T)
 
 dev.off()
 
