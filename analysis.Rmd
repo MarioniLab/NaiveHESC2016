@@ -648,7 +648,7 @@ plotExpression(sce_nt, features = c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG"
 
 Heatmap Naive vs Trans vs Primed with overlapping DEmarkers.
 
-```{r, heatNvPvT, fig.cap = "**Figure 27:** Heatmap of DE-expressed genes of transition subpopulation against naive and primed subpopulation, respectively.", fig.height=20, fig.width=10}
+```{r, heatNvPvT, fig.cap = "**Figure 27:** Heatmap of DE-expressed genes of transition subpopulation against naive and primed subpopulation, respectively.", fig.height=30, fig.width=10}
 transition_clust <- unname(cutree(my.tree_naive, k = 3))=="3"
 all.pheno <- as.character(sce$phenotype)
 all.pheno[match(colnames(sce_naive)[transition_clust], colnames(sce))] <- "transition"
@@ -690,7 +690,7 @@ all.markers <- rbind(markerset.nt, markerset.tp)
 use.markers <- rownames(all.markers)
 
 o <- order(all.pheno)
-top.exprs <- exprs(sce)[use.markers,o,drop=FALSE]
+top.exprs <- exprs(sce)[rownames(markerset.nt),o,drop=FALSE]
 re.pheno <- all.pheno[o]
 saveRDS(re.pheno, file = paste0(objectpath, "pheno"))
 heat.vals <- top.exprs - rowMeans(top.exprs)
@@ -709,7 +709,7 @@ NvsP <- DEmarkers[DE_shared,]
 NvsT <- markerset.nt[DE_shared,]
 PvsT <- markerset.tp[DE_shared,]
 PvsT[,"logFC"] <- PvsT[,"logFC"]*-1   # Because above, comparison was between PvsT instead of TvsP
-comparedDE <- cbind(NvsP, NvsT, PvsT)[,-c(2,3,4,5,6,9)]
+comparedDE <- cbind(NvsP, NvsT, PvsT)[,c(1,6,8)]
 colnames(comparedDE) <- c("Naive vs Primed LogFC", "Naive vs Trans LogFC", "Trans vs Primed LogFC")
 write.table(file=paste0(output, "DE_comparison.tsv"), comparedDE, sep="\t", quote=FALSE, col.names = NA)
 head(comparedDE, n = 20)
@@ -1181,9 +1181,17 @@ plot <- barplot(num.matrix, col = c("#0072B2", "#e79f00", "#CC79A7"), beside = T
 text(x = plot, y = num.matrix, label = num.matrix, cex = 0.75, pos = 3)
 ```
 
+Variability might be driven by logFC only. 
+```{r, fig.cap="**Figure 50:** Change in biological variability between naive and primed cells against logFC"}
+logFCs <- (rowMeans(exprs(sce_primed))) - (rowMeans(exprs(sce_naive)))
+biovar <- var.out_primed$bio - var.out_naive$bio
+
+plot(logFCs, biovar)
+```
+
 ### Size factors
 
-```{r, fig.cap="**Figure 50:** Distribution of size factors in naive and primed subpopulation."}
+```{r, fig.cap="**Figure 51:** Distribution of size factors in naive and primed subpopulation."}
 naive.size <- sce_naive$size_factor
 primed.size <- sce_primed$size_factor
 
@@ -1196,7 +1204,7 @@ hist(naive.size, xlim = c(0,8), breaks = 50, col=naive.col, xlab="Size Factor", 
 
 The first aim of this chapter is to locate the transcriptomic profiles of naive/primed ESCs (von Meyenn) on  transcriptional maps of external data sets. In order to do this, we use the naive and primed markers (from DE expression between naive and primed subpopulation, see 2.2.) to identify cells of an external dataset that have a naive-ish or primed-ish character and plot them against each other. Thus, we do not locate our cells on an external map but reversely, take the ESCs of interests (and of different points of time) and map these on our naive/primed-map (NP-map). This will result in a plot that locates requested cells by their 'naive'-ness or 'primed'-ness.  
 
-To show the general feasibility of this attempt and to better evaluate results of the NP mapping, we first map the ESCs of the von Meyenn dataset to the DE genes which were extracted of this set. This should separate the naive and primed subpopulation clearly and thus, prove the concept of this test (5.1.). Afterwards, the acutal test will be performed by arranging the Petropoulos Cells of different points of time in respect to their proportions of naive genes and primed genes (5.2.). Finally, we also locate Mouse ESC (Hisham Mohammed & Wolf Reik, 2016) on the NP-map to assess also later points of time.
+To show the general feasibility of this attempt and to better evaluate results of the NP mapping, we first map the ESCs of the von Meyenn dataset to the DE genes which were extracted of this set. This should separate the naive and primed subpopulation clearly and thus, prove the concept of this test (5.1.). Afterwards, the acutal test will be performed by arranging the Petropoulos Cells of different points of time in respect to their proportions of naive genes and primed genes (5.2.). Finally, we also locate Mouse ESC (Hisham Mohammed & Wolf Reik, 2016) and monkey ESCS (Nakamura, Nature 2016) on the NP-map to assess also later points of time.
 
 ## Mapping of vMeyenn ESCs (Proof of Concept)
 
@@ -1212,7 +1220,7 @@ all_markers <- all_markers[c(rownames(naive_markers), rownames(primed_markers)),
 We then count the numbers of expression values that are higher than a certain arbitrary threshold for each of these genes and for each cell of the dataset of interest. For example, if the expression value for only one of the naive marker genes is >threshold, the cell has one "naive count". If the same cell has 14 expression values >threshold for the primed markers, the cell is assigned 14 "primed counts". This is applied for all cells. After counting all marker counts, a log-ratio of naive counts / primed counts is calculated for each cell and can be plotted against the total number of marker counts (naive+primed).
 If a cell is particularly "primed-ish" it will be shown above the red abline while "naive-ish" cells are located below (see Figure 51).
 
-```{r, MA, fig.cap="**Figure 51:** Ratio of assigned naive and assigned primed cells in the vonMeyenn data set. Abline indicates 0-hypothesis in which both primed and expressed naive genes are expressed equally."}
+```{r, MA, fig.cap="**Figure 52:** Ratio of assigned naive and assigned primed cells in the vonMeyenn data set. Abline indicates 0-hypothesis in which both primed and expressed naive genes are expressed equally."}
 threshold <- 10
 par(mfrow=c(2,2))
 for (object in c(sce_trans, sce_trans[,pData(sce_trans)$phenotype=="naive"], 
@@ -1284,7 +1292,7 @@ for (cell in colnames(exprs_marked)){
 
 Finally, we can also display all stages separately to eventually identify correlations between time stages and manifestation of naiveness or primedness (Figure 52). At best, all cells of a particular stage of time would be identified as "naive-ish" and all cells of a particular (later) point of time would be identified as "primed-ish".
 
-```{r, MA2b, fig.cap="**Figure 52:** Ratio of assigned naive and assigned primed cells in the Petropoulos data set. Abline indicates a state of the cell in which both expressed primed and expressed naive genes are the same.", fig.height = 14}
+```{r, MA2b, fig.cap="**Figure 53:** Ratio of assigned naive and assigned primed cells in the Petropoulos data set. Abline indicates a state of the cell in which both expressed primed and expressed naive genes are the same.", fig.height = 14}
 par(mfrow=c(4,2))
 plot(naive_num, primed_num, xlim = c(0,1), ylim = c(0,1), main = "All Petropoulos ESCs", pch=16,
        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
@@ -1355,7 +1363,7 @@ primed_num <- list()
 
 Similarly to the mapping of the Petropoulos ESCs, we can now assign a respective naive/primed ratio the each of the mouse ESC and plot them on separate NP-maps depending on their respective time stage as shown in Figure 53.
 
-```{r, MA3b, fig.cap="**Figure 53:** Ratio of identified naive and identified primed cells of the Wolf MM ESCs for each time stage.", fig.height=11, fig.width=10}
+```{r, MA3b, fig.cap="**Figure 54:** Ratio of identified naive and identified primed cells of the Wolf MM ESCs for each time stage.", fig.height=11, fig.width=10}
 for (cell in colnames(exprs_marked)){ 
   naive_genes <- exprs_marked[which(exprs_marked[rownames(naive_markers),cell] > threshold), cell]
   primed_genes <- exprs_marked[which(exprs_marked[rownames(primed_markers),cell] > threshold), cell]
@@ -1412,7 +1420,7 @@ primed_num <- list()
 ```
 
 
-```{r MA4, fig.cap="**Figure 54:** Ratio of identified naive and identified primed cells of monkey ESCs for each time stage.", fig.height=11, fig.width=14}
+```{r MA4, fig.cap="**Figure 55:** Ratio of identified naive and identified primed cells of monkey ESCs for each time stage.", fig.height=11, fig.width=14}
 for (cell in colnames(exprs_marked)){ 
   naive_genes <- exprs_marked[which(exprs_marked[rownames(naive_markers),cell] > threshold), cell]
   primed_genes <- exprs_marked[which(exprs_marked[rownames(primed_markers),cell] > threshold), cell]
@@ -1497,10 +1505,10 @@ for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
   for (file in list.files(path = path, pattern = "*.vcf.gz", full.names = T)){
   
   blah <- readVcf(file)
-  is.x <- as.logical(!seqnames(blah)=="chrX")
+  is.auto <- as.logical(!seqnames(blah)=="chrX")
   is.het <- geno(blah)$GT=="0/1"
-  het <- sum(is.het & is.x)/sum(is.het) # Proportion of hets on X
-  snpcalls <- sum(is.het & is.x)/sum(is.x) # Proportion of X SNP calls that are het
+  het <- sum(is.het & is.auto)/sum(is.het) # Proportion of hets on autosomal chromsomes
+  snpcalls <- sum(is.het & is.auto)/sum(is.auto) # Proportion of autosomal SNP calls that are het
   current.props[[file]] <- c(het = het, snpcalls = snpcalls)
   } 
   
@@ -1524,35 +1532,40 @@ colnames(autosome.props) <- prop.names[match(colnames(autosome.props), gsub("(.*
 dim(autosome.props)
 ```
 
-```{r}
+```{r, fig.cap="**Figure 56:** Proportions of heterozygous SNPs on X-Chrom vs Autosome (top) and proportion of heterozygocity  only on X chromosome (bottom)."}
 sample <- sub(".*_([0-9]+)$", "\\1", colnames(combined.props))
 naive.auto <- autosome.props[,sample %in% c("2383", "2677", "2678")]
 primed.auto <- autosome.props[,sample %in% c("2384", "2739", "2740")]
 
 par(mfrow=c(2,2))
-plot(density(naive.props["het",], na.rm = T), main = "Allosome", xlab = "Proportion of hets on X", xlim = c(0, 0.1), col = "#e79f00")
-mtext(text = paste0("mean naive: ", round(mean(naive.props["het",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.props["het",], na.rm = T), digits = 3)), c(3))
-lines(density(primed.props["het",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+plot(density(naive.props["het",], na.rm = T), main = "Allosome", xlim = c(0, 0.1), 
+     xlab = "Proportion of hets on Xchrom vs hets on autosome", col = "#e79f00")
+mtext(text = paste0("mean naive: ", round(mean(naive.props["het",], na.rm = T), digits = 3), " | mean primed: ", 
+                    round(mean(primed.props["het",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.props["het",], na.rm = T), col = "#0072B2")
 legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
 
-plot(density(naive.props["snpcalls",], na.rm = T), main = "Allosome", xlab = "Proportion of hets on X", xlim = c(0, 0.13), col = "#e79f00", ylim = c(0,20))
-mtext(text = paste0("mean naive: ", round(mean(naive.props["snpcalls",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.props["snpcalls",], na.rm = T), digits = 3)), c(3))
-lines(density(primed.props["snpcalls",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+plot(density(naive.props["snpcalls",], na.rm = T), main = "Allosome", xlab = "Proportion of hets on X", 
+     xlim = c(0, 0.13), col = "#e79f00", ylim = c(0,20))
+mtext(text = paste0("mean naive: ", round(mean(naive.props["snpcalls",], na.rm = T), digits = 3), 
+                    " | mean primed: ", round(mean(primed.props["snpcalls",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.props["snpcalls",], na.rm = T), col = "#0072B2")
 legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
 
-plot(density(naive.auto["het",], na.rm = T), main = "Autosome", xlab = "Proportion of hets on X", col = "#e79f00")
-mtext(text = paste0("mean naive: ", round(mean(naive.auto["het",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.auto["het",], na.rm = T), digits = 3)), c(3))
-lines(density(primed.auto["het",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+plot(density(naive.auto["het",], na.rm = T), main = "Autosome", 
+     xlab = "Proportion of hets on autosomal vs hets on X", col = "#e79f00")
+mtext(text = paste0("mean naive: ", round(mean(naive.auto["het",], na.rm = T), digits = 3), 
+                    " | mean primed: ", round(mean(primed.auto["het",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.auto["het",], na.rm = T), col = "#0072B2")
 legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
 
-plot(density(naive.auto["snpcalls",], na.rm = T), main = "Autosome", xlab = "Proportion of hets on X", col = "#e79f00", ylim = c(0,15))
-mtext(text = paste0("mean naive: ", round(mean(naive.auto["snpcalls",], na.rm = T), digits = 3), " | mean primed: ", round(mean(primed.auto["snpcalls",], na.rm = T), digits = 3)), c(3))
-lines(density(primed.auto["snpcalls",], na.rm = T), main = "Primed", xlab = "Proportion of hets on X", xlim = c(0, 0.12), col = "#0072B2")
+plot(density(naive.auto["snpcalls",], na.rm = T), main = "Autosome", 
+     xlab = "Proportion of hets on autosomal chromosomes", col = "#e79f00", ylim = c(0,15))
+mtext(text = paste0("mean naive: ", round(mean(naive.auto["snpcalls",], na.rm = T), digits = 3), 
+                    " | mean primed: ", round(mean(primed.auto["snpcalls",], na.rm = T), digits = 3)), c(3))
+lines(density(primed.auto["snpcalls",], na.rm = T), col = "#0072B2")
 legend("topright", legend = c("Primed", "Naive"), pch=16,  col = c("#0072B2", "#e79f00"), bty = "n")
 ```
-
-
-
 
 ***
 

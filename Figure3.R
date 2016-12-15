@@ -14,7 +14,7 @@ colnames(hvg.matrix) <- c("Primed", "Naive")
 
 pdf(file="./figures/figure3a.pdf", width = 4)
 par(mar = c(5.1, 5.5, 4.1, 2.1), las = 1)
-plot <- barplot(hvg.matrix, ylab="Highly Variable Genes",
+plot <- barplot(hvg.matrix, ylab="Highly variable genes",
               ylim = c(0,7500), col = c(primed.col, naive.col), beside = TRUE,
               xlim = c(0,2), width = 0.7, space = c(0,0.5), cex.axis = 0.75, cex.lab = 1.3, cex.names = 1.3)
 text(x = plot, y = hvg.matrix, label = hvg.matrix, cex = 0.75, pos = 3)
@@ -62,11 +62,11 @@ gene.function[embryo.implant,1] <- "deepskyblue"
 pdf(file="./figures/figure3b.pdf")
 par(bty='l', las = 1, mar = c(5.1, 5.5, 4.1, 2.1))
 plot(hvg.out_naive[shared_genes,]$bio, hvg.out_primed[shared_genes,]$bio, xlim=c(0.5,9), ylim=c(0.5,9), 
-     pch = 16, cex = 1,  ylab = "Biological Variance [Primed]", col=gene.function[,1], 
-     xlab = "Biological Variance [Naive]", cex.lab=1.3)
+     pch = 16, cex = 1,  ylab = "Biological variance [primed]", col=gene.function[,1], 
+     xlab = "Biological variance [naive]", cex.lab=1.3)
 abline(0,1, col = "indianred2", lty = 1)
 legend("topright", legend = c("Cell proliferation", "DNA methylation", "Embryo implantation"), 
-       col = c("coral", "darkgoldenrod1", "deepskyblue"), bty="n", pch=16, cex)
+       col = c("coral", "darkgoldenrod1", "deepskyblue"), bty="o", pch=16, box.col = "white", bg="white")
 #text(hvg.out_naive[top_genes,]$bio+0.5, hvg.out_primed[top_genes,]$bio, labels = top_genes)
 dev.off()
 
@@ -84,7 +84,7 @@ colnames(data) <- c("Primed", "Naive")
 pdf(file="./figures/figure3c.pdf", width = 4)
 par(bty='n', las = 1, mar = c(3.1, 5.5, 4.1, 2.1))
 boxplot(data, col = c(primed.col, naive.col), boxwex = 0.5, ylim = c(-1,10), cex.lab = 1.3,
-        outline=FALSE, ylab = "Biological Variance", xaxt = "n")
+        outline=FALSE, ylab = "Biological variance", xaxt = "n")
 text(x = c(1,2), y=c(-1,-1), labels = c("Primed", "Naive"), cex=1.3)
 dev.off()
 
@@ -128,8 +128,8 @@ dev.off()
 
 pdf(file="./figures/sup.figure3c.pdf")
 par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 0.1))
-hist(primed.means, xlim = c(0,11), breaks = 100, col=primed.col, xlab="log Mean", main="Primed")
-hist(naive.means, xlim = c(0,11), breaks = 100, col=naive.col, xlab="log Mean", main="Naive")
+hist(primed.means, xlim = c(0,11), breaks = 100, col=primed.col, xlab="log mean", main="Primed")
+hist(naive.means, xlim = c(0,11), breaks = 100, col=naive.col, xlab="log mean", main="Naive")
 dev.off()
 
 # D
@@ -139,6 +139,6 @@ primed.size <- sce_primed$size_factor
 
 pdf(file="./figures/sup.figure3d.pdf")
 par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 1), las=1)
-hist(primed.size, xlim = c(0,8), breaks = 50, col=primed.col, xlab="Size Factor", main="Primed")
-hist(naive.size, xlim = c(0,8), breaks = 50, col=naive.col, xlab="Size Factor", main="Naive", ylab = "")
+hist(primed.size, xlim = c(0,8), breaks = 50, col=primed.col, xlab="Size factor", main="Primed")
+hist(naive.size, xlim = c(0,8), breaks = 50, col=naive.col, xlab="Size factor", main="Naive", ylab = "")
 dev.off()

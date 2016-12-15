@@ -111,35 +111,35 @@ plot4.grob <- p4$gtable$grob[[1]] #naive
 plot5.grob <- p5$gtable$grob[[1]] #primed
 plot6.grob <- p6$gtable$grob[[1]] #transition
 
-grid.mat <- matrix(1,40,41)
-grid.mat[1,4:37] <- 2      #xtext
-grid.mat[3:27,1:2] <- 3      #ytext
+grid.mat <- matrix(1,40,41)  #empty matrix
+grid.mat[1,4:37] <- 2      #xtext 
+grid.mat[3:27,1:2] <- 3    #ytext
 grid.mat[4:38,40:41] <- 4  #legend
 grid.mat[4:27,3] <- 5      #ylab
 #plots
-grid.mat[4:27,4:14] <- 6
-grid.mat[4:27,16:26] <- 7
-grid.mat[4:27,28:38] <- 8
+grid.mat[4:27,4:14] <- 6   #naive
+grid.mat[4:27,16:26] <- 7  #trans
+grid.mat[4:27,28:38] <- 8  #primed
 #xlabs
-grid.mat[3,4:14] <- 9
-grid.mat[3,16:26] <- 10 
-grid.mat[3,28:38] <- 11
-grid.mat[2, 4:5] <- 12 #number of naive
-grid.mat[2, 16:17] <- 13 #number of transition
-grid.mat[2, 28:29] <- 14 #number of primed
+grid.mat[3,4:14] <- 9      #naive
+grid.mat[3,16:26] <- 10    #trans
+grid.mat[3,28:38] <- 11    #primed
+grid.mat[2, 4:5] <- 12     #number of naive
+grid.mat[2, 16:17] <- 13   #number of transition
+grid.mat[2, 28:29] <- 14   #number of primed
 
 # shared genes
-grid.mat[29:38,4:14] <- 15  
-grid.mat[29:38,16:26] <- 16  
-grid.mat[29:38,28:38] <- 17 
-grid.mat[29:38,3] <- 18      #ylab
-grid.mat[29:38,1:2] <- 19     #ytext
+grid.mat[29:38,4:14] <- 15 #naive plot
+grid.mat[29:38,16:26] <- 16 #trans plot
+grid.mat[29:38,28:38] <- 17 #primed plot
+grid.mat[29:38,3] <- 18    #ylab
+grid.mat[29:38,1:2] <- 19  #ytext
 grid.mat[29:38,39:41] <- 20  #rownames
 
 shared.rownames <- p4$gtable$grob[[2]]
 xtext <- textGrob("Phenotype", gp = gpar(cex=1.25))
-ytext <- textGrob("DE Genes", rot=90, gp = gpar(cex=1.5))
-ytext.shared <- textGrob("Shared DE Genes", rot=90, gp = gpar(cex=1.5))
+ytext <- textGrob("DE genes", rot=90, gp = gpar(cex=1.5))
+ytext.shared <- textGrob("Shared DE genes", rot=90, gp = gpar(cex=1.5))
 xnaive <- textGrob(nrow(naive))
 xprimed <- textGrob(nrow(primed))
 xtrans <- textGrob(nrow(trans))
@@ -195,7 +195,7 @@ plot.new()
 legend("center", title = "Population",  legend = c("Naive", "Transition", "Primed"), 
        pch=16, cex=1.75, col=c(naive.col, trans.col, primed.col), bty='n')
 par(las = 0)
-mtext("Expression [log(exprs)]", line = -2, side=2, padj=2, outer=TRUE, cex = 1.5)
+mtext("Log expression", line = -2, side=2, padj=2, outer=TRUE, cex = 1.5)
 
 dev.off()
 

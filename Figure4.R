@@ -117,7 +117,7 @@ for (stage in stages){
     legend_image <- as.raster(matrix(rev(col.scale), ncol=1))
     plot(c(0,7),c(0,1),type = 'n', axes = F,xlab = '', ylab = '')
     text(x=2.65, y = 0.975, labels = "Number", cex = 3)
-    text(x=2.65, y = 0.925, labels = "of Cells", cex = 3)
+    text(x=2.65, y = 0.925, labels = "of cells", cex = 3)
     text(x=4.5, y = seq(0.2,0.8,l=5), labels = seq(1,5,l=5), cex = 3.5)
     rasterImage(legend_image, 0, 0.2, 2.5, 0.8)
     
@@ -155,7 +155,7 @@ naive_markers <- readRDS(file =  paste0(objectpath, "n.markers.map"))
 primed_markers <- readRDS(file =  paste0(objectpath, "p.markers.map"))
 sce_trans <- readRDS(file =  paste0(objectpath, "new_sce_trans"))
 
-pdf(file = "./figures/sup.figure4a.pdf", width = 25, height = 6)
+pdf(file = "./figures/sup.figure4.pdf", width = 25, height = 6)
 
 par(bty='n', mar = c(8.1, 4.1, 3.1, 0.2),  las = 1)
 layout(matrix(1:5,ncol=5), width = c(1,5,5,5,2))
@@ -187,9 +187,6 @@ for (object in c(sce_trans[,pData(sce_trans)$phenotype=="primed"],
     yaxt <- "n"
   } 
   
-  naive_num <- naive_num
-  primed_num <- primed_num
-
   naive_num <- matrix(matrix(unlist(naive_num)) * 100)
   primed_num <- matrix(matrix(unlist(primed_num)) * 100)
   
