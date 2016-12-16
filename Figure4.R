@@ -16,10 +16,7 @@ plot.new()
 
 for (stage in stages){
   main <- stage
-  if (stage == "E3"){yaxt <- "s"} 
-  else { yaxt <- "n" }
-  if (stage == "E5"){plot.new()
-    yaxt <- "s"}
+  if (stage == "E5"){plot.new()}
   if (stage == "E4.late"){main <- "E4 [primed]"}
   if (stage == "E5.early"){main <- "E5 [early]"}
   current_nums <- subset(nums, rownames(nums)==stage)
@@ -31,9 +28,13 @@ for (stage in stages){
   col.scale <- viridis(6)
   cell.col <- col.scale[num.per.cell]
   
-  plot(current_nums, xlim = c(0,80), ylim = c(0,80), cex.axis = 2.5, yaxt=yaxt, cex.lab = 2,
-       ylab="", main = main, pch=19, cex=2, xlab = "",  
+  plot(current_nums, xlim = c(0,80), ylim = c(0,80), cex.axis = 2.5, yaxt="n", cex.lab = 2,
+       ylab="", main = main, pch=19, cex=2, xlab = "", xaxt="n",  
        cex.main = 3, col=cell.col)
+  axis(side = 1, lwd.ticks = 0, cex.axis=2)
+  if (stage == "E3") {axis(side = 2, lwd.ticks = 0, cex.axis=2)}
+  if (stage == "E5") {axis(side = 2, lwd.ticks = 0, cex.axis=2)}
+
   abline(0,1, col = "indianred2", lty=1, cex=2)
 }
 
@@ -46,13 +47,11 @@ legend_image <- as.raster(matrix(rev(col.scale), ncol=1))
 plot(c(0,7),c(0,1),type = 'n', axes = F,xlab = '', ylab = '')
 text(x=2.65, y = 1, labels = "Number of cells", cex = 3)
 text(x=2.2, y = seq(0,0.8,l=6), labels = seq(1,6,l=6), cex = 3)
-rasterImage(legend_image, 1, 0, 1.8, 0.8)
+rasterImage(legend_image, 1, 0, 1.8, 0.8, interpolate=FALSE)
 
 dev.off()
 
-
-# Figure 4b
-
+# Figure 4 B
 
 stages <- readRDS(file = paste0(objectpath, "stages.mouse"))
 nums <- readRDS(file =  paste0(objectpath, "nums.mouse"))
@@ -66,8 +65,6 @@ layout(matrix(1:7,ncol=7), width = c(1,5,5,5,5,5,2))
 plot.new()
 
 for (stage in stages){
-  if (stage == "E3.5"){yaxt <- "s"} 
-  else { yaxt <- "n" }
   current_nums <- subset(nums, rownames(nums)==stage)
   cell.state <- paste0(round(current_nums[,1],1), "|", round(current_nums[,2], 1))
   state.num <- table(cell.state)
@@ -77,9 +74,11 @@ for (stage in stages){
   col.scale <- viridis(10)
   cell.col <- col.scale[num.per.cell]
     
-  plot(current_nums, xlim = c(0,31), ylim = c(0,31), cex.axis = 1.5, yaxt=yaxt, cex.lab = 2,
+  plot(current_nums, xlim = c(0,31), ylim = c(0,31), cex.axis = 1.5, yaxt="n", cex.lab = 2,
        ylab="", main = stage, pch=19, cex=2, xlab = "",  
-       cex.main = 3, col=cell.col)
+       cex.main = 3, col=cell.col, xaxt="n")
+  axis(side = 1, lwd.ticks = 0, cex.axis=2)
+  if (stage == "E3.5") {axis(side = 2, lwd.ticks = 0, cex.axis=2)}
   abline(0,1, col = "indianred2", lty=1, cex=2)
 }
 
@@ -93,7 +92,7 @@ plot(c(0,3),c(0,1),type = 'n', axes = F,xlab = '', ylab = '')
 text(x=1.2, y = 1, labels = "Number", cex = 2.5)
 text(x=1.2, y = 0.925, labels = "of cells", cex = 2.5)
 text(x=1.5, y = seq(0,0.8,l=4), labels = seq(1,10,l=4), cex = 2)
-rasterImage(legend_image, 0, 0, 0.9,0.8)
+rasterImage(legend_image, 0, 0, 0.9,0.8, interpolate=FALSE)
 
 dev.off()
 
@@ -102,27 +101,23 @@ dev.off()
 stages <- readRDS(file =  paste0(objectpath, "stages.monkey"))
 nums <- readRDS(file =  paste0(objectpath, "nums.monkey"))
 nums <- nums*100
-pdf(file = "./figures/figure4c.pdf", width = 25, height = 12)
 
+pdf(file = "./figures/figure4c.pdf", width = 25, height = 12)
 par(bty='n', mar = c(2.1, 4.1, 5.1, 0.2),  las = 1)
 layout(matrix(c(1:11, 6, 12:17),ncol=6, byrow = TRUE), width = c(1,5,5,5,5,2), heights = c(5,5,1))
 plot.new()
 
 for (stage in stages){
   
-  if (stage == "E06"){yaxt <- "s"} 
-  else { yaxt <- "n" }
   if (stage == "E13"){
-    
     legend_image <- as.raster(matrix(rev(col.scale), ncol=1))
-    plot(c(0,7),c(0,1),type = 'n', axes = F,xlab = '', ylab = '')
+    plot(c(0,7),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', xaxt="n", yaxt="n")
     text(x=2.65, y = 0.975, labels = "Number", cex = 3)
     text(x=2.65, y = 0.925, labels = "of cells", cex = 3)
     text(x=4.5, y = seq(0.2,0.8,l=5), labels = seq(1,5,l=5), cex = 3.5)
-    rasterImage(legend_image, 0, 0.2, 2.5, 0.8)
+    rasterImage(legend_image, 0, 0.2, 2.5, 0.8, interpolate = F)
     
     plot.new()
-    yaxt <- "s"
     }
   main <- stage
   main <- sub("0", "", main)
@@ -135,9 +130,12 @@ for (stage in stages){
   col.scale <- viridis(5)
   cell.col <- col.scale[num.per.cell]
   
-  plot(current_nums, xlim = c(0,25), ylim = c(0,25), cex.axis = 2.5, yaxt=yaxt, cex.lab = 2,
-       ylab="", main = main, pch=19, cex=2, xlab = "",  
+  plot(current_nums, xlim = c(0,25), ylim = c(0,25), cex.axis = 2.5, yaxt="n", cex.lab = 2,
+       ylab="", main = main, pch=19, cex=2, xlab = "", xaxt="n",  
        cex.main = 3, col=cell.col)
+  axis(side = 1, lwd.ticks = 0, cex.axis=2)
+  if (stage == "E06") {axis(side = 2, lwd.ticks = 0, cex.axis=2)}
+  if (stage == "E13") {axis(side = 2, lwd.ticks = 0, cex.axis=2)}
   abline(0,1, col = "indianred2", lty=1, cex=2)
 }
 
@@ -178,13 +176,10 @@ for (object in c(sce_trans[,pData(sce_trans)$phenotype=="primed"],
   } 
   if (all(object$phenotype=="primed")){
     name <- "Primed"
-    yaxt <- "s"
   } else if(all(object$phenotype=="naive")){
     name <- "Naive"
-    yaxt <- "n"
   } else if(all(object$phenotype=="transition")){
     name <- "Transition"
-    yaxt <- "n"
   } 
   
   naive_num <- matrix(matrix(unlist(naive_num)) * 100)
@@ -199,8 +194,10 @@ for (object in c(sce_trans[,pData(sce_trans)$phenotype=="primed"],
   cell.col <- col.scale[num.per.cell]
   
   plot(naive_num, primed_num, xlim = c(0,75), ylim = c(0,75), cex.axis = 1.5, yaxt=yaxt, cex.lab = 2,
-       ylab="", main = name, pch=19, cex=2, xlab = "",  
+       ylab="", main = name, pch=19, cex=2, xlab = "", xaxt="n", yaxt="n",  
        cex.main = 3, col=cell.col)
+  axis(side = 1, lwd.ticks = 0, cex.axis=2)
+  if (all(object$phenotype=="primed")) {axis(side = 2, lwd.ticks = 0, cex.axis=2)}
   abline(0,1, col = "indianred2", lty=1, cex=2)
 }
 
@@ -214,6 +211,6 @@ plot(c(0,3),c(0,1),type = 'n', axes = F,xlab = '', ylab = '')
 text(x=0.725, y = 1, labels = "Number", cex = 2.5)
 text(x=0.725, y = 0.925, labels = "of cells", cex = 2.5)
 text(x=1.5, y = seq(0,0.8,l=4), labels = seq(1,10,l=4), cex = 2)
-rasterImage(legend_image, 0, 0, 0.8,0.8)
+rasterImage(legend_image, 0, 0, 0.8,0.8, interpolate=FALSE)
 
 dev.off()
