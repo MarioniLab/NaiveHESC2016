@@ -58,7 +58,6 @@ rownames(gene.type) <- rownames(heat.vals)
 
 # Create three new heatmaps with only the stuff additionally to this one
 
-pdf(file="./figures/figure2a.pdf", onefile = FALSE, width = 10, height = 15)
 # naive vs trans and primed vs trans
 p1 <- pheatmap(heat.vals[,which(re.pheno == "naive")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
                annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")),
@@ -117,13 +116,13 @@ plot6.grob <- p6$gtable$grob[[1]] #transition
 
 grid.mat <- matrix(1,40,41)  #empty matrix
 grid.mat[1,4:37] <- 2      #xtext 
-grid.mat[3:27,1:2] <- 3    #ytext
+grid.mat[3:38,1:2] <- 3    #ytext
 grid.mat[4:38,40:41] <- 4  #legend
-grid.mat[4:27,3] <- 5      #ylab
+grid.mat[4:38,3] <- 5      #ylab
 #plots
-grid.mat[4:27,4:14] <- 6   #naive
-grid.mat[4:27,16:26] <- 7  #trans
-grid.mat[4:27,28:38] <- 8  #primed
+grid.mat[4:38,4:14] <- 6   #naive
+grid.mat[4:38,16:26] <- 7  #trans
+grid.mat[4:38,28:38] <- 8  #primed
 #xlabs
 grid.mat[3,4:14] <- 9      #naive
 grid.mat[3,16:26] <- 10    #trans
@@ -131,14 +130,6 @@ grid.mat[3,28:38] <- 11    #primed
 grid.mat[2, 4:5] <- 12     #number of naive
 grid.mat[2, 16:17] <- 13   #number of transition
 grid.mat[2, 28:29] <- 14   #number of primed
-
-# shared genes
-grid.mat[29:38,4:14] <- 15 #naive plot
-grid.mat[29:38,16:26] <- 16 #trans plot
-grid.mat[29:38,28:38] <- 17 #primed plot
-grid.mat[29:38,3] <- 18    #ylab
-grid.mat[29:38,1:2] <- 19  #ytext
-grid.mat[29:38,39:41] <- 20  #rownames
 
 shared.rownames <- p4$gtable$grob[[2]]
 xtext <- textGrob("Phenotype", gp = gpar(cex=1.25))
@@ -148,22 +139,45 @@ xnaive <- textGrob(nrow(naive))
 xprimed <- textGrob(nrow(primed))
 xtrans <- textGrob(nrow(trans))
 
+pdf(file="./figures/figure2a.pdf", onefile = FALSE, width = 10, height = 10)
 grid.arrange(grobs = list(empty.grob, xtext, ytext, legend.grob, ylab.grob, plot1.grob, 
                           plot3.grob, plot2.grob, xlab1.grob, xlab3.grob, xlab2.grob, 
-                          xnaive, xtrans, xprimed, plot4.grob, plot6.grob, plot5.grob, ylab2.grob, 
-                          ytext.shared, shared.rownames),
+                          xnaive, xtrans, xprimed),
              layout_matrix = grid.mat) 
 
 dev.off()
 
 
+pdf(file="./figures/sup.figure2b.pdf", onefile = FALSE, width = 7, height = 7)
+grid.mat <- matrix(1,40,47)  #empty matrix
+# shared genes
+grid.mat[4:38,4:14] <- 2 #naive plot
+grid.mat[4:38,16:26] <- 3 #trans plot
+grid.mat[4:38,28:38] <- 4 #primed plot
+grid.mat[4:38,3] <- 5    #ylab
+grid.mat[4:38,1:2] <- 6  #ytext
+grid.mat[4:38,39] <- 7  #rownames
+grid.mat[1,4:38] <- 8      #xtext 
+grid.mat[2, 4:5] <- 9     #number of naive
+grid.mat[2, 16:17] <- 10   #number of transition
+grid.mat[2, 28:29] <- 11   #number of primed
+grid.mat[3,4:14] <- 12      #naive
+grid.mat[3,16:26] <- 13    #trans
+grid.mat[3,28:38] <- 14   #primed
+grid.mat[4:38,45:47] <- 15  #legend
+
+grid.arrange(grobs = list(empty.grob, plot4.grob, plot6.grob, plot5.grob, ylab2.grob, 
+             ytext.shared, shared.rownames, xtext,  xnaive, xtrans, xprimed, 
+             xlab1.grob, xlab3.grob, xlab2.grob, legend.grob), layout_matrix = grid.mat)
+dev.off()
+
 # Legend 2A
 pdf(file="./figures/figure2a_legend.pdf", width = 10, height = 5)
 plot.new()
 par(mar=c(1.1,1.1,1.1,1.1))
-legend("left", legend = c("Naive", "Primed", "Transition"), fill=c(naive.col, primed.col, trans.col), 
+legend("left", legend = c("Naive", "Transition", "Primed"), fill=c(naive.col, trans.col, primed.col), 
        title = "Population", bty="n", horiz = T)
-legend("right", legend = c("Trans vs Naive", "Trans vs Primed", "Shared"), fill=c("grey20", "grey60", "grey80"), title = "DE Genes", bty="n", horiz = T)
+legend("right", legend = c("Trans vs Naive", "Trans vs Primed"), fill=c("grey20", "grey60"), title = "DE Genes", bty="n", horiz = T)
 
 dev.off()
 
