@@ -9,7 +9,7 @@ Each two most differentially expressed markers as well as ~~common?(Guo)~~ naive
 
    
 **Figure 2. Putative transition cells may form a separate subpopulation with transcriptional features between the naive and primed state.**  
-(A) Heat map showing mean-corrected expression values for DE genes between transition and naive cells (top), for DE genes between primed and transition cells (centre) and for genes present in both DE sets (bottom).
+(A) ~~Heat map showing~~ mean-corrected expression values for DE genes between transition and naive cells (top), for DE genes between primed and transition cells (centre) and for genes present in both DE sets (bottom).
 Numbers above the boxes indicate population size.  
 (B) Log-expression profiles of naive (top), putative transition (centre) and primed (bottom) cells for ~~common?~~ naive markers. 
 Each point indicates a cells, coloured according to its respective subpopulation.  
