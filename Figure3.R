@@ -142,3 +142,23 @@ par(mfrow=c(1,2), mar=c(5.1, 4.1, 4.1, 1), las=1)
 hist(primed.size, xlim = c(0,8), breaks = 50, col=primed.col, xlab="Size factor", main="Primed")
 hist(naive.size, xlim = c(0,8), breaks = 50, col=naive.col, xlab="Size factor", main="Naive", ylab = "")
 dev.off()
+
+# E
+var.out_naive <- readRDS(file = paste0(objectpath, "var.naive"))
+var.out_primed <-  readRDS(file = paste0(objectpath, "var.primed"))
+
+pdf(file="./figures/sup.figure3e.pdf")
+
+logFCs <- (rowMeans(exprs(sce_primed))) - (rowMeans(exprs(sce_naive)))
+biovar <- var.out_primed$bio - var.out_naive$bio
+colours <- rep("black", nrow(sce_naive))
+colours[which(rownames(sce_naive) %in% rownames(hvg.out_naive))] <- naive.col
+colours[which(rownames(sce_naive) %in% rownames(hvg.out_primed))] <- primed.col
+colours[which(rownames(sce_naive) %in% shared_genes)] <- "#CC79A7"
+plot <- cbind(logFCs, biovar, colours)
+#plot <- plot[order(plot[,3], decreasing = T),]
+plot(plot[,"logFCs"],plot[,"biovar"], pch=16, col = plot[,"colours"], cex=0.6, ylab = expression(paste(Delta, " Biological variance")), xlab="mean [logFC]")
+legend("bottomright", legend = c("HVG [primed]", "HVG [naive]", "HVG [shared]"), 
+       col = c(primed.col, naive.col, "#CC79A7"), bty="o", pch=16, box.col = "white", bg="white")
+
+dev.off()
