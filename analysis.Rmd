@@ -477,6 +477,7 @@ We then design a new model matrix for the naive subpopulation based on the two b
 design_naive <- model.matrix(~0 + sce_naive$batch)
 var.fit_naive <- trendVar(sce_naive, trend="loess", span=0.4, design = design_naive)
 var.out_naive <- decomposeVar(sce_naive, var.fit_naive, assay="exprs", get.spikes=TRUE)
+saveRDS(var.out_naive, file = paste0(objectpath, "var.naive"))
 plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-expression",
      ylab="Variance of log-expression")
 points(var.fit_naive$mean, var.fit_naive$var, col="red", pch=16)
@@ -813,13 +814,13 @@ Afterwards, we can create tSNE plots of the naive G1 subpopulation that display 
 
 ```{r, tsne.naive.g1, fig.cap="**Figure 30:** tSNE plots of the normalized expression values within the naive cells in G1 phase coloured by the most HVG gene (top), by KLF4 (centre) and by batch number (bottom).", fig.height=12}
 tsne1_naive_g1 <- plotTSNE(sce_naive_g1, exprs_values="norm_exprs", colour_by=top.hvg_naive_g1,
-                  perplexity=5, rand_seed=200, feature_set=chosen_naive_set_g1) + fontsize
+                  perplexity=5, rand_seed=150, feature_set=chosen_naive_set_g1) + fontsize
 
 tsne2_naive_g1 <- plotTSNE(sce_naive_g1, exprs_values="norm_exprs", colour_by="KLF4",
-                  perplexity=5, rand_seed=200, feature_set=chosen_naive_set_g1) + fontsize
+                  perplexity=5, rand_seed=150, feature_set=chosen_naive_set_g1) + fontsize
 
 tsne3_naive_g1 <- plotTSNE(sce_naive_g1, exprs_values="norm_exprs", colour_by="batch",
-                  perplexity=5, rand_seed=200, feature_set=chosen_naive_set_g1) + fontsize
+                  perplexity=5, rand_seed=150, feature_set=chosen_naive_set_g1) + fontsize
 
 multiplot(tsne1_naive_g1, tsne2_naive_g1, tsne3_naive_g1, cols=1)
 ```
@@ -953,6 +954,7 @@ A design matrix is modelled for the primed cells and the variance is computed. I
 design_primed <- model.matrix(~0 + sce_primed$batch)
 var.fit_primed <- trendVar(sce_primed, trend="loess", span=0.4, design = design_primed)
 var.out_primed <- decomposeVar(sce_primed, var.fit_primed, assay="exprs", get.spikes=TRUE)
+saveRDS(var.out_primed, file = paste0(objectpath, "var.primed"))
 plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-expression",
      ylab="Variance of log-expression")
 points(var.fit_primed$mean, var.fit_primed$var, col="red", pch=16)
