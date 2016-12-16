@@ -50,13 +50,13 @@ primed.genes <- c("DUSP6", "THY1")
 pdf(file="./figures/figure1c.pdf")
 
 par(mar = c(5.1, 5.1, 4.1, 2.1), las=1)
-plot(log2(rowMeans(counts(sce)[is.de==0,])), res$table$logFC[is.de==0], cex=0.3, ylim=c(-22.5, 22.5), pch = 16, 
-     ylab="logFC", xlab="Mean average", cex.lab=1.5, col=main.col)
+plot(log2(rowMeans(counts(sce)[is.de==0,])), res$table$logFC[is.de==0], cex=0.3, ylim=c(22.5,-22.5), pch = 16, 
+     ylab="logFC", xlab="Mean", cex.lab=1.5, col=main.col)
   points(log2(rowMeans(counts(sce)[is.de==1,])), res$table$logFC[is.de==1], cex=0.3, col=primed.col, pch = 16)
   points(log2(rowMeans(counts(sce)[is.de==-1,])), res$table$logFC[is.de==-1], cex=0.3, col=naive.col, pch = 16)
   points(log2(rowMeans(counts(sce)[c(naive.genes, primed.genes),])), res$table[c(naive.genes, primed.genes),]$logFC,
          cex=0.8, pch=16, col=c(rep(naive.col, length(naive.genes)), rep(primed.col, length(primed.genes))))
-  legend("topright", legend=c("Upregulated in primed cells", "Upregulated in naive cells"), col=c(primed.col, naive.col), pch=16, bty = "n")
+  legend("bottomright", legend=c( "Upregulated in naive cells", "Upregulated in primed cells"), col=c(naive.col, primed.col), pch=16, bty = "n")
   
   text(log2(rowMeans(counts(sce)[naive.genes[c(-2,-4)],]))+1.05, (res$table[naive.genes[c(-2,-4)],]$logFC), 
        labels = naive.genes[c(-2,-4)], col=naive.col)
