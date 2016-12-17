@@ -204,7 +204,7 @@ plot(colSums(mouse.counts)/1e6, sf.out, log="xy",
 
 We compute naive/primed proportions using the previously identified homologues.
 
-```{r, MA3a}
+```{r mouseprop}
 naive.exprs <- norm.mouse.counts[gene.ids %in% naive.mm.markers,]
 nrow(naive.exprs)
 primed.exprs <- norm.mouse.counts[gene.ids %in% primed.mm.markers,]
@@ -218,7 +218,7 @@ write.table(file=file.path(resdir, "mouse_coords.tsv"),
 
 We also make a plot for each stage, as was previously done.
 
-```{r MA3b}
+```{r mouseplot, fig.height=12, fig.width=6}
 par(mfrow=c(3,2))
 for (stage in unique(stages)) {
     current <- stages==stage
@@ -240,7 +240,7 @@ We remove some rows that contain missing values.
 These are also CPM values, so there's no point in normalizing them.
 
 ```{r monkeyin}
-monkey.counts <- read.table(paste0(input, "monkey.counts.txt"), sep = "\t", header = TRUE)
+monkey.counts <- read.table(file.path('counts', "monkey.counts.txt"), sep = "\t", header = TRUE)
 gene.names <- monkey.counts$macFas5_gene_symbol
 monkey.counts <- monkey.counts[,-(1:2)]
 keep <- rowSums(is.na(monkey.counts))==0
@@ -251,7 +251,7 @@ norm.monkey.counts <- log2(as.matrix(monkey.counts) + 1)
 
 We exploit the fact that there are many shared gene names between human and marmoset, to avoid the need for explicit remapping.
 
-```{r}
+```{r monkeygenes}
 naive.exprs <- norm.monkey.counts[gene.names %in% naive.markers,]
 nrow(naive.exprs)
 primed.exprs <- norm.monkey.counts[gene.names %in% primed.markers,]
@@ -262,7 +262,7 @@ We'll use the same threshold, despite the fact that we're dealing with CPMs rath
 This effectively assumes that each cell was sequenced at around 1 million reads per sample.
 It should be okay as this shouldn't particularly affect naive or primed markers.
 
-```{r}
+```{r monkeyprop}
 naive.num <- colMeans(naive.exprs >= threshold)
 primed.num <- colMeans(primed.exprs >= threshold)
 stages <- sub("_.*", "\\1", colnames(norm.monkey.counts))
@@ -273,7 +273,7 @@ write.table(file=file.path(resdir, "monkey_coords.tsv"),
 
 Finally, we make a plot for each stage, as was previously done.
 
-```{r monkeyplot}
+```{r monkeyplot, fig.height=15, fig.width=6}
 par(mfrow=c(4,2))
 ustages <- stages[grep("^E", stages)]
 ustages <- ustages[!duplicated(ustages)]
