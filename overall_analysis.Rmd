@@ -1,0 +1,231 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: overall analysis"
+author: Tobias Messmer and Aaron Lun
+date: 17 December 2016
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-overall/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-overall/")
+options(bitmapType="cairo", width=100)
+register(SerialParam())
+```
+
+# Reading in the data 
+
+First, we read in the processed data set.
+
+```{r readin}
+library(scran)
+sce <- readRDS("processed.rds")
+sce
+```
+
+To get a first impression of the data, expression profiles of typical ESC markers are plotted. 
+This is done after shuffling the cell order to avoid all naive cells being plotted after primed cells.
+
+```{r explot}
+set.seed(100)
+sce <- sce[, sample(ncol(sce))]
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+plotExpression(sce, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
+    colour_by="phenotype", shape_by = "batch", show_violin = FALSE) + fontsize
+```
+
+There is a strong batch effect in this data, so we construct a design matrix containing batch blocking factors.
+This ensures that downstream results will not be driven by differences between batches.
+
+```{r makedesign}
+design <- model.matrix(~0 + sce$batch)
+```
+
+Based on the variabilty of gene expression over the whole population, we can identify subpopulations within the data set. 
+As we already know that the cells are either in a naive or primed state, this clustering serves mainly as confirmation. 
+
+Finally, we set up a directory to save various results into.
+
+```{r}
+resdir <- "results-overall"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Detecting highly variable genes across all cells
+
+We fit a trend to the variances of the spike-ins.
+This represents the technical variance at any given mean count.
+For each endogenous gene, the difference between the technical and total variance is the biological component of variability.
+
+```{r }
+var.fit <- trendVar(sce, trend="loess", span=0.4, design = design)
+var.out <- decomposeVar(sce, var.fit, assay="exprs")
+```
+
+The trend passes through the bulk of the spike-ins, which is reassuring.
+Many genes have variances above this trend, corresponding to strong heterogeneity across the population.
+
+```{r}
+plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
+     ylab="Variance of log-expression")
+points(var.fit$mean, var.fit$var, col="red", pch=16)
+o <- order(var.out$mean)
+lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
+```
+
+The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
+
+```{r highvar}
+hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),]
+nrow(hvg.out)
+hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),]
+write.table(file = file.path(resdir, "hvg.tsv"), hvg.out, sep="\t", quote=FALSE, col.names = NA) 
+head(hvg.out)
+```
+
+The most highly variable genes across the whole population are shown to ensure that they are not driven by one or two outliers.
+
+```{r vioplot}
+plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.5, 
+    colour_by="phenotype", jitter="jitter") + fontsize 
+```
+
+# Detecting highly correlated genes.
+
+We identify pairs of HVGs with strong correlations.
+These genes are most likely to be driving substructure in the data, though there are also correlations due to tightly coordinated pathways (ribosomal) and mapping spillover.
+
+```{r correlation}
+set.seed(100) 
+var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)) 
+head(var.cor)
+sig.cor <- var.cor$FDR <= 0.05
+summary(sig.cor)
+```
+
+We save these correlated HVGs for later use. 
+As it happens, all (or almost all) HVGs were detected as being correlated with at least one other HVG, so it ends up that we use all of them.
+
+```{r chosencor}
+chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
+length(chosen)
+saveRDS(chosen, file = file.path(resdir, "cor_hvg.rds"))
+```
+
+```{r, eval=FALSE, results='hide'}
+rm(var.cor, sig.cor)
+gc()
+```
+
+# Dimensionality reduction using correlated HVGs
+
+We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
+
+```{r tsne, fig.height=10, fig.width=10}
+tsne1 <- plotTSNE(sce, exprs_values="exprs", colour_by=rownames(hvg.out)[1],
+    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
+tsne2 <- plotTSNE(sce, exprs_values="exprs", colour_by="KLF4",
+    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
+tsne3 <- plotTSNE(sce, exprs_values="exprs", colour_by="batch",
+    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
+tsne4 <- plotTSNE(sce, exprs_values="exprs", colour_by="phenotype",
+    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
+multiplot(tsne1, tsne3, tsne2, tsne4, cols=2)
+```
+
+We repeat this with PCA, which is simpler but provides more stable results.
+
+```{r pca, fig.height=10, fig.width=10}
+pca1 <- plotPCA(sce, exprs_values="exprs", colour_by=rownames(hvg.out)[1], 
+    feature_set = chosen) + fontsize
+pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="phenotype", 
+    feature_set = chosen) + fontsize
+pca3 <- plotPCA(sce, exprs_values="exprs", colour_by="batch", 
+    feature_set = chosen) + fontsize
+pca4 <- plotPCA(sce, exprs_values="exprs", colour_by="phenotype", 
+    feature_set = chosen) + fontsize
+multiplot(pca1, pca3, pca2, pca4, cols=2)
+```
+
+## Differential expression between naive and primed
+
+Finally, we test for differences in expression between the naive and primed conditions.
+This is done using _edgeR_, after summing all cells within each batch to create a pseudo-bulk sample.
+
+```{r desetup}
+library(edgeR)
+de.counts <- sumTechReps(counts(sce), paste(sce$phenotype, sce$batch, sep="."))
+de.counts <- de.counts[!isSpike(sce),] # removing spikes
+y <- DGEList(de.counts)
+```
+
+We construct a new design matrix for the summed samples.
+
+```{r}
+ptype <- factor(sub("\\..", "\\1", colnames(de.counts)))
+batch <- factor(sub("^.*\\.", "\\1", colnames(de.counts)))
+design_pheno <- model.matrix(~0 + ptype + batch) 
+```
+
+We run through _edgeR_'s analysis pipeline. 
+First, we normalize the samples using the TMM method.
+
+```{r}
+y <- calcNormFactors(y)
+y$samples
+```
+
+We estimate the negative binomial dispersion, which represents the variability between replicates.
+For true bulk RNA-seq experiments, we'd expect BCV values around 0.1 or lower, though the values here will be higher as they are derived from noisier single-cell values.
+
+```{r nbdisp}
+y <- estimateDisp(y, design_pheno)  
+plotBCV(y)
+```
+
+We fit a generalized linear model, with estimates of the quasi-likelihood dispersion to account for gene-specific variability.
+
+```{r qldisp}
+fit <- glmQLFit(y, design_pheno, robust=TRUE) 
+plotQLDisp(fit)
+```
+
+Finally, we set up contrasts between the primed and naive population.
+We use the QL F-test to test for significant differences in expression.
+
+```{r ftrest}
+con <- makeContrasts(ptypenaive - ptypeprimed, levels = design_pheno)
+res <- glmQLFTest(fit, contrast=con)
+summary(decideTestsDGE(res))
+DEmarkers <- topTags(res, n=Inf)$table
+write.table(DEmarkers, file=file.path(resdir, "de.tsv"), sep="\t", quote=FALSE, col.names=NA) 
+head(DEmarkers)
+```
+
+This is shown in more detail using the smear plot below.
+
+```{r smearplot}
+is.sig <- DEmarkers$FDR <= 0.05
+plotSmear(res, de.tags=rownames(DEmarkers)[is.sig], cex=0.1)
+```
+
+To ensure that the top DE genes are not driven by outliers, we can examine them explicitly.
+
+```{r viode}
+plotExpression(sce, features = rownames(DEmarkers)[1:10], col = "phenotype")
+```
+
+# Wrapping up
+
+There's nothing else to save, so we just report the session information here.
+
+```{r}
+sessionInfo()
+```
