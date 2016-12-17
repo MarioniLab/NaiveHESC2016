@@ -126,6 +126,14 @@ gc()
 
 # Dimensionality reduction using correlated HVGs
 
+For visualization, we remove the batch effect from the expression values.
+This does not affect any other part of the procedure, it just makes it look a bit prettier.
+
+```{r}
+library(limma)
+exprs(sce) <- removeBatchEffect(sce, sce$batch)
+```
+
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
 
 ```{r tsne, fig.height=10, fig.width=10}
@@ -145,7 +153,7 @@ We repeat this with PCA, which is simpler but provides more stable results.
 ```{r pca, fig.height=10, fig.width=10}
 pca1 <- plotPCA(sce, exprs_values="exprs", colour_by=rownames(hvg.out)[1], 
     feature_set = chosen) + fontsize
-pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="phenotype", 
+pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="KLF4", 
     feature_set = chosen) + fontsize
 pca3 <- plotPCA(sce, exprs_values="exprs", colour_by="batch", 
     feature_set = chosen) + fontsize

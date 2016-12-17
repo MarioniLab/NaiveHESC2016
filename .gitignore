@@ -1,6 +1,9 @@
 *.html
+*.md
+*.rds
 .DS_Store
 objects
 output
-figures
+figure-*
+results-*
 .Rhistory
