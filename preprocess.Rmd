@@ -318,7 +318,7 @@ sce <- computeSumFactors(sce, cluster= clusters)
 summary(sizeFactors(sce))
 ```
 
-This correlates well with library size normalization, though a bit of scatter indicates that there is some DE within the population.
+This correlates well with library size normalization, which is typically expected from read count data.
 
 ```{r sumnormplot}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy", ylab="Library size (millions)", 
@@ -326,6 +326,7 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy", ylab="Library size (milli
 ```
 
 Spike-in transcripts are normalized separately, because they aren't subject to the effects of total RNA content.
+Here, the correlation is worse, which is also expected.
 
 ```{r spikenorm}
 sce <- computeSpikeFactors(sce, type="Spike", general.use=FALSE) 
@@ -346,8 +347,19 @@ We can examine the proportion of variance attributable to various factors.
 Phenotype is the largest contributor (obviously) but the batch effect also needs to be considered.
 
 ```{r varbias}
-plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike",
-    "log10_counts_feature_controls_Spike", "phenotype", "batch")) + fontsize
+plotExplanatoryVariables(sce, variables=c("phenotype", "batch")) + fontsize
+```
+
+The spike-in variance measures any leftover technical bias from scaling normalization, assuming that library quantification was _not_ performed.
+In this case, the spike-ins are correlated with batch, so let's get rid of that first.
+After doing so, you can see that there's not a lot of leftover bias.
+
+```{r}
+library(limma)
+tmp.sce <- sce
+exprs(tmp.sce) <- removeBatchEffect(exprs(sce), sce$batch)
+plotExplanatoryVariables(tmp.sce, variables=c("counts_feature_controls_Spike",
+    "log10_counts_feature_controls_Spike")) + fontsize
 ```
 
 # Wrapping up
