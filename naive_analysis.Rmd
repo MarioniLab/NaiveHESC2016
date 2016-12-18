@@ -153,16 +153,17 @@ my.tree_naive <- hclust(my.dist_naive, method="ward.D2")
 To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
 These suggest that `k=3` is the best, with the third cluster being genuinely separated from the others.
 
-```{r silhouette, fig.width=10, fig.height=10, dev='pdf'}
+```{r silhouette, fig.width=10, fig.height=10}
 library(cluster)
 par(mfrow=c(2,2))
 for (k in 2:5){
-    my.clusters_naive <- unname(cutree(my.tree_naive, k = k))
+    my.clusters_naive <- unname(cutree(my.tree_naive, k=k))
     col <- rainbow(k)
     sil <- silhouette(my.clusters_naive, dist = my.dist_naive)
     sil.cols <- col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
-    o <- order(-sil[,1], sil[,3])
-    plot(sil, main = paste(k, "clusters"), col=sil.cols[o], do.col.sort=FALSE)
+    sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
+    plot(sil, main = paste(k, "clusters"), border=sil.cols, 
+        col=sil.cols, do.col.sort=FALSE)
 }
 ```
 
@@ -341,15 +342,17 @@ legend("topright", col=clust.cols, legend=levels(re.pheno), pch=16)
 ```
 
 We also have a look at the top genes that are uniquely expressed in the transition population.
+These genes must be DE against both naive and primed cells, _and_ in the same direction against both.
 
 ```{r}
 norder <- collected$naive[order(rownames(collected$naive)),]
 porder <- collected$primed[order(rownames(collected$primed)),]
 maxp <- pmax(porder$P.Value, norder$P.Value)
+maxp <- ifelse(sign(norder$logFC)==sign(porder$logFC), maxp, 1)
 unique.marker <- data.frame(vsNaive=norder$logFC, vsPrimed=porder$logFC,
     AveExpr=norder$AveExpr, P.Value=maxp, row.names=rownames(porder))
 unique.marker <-  unique.marker[order(maxp),]
-write.table(unique.marker, file=file.path(resdir, "markers_unique_transition.tsv"),
+write.table(unique.marker, file=file.path(resdir, "markers_unique_trans.tsv"),
     sep="\t", quote=FALSE, col.names=NA)
 head(unique.marker, 20)
 ```
