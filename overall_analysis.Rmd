@@ -101,10 +101,11 @@ plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.5,
 
 We identify pairs of HVGs with strong correlations.
 These genes are most likely to be driving substructure in the data, though there are also correlations due to tightly coordinated pathways (ribosomal) and mapping spillover.
+For convenience, we only take the top 1000 genes with the largest biological components.
 
 ```{r correlation}
 set.seed(100) 
-var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)) 
+var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)[1:1000]) 
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
 summary(sig.cor)
@@ -119,31 +120,24 @@ length(chosen)
 saveRDS(chosen, file = file.path(resdir, "cor_hvg.rds"))
 ```
 
-```{r, eval=FALSE, results='hide'}
+```{r, echo=FALSE, results='hide'}
 rm(var.cor, sig.cor)
 gc()
 ```
 
 # Dimensionality reduction using correlated HVGs
 
-For visualization, we remove the batch effect from the expression values.
-This does not affect any other part of the procedure, it just makes it look a bit prettier.
-
-```{r}
-library(limma)
-exprs(sce) <- removeBatchEffect(sce, sce$batch)
-```
-
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
+We use `norm_exprs` in which the batch effect has already been removed.
 
 ```{r tsne, fig.height=10, fig.width=10}
-tsne1 <- plotTSNE(sce, exprs_values="exprs", colour_by=rownames(hvg.out)[1],
+tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by=rownames(hvg.out)[1],
     perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
-tsne2 <- plotTSNE(sce, exprs_values="exprs", colour_by="KLF4",
+tsne2 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="KLF4",
     perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
-tsne3 <- plotTSNE(sce, exprs_values="exprs", colour_by="batch",
+tsne3 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="batch",
     perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
-tsne4 <- plotTSNE(sce, exprs_values="exprs", colour_by="phenotype",
+tsne4 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="phenotype",
     perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
 multiplot(tsne1, tsne3, tsne2, tsne4, cols=2)
 ```
@@ -151,13 +145,13 @@ multiplot(tsne1, tsne3, tsne2, tsne4, cols=2)
 We repeat this with PCA, which is simpler but provides more stable results.
 
 ```{r pca, fig.height=10, fig.width=10}
-pca1 <- plotPCA(sce, exprs_values="exprs", colour_by=rownames(hvg.out)[1], 
+pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by=rownames(hvg.out)[1], 
     feature_set = chosen) + fontsize
-pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="KLF4", 
+pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="KLF4", 
     feature_set = chosen) + fontsize
-pca3 <- plotPCA(sce, exprs_values="exprs", colour_by="batch", 
+pca3 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="batch", 
     feature_set = chosen) + fontsize
-pca4 <- plotPCA(sce, exprs_values="exprs", colour_by="phenotype", 
+pca4 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
     feature_set = chosen) + fontsize
 multiplot(pca1, pca3, pca2, pca4, cols=2)
 ```

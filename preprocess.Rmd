@@ -357,10 +357,9 @@ After doing so, you can see that there's not a lot of leftover bias.
 
 ```{r}
 library(limma)
-tmp.sce <- sce
-exprs(tmp.sce) <- removeBatchEffect(exprs(sce), sce$batch)
+norm_exprs(tmp.sce) <- removeBatchEffect(exprs(sce), sce$batch)
 plotExplanatoryVariables(tmp.sce, variables=c("counts_feature_controls_Spike",
-    "log10_counts_feature_controls_Spike")) + fontsize
+    "log10_counts_feature_controls_Spike"), exprs_values="norm_exprs") + fontsize
 ```
 
 # Wrapping up
