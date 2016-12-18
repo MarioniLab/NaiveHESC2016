@@ -17,6 +17,7 @@ output:
 dir.create("figure-naive/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-naive/")
 options(bitmapType="cairo", width=100)
+library(BiocParallel)
 register(SerialParam())
 ```
 
@@ -127,7 +128,7 @@ multiplot(tsne1_naive, tsne2_naive, tsne3_naive, cols=3)
 
 And again, for PCA plots.
 
-```{r pca.naive}
+```{r pca.naive, fig.width=15, fig.height=6}
 pca1_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1], 
     feature_set = chosen_naive) + fontsize
 pca2_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="KLF4", 
@@ -152,7 +153,7 @@ my.tree_naive <- hclust(my.dist_naive, method="ward.D2")
 To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
 These suggest that `k=3` is the best, with the third cluster being genuinely separated from the others.
 
-```{r silhouette, fig.width=10, fig.height=10}
+```{r silhouette, fig.width=10, fig.height=10, dev='pdf'}
 library(cluster)
 par(mfrow=c(2,2))
 for (k in 2:5){
@@ -179,7 +180,7 @@ heatmap.2(heat.vals_naive, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
 
 We can have a look at the clustering result on our PCA plots from before, and on the overall PCA plot with all cells in the data set.
 
-```{r naive_PCA, fig.width=10, fig.height=6}
+```{r naive_PCA}
 sce_naive$cluster <- factor(my.clusters_naive)
 plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="cluster", 
     feature_set = chosen_naive) + fontsize
@@ -228,9 +229,8 @@ all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==3]] <- "tran
 write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "combined.tsv"),
     row.names=FALSE, quote=FALSE, sep="\t")
 sce$phenotype <- all.pheno
-pca_overall <- plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
+plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
     feature_set = readRDS("results-overall/cor_hvg.rds")) + fontsize
-multiplot(pca_naive, pca_overall ,cols=2)
 ```
 
 ## Identifying marker genes for cluster 3
