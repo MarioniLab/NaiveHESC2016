@@ -370,7 +370,7 @@ entreznames <- fData(sce)$entrezgene
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "go_unique_trans.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
 ```
 
@@ -379,7 +379,37 @@ And again with KEGG terms:
 ```{r naivekegg}
 kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
 topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "kegg_unique_trans.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We also do this for the top set of genes that are DE between the transition and naive populations.
+
+```{r geneset_vs_naive}
+vs.naive.genes <- rownames(collected$naive)[1:200]
+vs.naive <- rownames(sce) %in% vs.naive.genes
+go <- goana(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species = "Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_trans_vs_naive.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+kegg <- kegga(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species = "Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_trans_vs_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We repeat this for the top set of genes that are DE between transition and primed populations.
+
+```{r geneset_vs_primed}
+vs.primed.genes <- rownames(collected$primed)[1:200]
+vs.primed <- rownames(sce) %in% vs.primed.genes
+go <- goana(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species = "Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_trans_vs_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+kegg <- kegga(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species = "Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_trans_vs_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
 ```
 

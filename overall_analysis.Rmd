@@ -158,7 +158,9 @@ pca4 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype",
 multiplot(pca1, pca3, pca2, pca4, cols=2)
 ```
 
-## Differential expression between naive and primed
+# Differential expression analysis
+
+## Testing for differences between naive and primed
 
 Finally, we test for differences in expression between the naive and primed conditions.
 This is done using _edgeR_, after summing all cells within each batch to create a pseudo-bulk sample.
@@ -224,6 +226,51 @@ To ensure that the top DE genes are not driven by outliers, we can examine them 
 
 ```{r viode}
 plotExpression(sce, features = rownames(DEmarkers)[1:10], col = "phenotype")
+```
+
+## Interpreting the set of DE genes
+
+We use the DE genes for gene set analyses.
+First, we take the set of genes that were upregulated in naive over primed.
+
+```{r upgo}
+up.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC > 0]
+is.up <- rownames(sce) %in% up.genes
+entreznames <- fData(sce)$entrezgene
+has.entrez <- !is.na(entreznames)
+go <- goana(entreznames[has.entrez & is.up], universe=entreznames[has.entrez], species = "Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_up.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+```
+
+We repeat the dose for KEGG analyses.
+
+```{r upkegg}
+kegg <- kegga(entreznames[has.entrez & is.up], universe=entreznames[has.entrez], species = "Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_up.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We now turn our attention to the downregulated genes, i.e., those expressed in primed and not naive.
+
+```{r downgo}
+down.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC < 0]
+is.down <- rownames(sce) %in% down.genes
+go <- goana(entreznames[has.entrez & is.down], universe=entreznames[has.entrez], species = "Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_down.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+```
+
+We repeat for KEGG analyses.
+
+```{r downkegg}
+kegg <- kegga(entreznames[has.entrez & is.down], universe=entreznames[has.entrez], species = "Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_down.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
 ```
 
 # Wrapping up

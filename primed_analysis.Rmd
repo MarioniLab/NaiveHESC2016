@@ -252,7 +252,7 @@ entreznames <- fData(sce_primed)$entrezgene
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "go_unique_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
 ```
 
@@ -261,7 +261,27 @@ And again with KEGG terms:
 ```{r primedkegg}
 kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
 topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "kegg_unique_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We also have a look at the shared HVGs and see what they look like.
+
+```{r primedgo.shared}
+shared.genes <- rownames(var.out_primed)[intersect(phvg, nhvg)]
+is.shared <- rownames(sce_primed) %in% shared.genes
+go <- goana(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_shared_hvg.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+```
+
+And again with KEGG terms:
+
+```{r primedkegg.shared}
+kegg <- kegga(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species = "Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
 ```
 
