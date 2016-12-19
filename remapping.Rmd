@@ -82,13 +82,15 @@ Our remapping procedure is demonstrated on our own data, as a proof of concept.
 For each cell, we count the number of marker genes that have normalized counts above 10.
 The ratio of the number of expressed primed/naive marker genes is used as a measure of the naivete of each cell.
 
-```{r vonmap}
+```{r vonmap, fig.width=15, fig.height=6}
 threshold <- log2(10)
-par(mfrow=c(1,2))
+par(mfrow=c(1,3))
 collected <- list()
-for (type in c("naive", "primed")) {
-    naive.exprs <- exprs(sce)[naive.markers,sce$phenotype==type]
-    primed.exprs <- exprs(sce)[primed.markers,sce$phenotype==type]
+all.types <- read.table(file.path("results-naive", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
+for (type in unique(all.types$Type)) {
+    of.type <- all.types$Cell[type==all.types$Type]
+    naive.exprs <- exprs(sce)[naive.markers,of.type]
+    primed.exprs <- exprs(sce)[primed.markers,of.type]
     naive.num <- colMeans(naive.exprs >= threshold)
     primed.num <- colMeans(primed.exprs >= threshold)
     plot(naive.num, primed.num, xlim = c(0,1), ylim = c(0,1), main = type, pch=16,
