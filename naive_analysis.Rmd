@@ -28,7 +28,7 @@ This is more sensitive than doing so on the entire data set, where the naive/pri
 
 ```{r naivein}
 library(scran)
-sce <- readRDS("processed.rds")
+sce <- readRDS("sce_all.rds")
 sce_naive <- sce[,pData(sce)$phenotype=="naive"] 
 sce_naive$batch <- factor(sce_naive$batch)
 dim(sce_naive)
@@ -69,6 +69,7 @@ The biological component is computed as the difference in the total variance and
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
 
 ```{r var.naive}
+write.table(file=file.path(resdir, "var.tsv"), var.out_naive, sep="\t", quote=FALSE, col.names = NA) 
 hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
 hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
 nrow(hvg.out_naive)
@@ -227,7 +228,7 @@ As expected, they show up in the middle, so we will describe this as a "transiti
 ```{r}
 all.pheno <- as.character(sce$phenotype)
 all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==3]] <- "transition"
-write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "combined.tsv"),
+write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
     row.names=FALSE, quote=FALSE, sep="\t")
 sce$phenotype <- all.pheno
 plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
@@ -357,12 +358,12 @@ write.table(unique.marker, file=file.path(resdir, "markers_unique_trans.tsv"),
 head(unique.marker, 20)
 ```
 
-## Gene Set Enrichtment Analysis on DE genes 
+## Gene set analysis on unique transition genes
 
 We do gene set analyses on the top set of genes that are uniquely expressed in this transition population.
 First, gene ontology terms:
 
-```{r, naivetransGK}
+```{r naivego}
 unique.genes <- rownames(unique.marker)[1:200]
 is.unique <- rownames(sce) %in% unique.genes
 entreznames <- fData(sce)$entrezgene
@@ -387,6 +388,6 @@ head(topkegg)
 We save our object for later use and report the session information.
 
 ```{r}
-saveRDS(sce_naive, file="naive.rds")
+saveRDS(sce_naive, file="sce_naive.rds")
 sessionInfo()
 ```

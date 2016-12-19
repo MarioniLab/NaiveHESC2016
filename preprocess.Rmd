@@ -108,7 +108,7 @@ rm(all.counts)
 gc()
 ```
 
-# Adding feature-level annotation 
+## Adding feature-level annotation 
 
 Next, we add information such as gene symbols and chromosome locations.
 We download annotation from BioMart and store it along with the length information.
@@ -170,6 +170,13 @@ sce <- newSCESet(countData=combined.counts,
                  featureData=AnnotatedDataFrame(features), 
                  phenoData=AnnotatedDataFrame(pheno))
 sce
+```
+
+We also add a directory to store any useful results.
+
+```{r}
+resdir <- "results-preprocess"
+dir.create(resdir, showWarning=FALSE)
 ```
 
 ```{r, echo=FALSE, results='hide'}
@@ -252,6 +259,7 @@ These are stored in the `sce` object prior to further analysis.
 ```{r filterPhase, fig.width=10, fig.height=6}
 hs.pairs <- readRDS(system.file("exdata", "human_cycle_markers.rds", package="scran"))
 assigned <- cyclone(sce, pairs=hs.pairs)
+write.table(file=file.path(resdir, "phases.tsv"), assigned, row.names=FALSE, sep="\t", quote=TRUE)
 head(assigned$scores)
 sce$phase <- assigned$phases
 table(assigned$phases)
@@ -367,7 +375,7 @@ plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike",
 We save the object to file for use in downstream analyses.
 
 ```{r}
-saveRDS(sce, file="processed.rds")
+saveRDS(sce, file="sce_all.rds")
 sessionInfo()
 ```
 

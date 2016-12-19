@@ -27,7 +27,7 @@ First, we read in the processed data set.
 
 ```{r readin}
 library(scran)
-sce <- readRDS("processed.rds")
+sce <- readRDS("sce_all.rds")
 sce
 ```
 
@@ -84,6 +84,7 @@ lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
 The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
 
 ```{r highvar}
+write.table(file=file.path(resdir, "var.tsv"), var.out, sep="\t", quote=FALSE, col.names = NA) 
 hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),]
 nrow(hvg.out)
 hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),]
