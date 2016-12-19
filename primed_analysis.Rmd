@@ -1,0 +1,275 @@
+---
+title: "Single-cell RNA-seq of primed/primed embryonic stem cells: primed-only analysis"
+author: Tobias Messmer and Aaron Lun
+date: 17 December 2016
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-primed/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-primed/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+```
+
+# Selecting only the primed subpopulations
+
+We select only the primed cells and attempt to identify subpopulations within the primed condition.
+Again, this is more sensitive than doing so on the entire data set, where the primed/primed differences dominate.
+
+```{r primedin}
+library(scran)
+sce <- readRDS("sce_all.rds")
+sce_primed <- sce[,pData(sce)$phenotype=="primed"] 
+sce_primed$batch <- factor(sce_primed$batch)
+dim(sce_primed)
+```
+
+We can examine the expression of the various ESC markers in more detail.
+
+```{r primedExpMarker}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+plotExpression(sce_primed, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"),
+    colour_by="batch") + fontsize
+```
+
+We also set up an output directory for the results.
+
+```{r primedout}
+resdir <- "results-primed"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Detecting primed-only HVGs
+
+We detect HVGs in the primed population, using the variance of the normalized log-expression values.
+A trend is fitted to the spike-in variances and represents the technical aspect of variability.
+The fit is okay, though there is a lot of deviation, again probably due to amplification-induced variability.
+
+```{r primed.design}
+design_primed <- model.matrix(~0 + sce_primed$batch)
+var.fit_primed <- trendVar(sce_primed, trend="loess", span=0.4, design = design_primed)
+var.out_primed <- decomposeVar(sce_primed, var.fit_primed, assay="exprs", get.spikes=TRUE)
+plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-expression",
+     ylab="Variance of log-expression")
+points(var.fit_primed$mean, var.fit_primed$var, col="red", pch=16)
+curve(var.fit_primed$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+```
+
+The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
+Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
+
+```{r var.primed}
+write.table(file=file.path(resdir, "var.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names = NA) 
+hvg.out_primed <- var.out_primed[which(var.out_primed$FDR <= 0.05 & var.out_primed$bio >= 0.5),]
+hvg.out_primed <- hvg.out_primed[order(hvg.out_primed$bio, decreasing=TRUE),]
+nrow(hvg.out_primed)
+write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
+head(hvg.out_primed)
+```
+
+We check that the HVGs are not being driven by outliers or batch effects.
+
+```{r violin.hvg}
+plotExpression(sce_primed, rownames(hvg.out_primed)[1:10], alpha=0.05, 
+    colour_by="batch", jitter="jitter") + fontsize
+```
+
+# Detecting correlated HVGs
+
+We also assess the pairwise correlations between the genes across the primed cells.
+Again, the usual suspects dominate the top set of correlations.
+
+```{r, cor.primed}
+set.seed(100) 
+var.cor_primed <- correlatePairs(sce_primed, design = design_primed, subset.row=rownames(hvg.out_primed)) 
+head(var.cor_primed)
+```
+
+We focus on the genes that have significantly large correlations.
+This happens to be the majority of HVGs that were originally detected.
+
+```{r, sig.primed}
+sig.cor_primed <- var.cor_primed$FDR <= 0.05
+summary(sig.cor_primed)
+chosen_primed <- unique(c(var.cor_primed$gene1[sig.cor_primed], var.cor_primed$gene2[sig.cor_primed]))
+saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_primed)
+length(chosen_primed)
+```
+
+```{r, echo=FALSE, results="hide"}
+rm(var.cor_primed)
+gc()
+```
+
+# Performing dimensionality reduction
+
+We remove the batch effect prior to performing dimensionality reduction.
+
+```{r}
+library(limma)
+norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
+```
+
+We then create _t_-SNE plots, using only the set of correlated HVGs.
+
+```{r tsne.primed, fig.width=15, fig.height=6}
+tsne1_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by=rownames(hvg.out_primed)[1],
+    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
+tsne2_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by="KLF4",
+    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
+tsne3_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by="batch",
+    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
+multiplot(tsne1_primed, tsne2_primed, tsne3_primed, cols=3)
+```
+
+And again, for PCA plots.
+
+```{r pca.primed, fig.width=15, fig.height=6}
+pca1_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by=rownames(hvg.out_primed)[1], 
+    feature_set = chosen_primed) + fontsize
+pca2_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by="KLF4", 
+    feature_set = chosen_primed) + fontsize
+pca3_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by="batch", 
+    feature_set = chosen_primed) + fontsize
+multiplot(pca1_primed, pca2_primed, pca3_primed, cols=3)
+```
+
+Both plots suggest that there is a small subpopulation off the main bulk of cells.
+
+# Clustering on Euclidean distance
+
+We perform hierarchical clustering on the Euclidean distance, using the correlated HVGs identified previously and the batch-corrected expression values.
+
+```{r primedclust}
+chosen.exprs_primed <- norm_exprs(sce_primed)[chosen_primed,]
+my.dist_primed <- dist(t(chosen.exprs_primed))
+my.tree_primed <- hclust(my.dist_primed, method="ward.D2")
+```
+
+To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
+There's not much evidence for clear separation of the clusters at any `k`.
+Many clusters have cells have negative widths that should be allocated to other clusters, indicating that the separation of cells here is quite weak.
+As such, we do not perform any clustering.
+
+```{r silhouette, fig.width=10, fig.height=10}
+library(cluster)
+par(mfrow=c(2,2))
+for (k in 2:5){
+    my.clusters_primed <- unname(cutree(my.tree_primed, k=k))
+    col <- rainbow(k)
+    sil <- silhouette(my.clusters_primed, dist = my.dist_primed)
+    sil.cols <- col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
+    sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
+    plot(sil, main = paste(k, "clusters"), border=sil.cols, 
+        col=sil.cols, do.col.sort=FALSE)
+}
+```
+
+# Comparison of subpopulation heterogeneity
+
+## Between naive and primed conditions
+
+We compare the variability of the naive and primed populations to each other.
+HVGs in each set are coloured separately, while HVGs detected in both conditions are shown in red.
+This result suggests that the heterogeneity is elevated in the primed subpopulation.
+
+```{r varcomp}
+var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
+hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
+lfc <- var.out_primed$mean - var.out_naive$mean
+dbio <- var.out_primed$bio - var.out_naive$bio
+plot(lfc, dbio, xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), pch=16)
+phvg <- match(rownames(hvg.out_primed), rownames(var.out_primed))
+nhvg <- match(rownames(hvg.out_naive), rownames(var.out_naive))
+all.hvgs <- c(nhvg, phvg)
+cols <- rep(c("orange", "dodgerblue"), c(length(nhvg), length(phvg)))
+set.seed(1000)
+shuffled <- sample(length(cols))
+all.hvgs <- all.hvgs[shuffled]
+cols <- cols[shuffled]
+points(lfc[all.hvgs], dbio[all.hvgs], col=cols, pch=16)
+in.both <- intersect(phvg, nhvg)
+points(lfc[in.both], dbio[in.both], col="salmon", pch=16)
+```
+
+We also check the number of expressed genes and the size factors between naive and primed cells.
+The primed cells seem a bit smaller, which might explain some of the increased heterogeneity.
+(Though if that were the case, we should have seen a shift in variability correlated with the log-fold change.)
+
+```{r, fig.width=10, fig.height=6}
+par(mfrow=c(1,2))
+sce_naive <- readRDS("sce_naive.rds")
+naive.genenum <- nexprs(sce_naive) 
+primed.genenum <- nexprs(sce_primed) 
+boxplot(list(Naive=naive.genenum, Primed=primed.genenum), ylab="Number of expressed genes")
+boxplot(list(Naive=sizeFactors(sce_naive), Primed=sizeFactors(sce_primed)), 
+    log="y", ylab="Size factors")
+```
+
+If simply the reduced count size were driving the increase in variability, we should see differences in the technical variance.
+This is not the case - or, at least, not enough to explain the differences in the biological components.
+
+```{r}
+plot(var.out_naive$mean, var.out_naive$tech, pch=16, col="orange", 
+    xlab="Log-mean", ylab="Technical variance")
+points(var.out_primed$mean, var.out_primed$tech, pch=16, col="dodgerblue")
+legend("topright", col=c("dodgerblue", "orange"), legend=c("Primed", "Naive"), pch=16)
+```
+
+## Interpreting the increased heterogeneity
+
+We check whether the extra variability is caused by the cell cycle.
+There are some differences in the classification of cells by `cyclone`, which I suppose could be biologically meaningful.
+
+```{r phasecheck}
+primed.col <- "#0072B2"
+naive.col <- "#e79f00"
+primed.phases <- table(sce_primed$phase)
+naive.phases <- table(sce_naive$phase)
+barplot(rbind(primed.phases, naive.phases), beside = TRUE, 
+    col = c(primed.col, naive.col), ylab="Number of cells")
+legend("topright", legend = c("primed", "naive"), 
+    fill = c(primed.col, naive.col), bty="n", cex=1.5)
+```
+
+We take the primed-only HVGs and use them in a gene set analysis.
+
+```{r primedgo}
+unique.genes <- rownames(var.out_primed)[setdiff(phvg, nhvg)]
+is.unique <- rownames(sce_primed) %in% unique.genes
+entreznames <- fData(sce_primed)$entrezgene
+has.entrez <- !is.na(entreznames)
+go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+```
+
+And again with KEGG terms:
+
+```{r primedkegg}
+kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+# Wrapping up
+
+We save our object for later use and report the session information.
+
+```{r}
+saveRDS(sce_primed, file="sce_primed.rds")
+sessionInfo()
+```
