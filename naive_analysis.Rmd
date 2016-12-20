@@ -30,8 +30,15 @@ This is more sensitive than doing so on the entire data set, where the naive/pri
 library(scran)
 sce <- readRDS("sce_all.rds")
 sce_naive <- sce[,pData(sce)$phenotype=="naive"] 
-sce_naive$batch <- factor(sce_naive$batch)
 dim(sce_naive)
+```
+
+We adjust the `batch` factor to get rid of the now-unnecessary "primed" level. 
+We also re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
+
+```{r}
+sce_naive$batch <- factor(sce_naive$batch)
+sce_naive <- normalize(sce_naive)
 ```
 
 We can examine the expression of the various ESC markers in more detail.
@@ -176,7 +183,7 @@ heat.vals_naive <- chosen.exprs_naive - rowMeans(chosen.exprs_naive)
 clust.col_naive <- rainbow(max(my.clusters_naive))
 library(gplots)
 heatmap.2(heat.vals_naive, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3, 
-    breaks = seq(-5,5, 1), ColSideColors=clust.col_naive[my.clusters_naive], 
+    breaks = seq(-10, 10, 1), ColSideColors=clust.col_naive[my.clusters_naive], 
     Colv=as.dendrogram(my.tree_naive), dendrogram='column')
 ``` 
 
@@ -368,7 +375,7 @@ unique.genes <- rownames(unique.marker)[1:200]
 is.unique <- rownames(sce) %in% unique.genes
 entreznames <- fData(sce)$entrezgene
 has.entrez <- !is.na(entreznames)
-go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
+go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
 write.table(file=file.path(resdir, "go_unique_trans.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
@@ -377,7 +384,7 @@ head(topgo)
 And again with KEGG terms:
 
 ```{r naivekegg}
-kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
+kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
 topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_unique_trans.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
@@ -388,11 +395,11 @@ We also do this for the top set of genes that are DE between the transition and 
 ```{r geneset_vs_naive}
 vs.naive.genes <- rownames(collected$naive)[1:200]
 vs.naive <- rownames(sce) %in% vs.naive.genes
-go <- goana(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species = "Hs")
+go <- goana(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
 write.table(file=file.path(resdir, "go_trans_vs_naive.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
-kegg <- kegga(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species = "Hs")
+kegg <- kegga(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species="Hs")
 topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_trans_vs_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
@@ -403,11 +410,11 @@ We repeat this for the top set of genes that are DE between transition and prime
 ```{r geneset_vs_primed}
 vs.primed.genes <- rownames(collected$primed)[1:200]
 vs.primed <- rownames(sce) %in% vs.primed.genes
-go <- goana(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species = "Hs")
+go <- goana(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
 write.table(file=file.path(resdir, "go_trans_vs_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
-kegg <- kegga(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species = "Hs")
+kegg <- kegga(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species="Hs")
 topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_trans_vs_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
