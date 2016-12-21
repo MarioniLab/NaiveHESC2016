@@ -1,237 +1,123 @@
-# Create figure directory and specifiy path of necessary R-objects
-dir.create(file.path("./figures"), showWarnings = F)
-objectpath <- file.path("./objects/")
+source("central.R")
 
-# Load colours
-primed.col <- readRDS(file = paste0(objectpath, "primed.col"))
-naive.col <- readRDS(file = paste0(objectpath, "naive.col"))
-trans.col <- readRDS(file = paste0(objectpath, "trans.col"))
+# Loading in the expression values.
+library(scater)
+sce <- readRDS("sce_all.rds")
+pops <- read.table(file.path("results-naive", "groups.tsv"), stringsAsFactors=FALSE, header=TRUE)
+m <- match(colnames(sce), pops$Cell)
+pops <- pops[m,]
 
-# Figure 2
+# Figure 2A
+library(pheatmap)
+library(gridExtra)
+library(grid)
 
-# A
+# Loading in the DE marker genes.
+de.naive <- read.table(file.path("results-naive", "markers_trans_vs_naive.tsv"), header=TRUE, nrows=50)
+de.primed <- read.table(file.path("results-naive", "markers_trans_vs_primed.tsv"), header=TRUE, nrows=50)
+o <- order(-de.naive$logFC)
+top.naive <- rownames(de.naive)[o]
+o <- order(de.primed$logFC)
+top.primed <- rownames(de.primed)[o]
 
-library("pheatmap")
-library("gridExtra")
-library("grid")
+heat.naive.vals <- exprs(sce)[top.naive,]
+heat.naive.vals <- heat.naive.vals - rowMeans(heat.naive.vals)
+heat.primed.vals <- exprs(sce)[top.primed,]
+heat.primed.vals <- heat.primed.vals - rowMeans(heat.primed.vals)
 
-re.pheno <- readRDS(file = paste0(objectpath, "pheno"))
+colramp <- colorRampPalette(c("navy", "white", "orangered"))(50)
+bound <- 5
+colbreaks <- seq(-bound, bound, length.out=length(colramp)+1)
+heat.naive.vals[heat.naive.vals >= bound] <- bound 
+heat.naive.vals[heat.naive.vals <= -bound] <- -bound 
+heat.naive.vals[heat.naive.vals >= bound] <- bound 
+heat.naive.vals[heat.naive.vals <= -bound] <- -bound 
 
-# lower third
-shared.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
-shared.vals[shared.vals < -5] <- -5
-shared.vals[shared.vals > 5] <- 5
-shared.vals <- shared.vals[which(duplicated(rownames(shared.vals))),]
+pdf(file=file.path(figdir, "2a.pdf"), width = 10, height = 10)
+layout(rbind(c(13,10,11,12,13), c(8,1,2,3,7),c(9,4,5,6,7)), widths=c(0.2, 1, 1, 1, 0.2), heights=c(0.1, 1, 1))
 
-genes.shared <- rep("shared",nrow(shared.vals))
-genes.shared <- factor(genes.shared, levels = "shared")
-genes.shared <- as.data.frame(genes.shared)
-colnames(genes.shared) <- "Gene Type"
-rownames(genes.shared) <- rownames(shared.vals)
+# Adding heatmaps.
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+image(t(heat.naive.vals[,pops$Type=="naive"]), axes=FALSE, col=colramp, breaks=colbreaks)
+image(t(heat.naive.vals[,pops$Type=="transition"]), axes=FALSE, col=colramp, breaks=colbreaks)
+image(t(heat.naive.vals[,pops$Type=="primed"]), axes=FALSE, col=colramp, breaks=colbreaks)
 
-# upper two thirs
-heat.vals <- readRDS(file = paste0(objectpath, "heat.vals"))
-heat.vals[heat.vals < -5] <- -5
-heat.vals[heat.vals > 5] <- 5
+image(t(heat.primed.vals[,pops$Type=="naive"]), axes=FALSE, col=colramp, breaks=colbreaks)
+image(t(heat.primed.vals[,pops$Type=="transition"]), axes=FALSE, col=colramp, breaks=colbreaks)
+image(t(heat.primed.vals[,pops$Type=="primed"]), axes=FALSE, col=colramp, breaks=colbreaks)
 
-naive <- re.pheno[which(re.pheno == "naive")]
-primed <- re.pheno[which(re.pheno == "primed")]
-trans <- re.pheno[which(re.pheno == "transition")]
-
-naive <- as.data.frame(naive)
-rownames(naive) <- colnames(heat.vals[,which(re.pheno == "naive")])
-primed <- as.data.frame(primed)
-rownames(primed) <- colnames(heat.vals[,which(re.pheno == "primed")])
-trans <- as.data.frame(trans)
-rownames(trans) <- colnames(heat.vals[,which(re.pheno == "transition")])
-
-gene.type <- c(rep("primed", nrow(heat.vals)/2), rep("naive", nrow(heat.vals)/2))
-gene.type <- gene.type[-which(rownames(heat.vals) %in% rownames(shared.vals))]
-gene.type <- factor(gene.type, levels = c( "primed", "naive"))
-gene.type <- as.data.frame(gene.type)
-gene.type <- as.data.frame(gene.type)
-
-heat.vals <- heat.vals[-which(rownames(heat.vals) %in% rownames(shared.vals)),]
-colnames(gene.type) <- "Transition vs"
-rownames(gene.type) <- rownames(heat.vals)
-
-
-# Create three new heatmaps with only the stuff additionally to this one
-
-# naive vs trans and primed vs trans
-p1 <- pheatmap(heat.vals[,which(re.pheno == "naive")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")),
-               show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col =naive, show_rownames = FALSE,
-               annotation_colors = list("naive" = c("naive" = naive.col), "Transition vs" = c(primed = "grey20", naive ="grey60")),
-               annotation_legend = FALSE, annotation_names_row = FALSE)
-
-
-p2 <- pheatmap(heat.vals[,which(re.pheno == "primed")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")), 
-               show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = primed, show_rownames = FALSE,
-               annotation_colors = list("primed" = c("primed" = primed.col), "Transition vs" = c(primed = "grey20", naive ="grey60")),
-               annotation_legend = FALSE, annotation_names_row = FALSE)
-
-p3 <-  pheatmap(heat.vals[,which(re.pheno == "transition")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-                annotation_row = gene.type, cluster_rows = FALSE, gaps_row = length(which(gene.type=="naive")),
-                show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = trans, show_rownames = FALSE,
-                annotation_colors = list("trans" = c("transition" = trans.col), "Transition vs" = c(primed = "grey20", naive ="grey60")),
-                annotation_legend = FALSE, annotation_names_row = FALSE)
-# shared genes
-p4 <- pheatmap(shared.vals[,which(re.pheno == "naive")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = genes.shared, cluster_rows = FALSE, fontsize_row = 11,
-               show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = naive, show_rownames = TRUE,
-               annotation_colors = list("naive" = c("naive" = naive.col), "Gene Type" = c(shared = "grey80")),
-               annotation_legend = FALSE, annotation_names_row = FALSE) 
-
-p5 <- pheatmap(shared.vals[,which(re.pheno == "primed")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = genes.shared, cluster_rows = FALSE, 
-               show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = primed, show_rownames = FALSE,
-               annotation_colors = list("primed" = c("primed" = primed.col), "Gene Type" = c(shared = "grey80")),
-               annotation_legend = FALSE, annotation_names_row = FALSE)
-
-p6 <- pheatmap(shared.vals[,which(re.pheno == "transition")], color = colorRampPalette(c("navy", "white", "orangered"))(50), legend=T, 
-               annotation_row = genes.shared, cluster_rows = FALSE, 
-               show_colnames = FALSE, cluster_cols = FALSE, fontsize = 4, annotation_col = trans, show_rownames = FALSE,
-               annotation_colors = list("trans" = c("transition" = trans.col), "Gene Type" = c(shared = "grey80")),
-               annotation_legend = FALSE, annotation_names_row = FALSE)
-
-plot1.grob <- p1$gtable$grob[[1]] #naive
-xlab1.grob <- p1$gtable$grob[[2]] 
-pheno.grob <- p1$gtable$grob[[3]]  
-ylab.grob <- p1$gtable$grob[[4]]  
-legend.grob <- p1$gtable$grob[[5]]  
-
-plot2.grob <- p2$gtable$grob[[1]] #primed
-xlab2.grob <- p2$gtable$grob[[2]]  
-
-plot3.grob <- p3$gtable$grob[[1]] #transition
-xlab3.grob<- p3$gtable$grob[[2]]  
-empty.grob <- nullGrob()
-
-ylab2.grob <- p5$gtable$grob[[4]]  
-plot4.grob <- p4$gtable$grob[[1]] #naive
-plot5.grob <- p5$gtable$grob[[1]] #primed
-plot6.grob <- p6$gtable$grob[[1]] #transition
-
-grid.mat <- matrix(1,40,41)  #empty matrix
-grid.mat[1,4:37] <- 2      #xtext 
-grid.mat[3:38,1:2] <- 3    #ytext
-grid.mat[4:38,40:41] <- 4  #legend
-grid.mat[4:38,3] <- 5      #ylab
-#plots
-grid.mat[4:38,4:14] <- 6   #naive
-grid.mat[4:38,16:26] <- 7  #trans
-grid.mat[4:38,28:38] <- 8  #primed
-#xlabs
-grid.mat[3,4:14] <- 9      #naive
-grid.mat[3,16:26] <- 10    #trans
-grid.mat[3,28:38] <- 11    #primed
-grid.mat[2, 4:5] <- 12     #number of naive
-grid.mat[2, 16:17] <- 13   #number of transition
-grid.mat[2, 28:29] <- 14   #number of primed
-
-shared.rownames <- p4$gtable$grob[[2]]
-xtext <- textGrob("Phenotype", gp = gpar(cex=1.25))
-ytext <- textGrob("DE genes", rot=90, gp = gpar(cex=1.5))
-ytext.shared <- textGrob("Shared DE genes", rot=90, gp = gpar(cex=1.5))
-xnaive <- textGrob(nrow(naive))
-xprimed <- textGrob(nrow(primed))
-xtrans <- textGrob(nrow(trans))
-
-pdf(file="./figures/figure2a.pdf", onefile = FALSE, width = 10, height = 10)
-grid.arrange(grobs = list(empty.grob, xtext, ytext, legend.grob, ylab.grob, plot1.grob, 
-                          plot3.grob, plot2.grob, xlab1.grob, xlab3.grob, xlab2.grob, 
-                          xnaive, xtrans, xprimed),
-             layout_matrix = grid.mat) 
-
-dev.off()
-
-
-pdf(file="./figures/sup.figure2b.pdf", onefile = FALSE, width = 7, height = 7)
-grid.mat <- matrix(1,40,47)  #empty matrix
-# shared genes
-grid.mat[4:38,4:14] <- 2 #naive plot
-grid.mat[4:38,16:26] <- 3 #trans plot
-grid.mat[4:38,28:38] <- 4 #primed plot
-grid.mat[4:38,3] <- 5    #ylab
-grid.mat[4:38,1:2] <- 6  #ytext
-grid.mat[4:38,39] <- 7  #rownames
-grid.mat[1,4:38] <- 8      #xtext 
-grid.mat[2, 4:5] <- 9     #number of naive
-grid.mat[2, 16:17] <- 10   #number of transition
-grid.mat[2, 28:29] <- 11   #number of primed
-grid.mat[3,4:14] <- 12      #naive
-grid.mat[3,16:26] <- 13    #trans
-grid.mat[3,28:38] <- 14   #primed
-grid.mat[4:38,45:47] <- 15  #legend
-
-grid.arrange(grobs = list(empty.grob, plot4.grob, plot6.grob, plot5.grob, ylab2.grob, 
-             ytext.shared, shared.rownames, xtext,  xnaive, xtrans, xprimed, 
-             xlab1.grob, xlab3.grob, xlab2.grob, legend.grob), layout_matrix = grid.mat)
-dev.off()
-
-# Legend 2A
-pdf(file="./figures/figure2a_legend.pdf", width = 10, height = 5)
-plot.new()
-par(mar=c(1.1,1.1,1.1,1.1))
-legend("left", legend = c("Naive", "Transition", "Primed"), fill=c(naive.col, trans.col, primed.col), 
-       title = "Population", bty="n", horiz = T)
-legend("right", legend = c("Trans vs Naive", "Trans vs Primed"), fill=c("grey20", "grey60"), title = "DE Genes", bty="n", horiz = T)
-
-dev.off()
-
-# B
-library("edgeR")
-res_all <- readRDS(file = paste0(objectpath, "res_all"))
-top.genes <- topTags(res_all, n=Inf)$table
-top.genes <- head(rownames(top.genes[top.genes$PValue<0.05,]), n=10)
-sce_trans <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/new_sce_trans")
-chosen <- readRDS(file = "~/Documents/vMeyenn/paper_files/objects/chosen1")
-fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-sce_trans$Phenotype <- sce_trans$phenotype
-
-pdf(file="./figures/figure2b.pdf", width = 10, height = 15)
-
-par(las=1, mar = c(3.1, 2.1, 1.1, 0.5))
-layout(matrix(c(5,5,5,1,2,3,4,4,4), ncol=3), width = c(1,9,2))
-for (ptype in c("naive", "transition", "primed")) {
-  object <- sce_trans[,pData(sce_trans)$phenotype==ptype]
-  ugly.plot <- plotExpression(object, features = c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG"), col = "phenotype")
-  plot_data <- ggplot_build(ugly.plot)
-
-  if (ptype == "primed"){plot_data$data[[1]]$colour[] <- primed.col
-  } else if (ptype == "naive") {plot_data$data[[1]]$colour[] <- naive.col
-  } else if (ptype == "transition") {plot_data$data[[1]]$colour[] <- trans.col}
-
-  plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = plot_data$data[[1]]$colour,
-     pch=16, xlab = "" , ylab ="", cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,11))
-  if (ptype == "primed"){
-  axis(1, at=1:5, labels = levels(plot_data$plot$data$Feature), cex.axis = 2)}
+# Adding the colorbar.
+par(mar=c(1.1, 0.5, 1.1, 2))
+plot(c(0, 10), range(colbreaks)*2, type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='')
+axis(4, at=(-bound):bound, las=1)
+for (i in seq_along(colramp)){ 
+    rect(0,colbreaks[i],10,colbreaks[i+1], col=colramp[i], border=colramp[i])
 }
-plot.new()
-legend("center", title = "Population",  legend = c("Naive", "Transition", "Primed"), 
-       pch=16, cex=1.75, col=c(naive.col, trans.col, primed.col), bty='n')
-par(las = 0)
-mtext("Log expression", line = -2, side=2, padj=2, outer=TRUE, cex = 1.5)
+
+# Adding references to the type of gene.
+par(mar=c(0.5, 0.5, 0.5, 0.2))
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(v=1, col="grey30", lwd=5)
+text(0.5, 0.5, "DE genes (transition versus naive)", srt=90, cex=1.5)
+
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(v=1, col="grey70", lwd=5)
+text(0.5, 0.5, "DE genes (transition versus primed)", srt=90, cex=1.5)
+
+# Adding references to the type of cells.
+par(mar=c(0.2, 0.5, 0.5, 0.5))
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(h=0, col=naive.col, lwd=5)
+text(0.5, 0.5, sprintf("Naive cells (%i)", sum(pops$Type=="naive")), cex=1.5)
+
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(h=0, col=trans.col, lwd=5)
+text(0.5, 0.5, sprintf("Transition cells (%i)", sum(pops$Type=="transition")), cex=1.5)
+
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(h=0, col=primed.col, lwd=5)
+text(0.5, 0.5, sprintf("Primed cells (%i)", sum(pops$Type=="primed")), cex=1.5)
+dev.off()
+
+# Figure 2B
+pdf(file=file.path(figdir, "2b.pdf"), width = 6, height = 10)
+markers <- c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG")
+
+par(las=1, mar = c(2.1, 4.5, 0.1, 0.5), mfrow=c(3,1))
+for (ptype in c("naive", "transition", "primed")) {
+    object <- sce[,pops$Type==ptype]
+    ugly.plot <- plotExpression(object, features = markers, col = "phenotype")
+    plot_data <- ggplot_build(ugly.plot)
+  
+    pcol <- switch(ptype, naive=naive.col, primed=primed.col, transition=trans.col)      
+    plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = pcol, 
+         ylab=bquote(.(stuff)~log[2]*"-expression", list(stuff=paste0(toupper(substring(ptype, 1, 1)), substring(ptype, 2)))),
+         pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,11), cex.axis=1.2)
+    if (ptype == "primed"){
+        axis(1, at=seq_along(markers), labels = levels(plot_data$plot$data$Feature), cex.axis = 1.5)
+    } else {
+        axis(1, at=seq_along(markers), labels=character(length(markers)))
+    }
+}
 
 dev.off()
 
-# C
-pdf(file="./figures/figure2c.pdf", width = 10)
-
-ugly.plot <- plotPCA(sce_trans, exprs_values="exprs", colour_by="Phenotype", feature_set = chosen) + 
-  fontsize + theme(legend.title = element_text(size=15), legend.text = element_text(size=12))
+# Figure 2C
+chosen <- readRDS(file.path("results-overall", "cor_hvg.rds"))
+ugly.plot <- plotPCA(sce, exprs_values="norm_exprs", feature_set = chosen)
 plot_data <- ggplot_build(ugly.plot)
 
-plot_data$data[[2]]$fill[which(plot_data$data[[2]]$fill=="#FF9E4A")] <- primed.col # Primed
-plot_data$data[[2]]$fill[which(plot_data$data[[2]]$fill=="#729ECE")] <- naive.col # Naive
-plot_data$data[[2]]$fill[which(plot_data$data[[2]]$fill=="#67BF5C")] <- trans.col # Transition
+all.colors <- character(ncol(sce))
+all.colors[pops$Type=="naive"] <- naive.col
+all.colors[pops$Type=="transition"] <- trans.col
+all.colors[pops$Type=="primed"] <- primed.col
 
-par(mar = c(5.1, 5.1, 4.1, 6.1), las = 1)
-plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = plot_data$data[[2]]$fill, 
+pdf(file=file.path(figdir, "2c.pdf"), width=8, height=6)
+layout(cbind(1,2), width=c(5, 1.5))
+par(mar=c(5.1, 4.2, 4.1, 1.1))
+plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = all.colors,
      pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5)
-par(xpd=TRUE)
-legend(23.7,10.37, title = "Population",  legend = c("Primed", "Naive", "Transition"), pch=16, cex=1.25, col=c(primed.col, naive.col, trans.col), bty='n')
-
+par(mar=c(5.1, 0.1, 4.1, 0.1))
+plot.new()
+legend("topleft", legend=c("Naive", "Transition", "Primed"), col=c(naive.col, trans.col, primed.col), pch=16, cex=1.5)
 dev.off()

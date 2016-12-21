@@ -17,6 +17,7 @@ if [ -e $targetdir ]
 then
     cp *.html $targetdir
     cp -r results-* $targetdir
+    cp -r Figures $targetdir
 else 
     echo "'$targetdir' does not exist!"
     exit 1    
