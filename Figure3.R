@@ -1,95 +1,106 @@
-# Create figure directory and specifiy path of necessary R-objects
-dir.create(file.path("./figures"), showWarnings = F)
-objectpath <- file.path("./objects/")
+source("central.R")
 
-# Load Colors 
-primed.col <- readRDS(file = paste0(objectpath, "primed.col"))
-naive.col <- readRDS(file = paste0(objectpath, "naive.col"))
+hvg.naive <- read.table(file.path("results-naive", "hvg.tsv"), header=TRUE)
+hvg.primed <- read.table(file.path("results-primed", "hvg.tsv"), header=TRUE)
+var.naive <- read.table(file.path("results-naive", "var.tsv"), header=TRUE)
+var.primed <- read.table(file.path("results-primed", "var.tsv"), header=TRUE)
+de.res <- read.table(file.path("results-overall", "de.tsv"), header=TRUE)
+de.res <- de.res[rownames(var.naive),]
 
-# Figure 3
-
-# A
-hvg.matrix <- readRDS(file = paste0(objectpath, "hvg.matrix"))
-colnames(hvg.matrix) <- c("Primed", "Naive")
-
-pdf(file="./figures/figure3a.pdf", width = 4)
+# Figure 3A
+pdf(file=file.path(figdir, "3a.pdf"), width = 4)
 par(mar = c(5.1, 5.5, 4.1, 2.1), las = 1)
-plot <- barplot(hvg.matrix, ylab="Highly variable genes",
-              ylim = c(0,7500), col = c(primed.col, naive.col), beside = TRUE,
-              xlim = c(0,2), width = 0.7, space = c(0,0.5), cex.axis = 0.75, cex.lab = 1.3, cex.names = 1.3)
-text(x = plot, y = hvg.matrix, label = hvg.matrix, cex = 0.75, pos = 3)
-
+hvg.num <- c(Primed=nrow(hvg.primed), Naive=nrow(hvg.naive))
+out <- barplot(hvg.num/1e3, ylab=expression("Number of highly variable genes ("*10^3*")"),
+        ylim = c(0, 7), col = c(primed.col, naive.col), beside = TRUE,
+        width = 0.7, space = c(0.2), cex.axis = 1.2, cex.lab = 1.3, cex.names = 1.3)
+text(x = out, y = hvg.num/1e3, label = hvg.num, cex = 1.2, pos = 3)
 dev.off()
 
+# Figure 3B
+library(org.Hs.eg.db)
+anno <- select(org.Hs.eg.db, key="GO:0000278", keytype="GOALL", column="ENSEMBL")
+library(scater)
+sce_naive <- readRDS("sce_naive.rds")
+stopifnot(identical(rownames(sce_naive), rownames(var.naive)))
+is.cycling <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 
-# B
-library("org.Hs.eg.db")
-library("limma")
-hvg.out_naive <- readRDS(file = paste0(objectpath, "hvg.naive"))
-hvg.out_primed <- readRDS(file = paste0(objectpath, "hvg.primed"))
-shared_genes <- intersect(rownames(hvg.out_naive), rownames(hvg.out_primed))
+pdf(file=file.path(figdir, "3b.pdf"))
+plot(var.naive$bio, var.primed$bio, xlim=c(0, 12), ylim=c(0, 12), pch=16, cex=0.5, col="grey80",
+     xlab="Biological component (naive)", ylab="Biological component (primed)", cex.axis=1.2, cex.lab=1.4)
+hvgs <- intersect(rownames(hvg.naive), rownames(hvg.primed))
+is.shared <- rownames(var.naive) %in% hvgs
+points(var.naive$bio[is.shared], var.primed$bio[is.shared], col="black", pch=16, cex=0.8)
+abline(0, 1, col="red", lwd=2)
 
-ensembl <- readRDS(file = paste0(objectpath, "ensemblGenes"))
-
-entrez <- ensemblGenes[match(shared_genes, ensemblGenes$external_gene_name),]
-shared_genes <- shared_genes[-which(is.na(entrez$entrezgene))]
-entrez <- entrez[-which(is.na(entrez$entrezgene)),]
-entrez_genes <- entrez$entrezgene
-
-GoTerms <- goana(entrez_genes, species = "Hs")
-
-# [567] "regulation of cell proliferation"   GO:0042127         
-# [629] "regulation of DNA methylation"  GO:0044030
-# [688] "embryo implantation"          GO:0007566                                                                              
+points(var.naive$bio[is.cycling & is.shared], var.primed$bio[is.cycling & is.shared], col="coral", pch=16, cex=1)
+legend(12, 0, xjust=1, yjust=0, legend=c("Not shared", "Shared HVG", "Shared, cell cycle"), 
+       col=c("grey80", "black", "coral"), pch=16, cex=1.2)
+dev.off()    
     
-cell.prol <- AnnotationDbi::select(org.Hs.eg.db, keys="GO:0042127", keytype="GOALL", column="ENSEMBL")
-DNA.meth <- AnnotationDbi::select(org.Hs.eg.db, keys="GO:0044030", keytype="GOALL", column="ENSEMBL")
-embryo.implant <- AnnotationDbi::select(org.Hs.eg.db, keys="GO:0007566", keytype="GOALL", column="ENSEMBL")
+# Figure 2C
+anno <- select(org.Hs.eg.db, key="GO:0007420", keytype="GOALL", column="ENSEMBL")
+is.brain <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
+anno <- select(org.Hs.eg.db, key="GO:0042384", keytype="GOALL", column="ENSEMBL")
+is.cilia <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 
-ensembl_ids <- ensemblGenes[match(shared_genes, ensemblGenes$external_gene_name),]
-ensembl_ids <- ensembl_ids$ensembl_gene_id
-cell.prol <- intersect(ensembl_ids, cell.prol$ENSEMBL)
-DNA.meth <- intersect(ensembl_ids, DNA.meth$ENSEMBL)
-embryo.implant <- intersect(ensembl_ids, embryo.implant$ENSEMBL)
+unique.primed <- hvg.primed[!rownames(hvg.primed) %in% rownames(hvg.naive),]
+unique.naive <- hvg.naive[!rownames(hvg.naive) %in% rownames(hvg.primed),]
+op <- seq_len(nrow(unique.primed))/nrow(unique.primed) * 100
+on <- seq_len(nrow(unique.naive))/nrow(unique.naive) * 100
+yp <- sort(unique.primed$bio)
+yn <- sort(unique.naive$bio)
 
-gene.function <- data.frame("Color"=rep("grey20", length(ensembl_ids)), row.names = ensembl_ids)
-gene.function$Color <- as.character(gene.function$Color)
-gene.function[cell.prol,1] <- "coral"
-gene.function[DNA.meth,1] <- "darkgoldenrod1"
-gene.function[embryo.implant,1] <- "deepskyblue"
+pdf(file=file.path(figdir, "3c.pdf"))
+par(mar = c(5.1, 5.1, 4.1, 2.1))
+plot(op, yp, ylab="Biological component", col=primed.col, xlab="Relative rank (%)", type="l", lwd=3, cex.axis=1.2, cex.lab=1.4)
+lines(on, yn, col=naive.col, lwd=3)
 
+is.primed.brain <- is.brain[match(rownames(unique.primed), rownames(var.primed))]
+bonus <- 0.1
+primed.sub.col <- "royalblue3"
+naive.sub.col <- "goldenrod3"
+points(op[is.primed.brain], yp[is.primed.brain]+bonus, pch=25, bg=primed.sub.col)
+is.naive.brain <- is.brain[match(rownames(unique.naive), rownames(var.naive))]
+points(on[is.naive.brain], yn[is.naive.brain]+bonus, pch=25, bg=naive.sub.col)
 
-pdf(file="./figures/figure3b.pdf")
-par(bty='l', las = 1, mar = c(5.1, 5.5, 4.1, 2.1))
-plot(hvg.out_naive[shared_genes,]$bio, hvg.out_primed[shared_genes,]$bio, xlim=c(0.5,9), ylim=c(0.5,9), 
-     pch = 16, cex = 1,  ylab = "Biological variance [primed]", col=gene.function[,1], 
-     xlab = "Biological variance [naive]", cex.lab=1.3)
-abline(0,1, col = "indianred2", lty = 1)
-legend("topright", legend = c("Cell proliferation", "DNA methylation", "Embryo implantation"), 
-       col = c("coral", "darkgoldenrod1", "deepskyblue"), bty="o", pch=16, box.col = "white", bg="white")
-#text(hvg.out_naive[top_genes,]$bio+0.5, hvg.out_primed[top_genes,]$bio, labels = top_genes)
-dev.off()
+is.primed.cilia <- is.cilia[match(rownames(unique.primed), rownames(var.primed))]
+points(op[is.primed.cilia], yp[is.primed.cilia], pch=21, bg=primed.sub.col)
+is.naive.cilia <- is.cilia[match(rownames(unique.naive), rownames(var.naive))]
+points(on[is.naive.cilia], yn[is.naive.cilia], pch=21, bg=naive.sub.col)
 
-
-# C
-primed_genes <- unique(rownames(hvg.out_naive), rownames(hvg.out_primed))
-naive_genes <- unique(rownames(hvg.out_primed), rownames(hvg.out_naive))
-
-data <- list(primed = data.frame(hvg.out_primed[primed_genes,]$bio), naive = data.frame(hvg.out_naive[naive_genes,]$bio))
-data <- lapply(data, function(x) { x[1:nrow(hvg.out_primed),] })
-data <- cbind(data$primed, data$naive)
-data <- as.data.frame(data)
-colnames(data) <- c("Primed", "Naive")
-
-pdf(file="./figures/figure3c.pdf", width = 4)
-par(bty='n', las = 1, mar = c(3.1, 5.5, 4.1, 2.1))
-boxplot(data, col = c(primed.col, naive.col), boxwex = 0.5, ylim = c(-1,10), cex.lab = 1.3,
-        outline=FALSE, ylab = "Biological variance", xaxt = "n")
-text(x = c(1,2), y=c(-1,-1), labels = c("Primed", "Naive"), cex=1.3)
+legend(0, max(yp, yn), 
+       legend=c(sprintf("Primed-only HVG (%i)", length(op)),
+                sprintf("Primed-only, brain development"),
+                sprintf("Primed-only, cilia assembly"),
+                sprintf("Naive-only HVG (%i)", length(on)),
+                sprintf("Naive-only, brain development"),
+                sprintf("Naive-only, cilia assembly")),
+       col=c(primed.col, "black", "black", naive.col, "black", "black"),
+       pt.bg=c(primed.col, primed.sub.col, primed.sub.col, naive.col, naive.sub.col, naive.sub.col),
+       pch=c(NA, 25, 21, NA, 25, 21),
+       lwd=c(2,NA,NA,2,NA,NA), cex=1.2)
 dev.off()
 
 
 # Supplements
+
+# Plotting all of the HVGs together in one pile.
+x <- -de.res$logFC
+y <- var.primed$bio - var.naive$bio
+plot(x, y, pch=16, cex=0.5,
+     ylab="Difference in variance (primed - naive)",
+     xlab=expression(Log[2]~"fold change (primed/naive)")) 
+
+hvgs <- c(rownames(hvg.naive), rownames(hvg.primed))
+cols <- rep(c(naive.col, primed.col), c(nrow(hvg.naive), nrow(hvg.primed)))
+set.seed(100)
+s <- sample(length(cols))
+hvgs <- hvgs[s]
+cols <- cols[s]
+m <- match(hvgs, rownames(var.naive))
+points(x[m], y[m], col=cols, pch=16, cex=0.5)
+
 
 sce_primed <- readRDS(file = paste0(objectpath, "new_sce_primed_object"))
 sce_naive <- readRDS(file = paste0(objectpath, "new_sce_naive_object"))

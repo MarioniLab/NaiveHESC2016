@@ -189,6 +189,7 @@ for (k in 2:5){
 We compare the variability of the naive and primed populations to each other.
 HVGs in each set are coloured separately, while HVGs detected in both conditions are shown in red.
 This result suggests that the heterogeneity is elevated in the primed subpopulation.
+Note that this is not purely driven by a change in the mean expression, as the shift in the biological components occurs mostly for genes at a log-fold change of zero.
 
 ```{r varcomp}
 var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
