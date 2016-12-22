@@ -187,13 +187,21 @@ for (k in 2:5){
 ## Between naive and primed conditions
 
 We compare the variability of the naive and primed populations to each other.
-HVGs in each set are coloured separately, while HVGs detected in both conditions are shown in red.
-This result suggests that the heterogeneity is elevated in the primed subpopulation.
-Note that this is not purely driven by a change in the mean expression, as the shift in the biological components occurs mostly for genes at a log-fold change of zero.
+There are more HVGs detected in the primed population.
 
-```{r varcomp, fig.width=10, fig.height=6}
+```{r}
 var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
 hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
+nrow(hvg.out_primed)
+nrow(hvg.out_naive)
+```
+
+We also plot the differences in the biological component between conditions, for all genes and primed/naive HVGs.
+This result suggests that the heterogeneity is elevated in the primed subpopulation.
+Note that this is not purely driven by a change in the mean expression, as the shift in the biological components occurs mostly for genes at a log-fold change of zero.
+(Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.)
+
+```{r varcomp, fig.width=10, fig.height=6}
 dbio <- var.out_primed$bio - var.out_naive$bio
 
 # Expression values are not directly comparable between separately-normalized objects.
@@ -212,54 +220,29 @@ smoothScatter(lfc[nhvg], dbio[nhvg], xlab=expression(Log[2]~"fold change"),
     ylab=expression(Delta*"biological component"), main="Naive HVGs")
 ```
 
-We also check the number of expressed genes and the size factors between naive and primed cells.
-The primed cells seem a bit smaller, which might explain some of the increased heterogeneity.
-(Though if that were the case, we should have seen a shift in variability correlated with the log-fold change.)
+We can look further at the distribution of total and technical variances with respect to the mean.
+The technical trends are quite similar.
+It's also quite obvious that the bulk of genes are more heterogeneous in the primed condition.
 
 ```{r, fig.width=10, fig.height=6}
 par(mfrow=c(1,2))
-sce_naive <- readRDS("sce_naive.rds")
-naive.genenum <- nexprs(sce_naive) 
-primed.genenum <- nexprs(sce_primed) 
-boxplot(list(Naive=naive.genenum, Primed=primed.genenum), ylab="Number of expressed genes")
-
-# Size factors not comparable after subsetting and re-centering in each object; 
-# need to go back to the source when comparing size factors.
-sce_all <- readRDS("sce_all.rds")
-by.pheno <- list(Naive=sizeFactors(sce_all)[sce_all$phenotype=="naive"],
-                 Primed=sizeFactors(sce_all)[sce_all$phenotype=="primed"])
-boxplot(by.pheno, log="y", ylab="Size factors")
+plot(var.out_primed$mean, var.out_primed$total, col="dodgerblue", pch=16)
+points(var.out_primed$mean, var.out_primed$tech, col="red", pch=16)
+plot(var.out_naive$mean, var.out_naive$total, col="orange", pch=16)
+points(var.out_naive$mean, var.out_naive$tech, col="red", pch=16)
 ```
 
-We can test if the reduced count size is purely responsible for the increase in variability, by downsampling counts in the naive state to match the mean size factors.
-There doesn't seem to be a major difference in the total variance trends, so this probably isn't the reason for the increased heterogeneity.
-As one might expect, really, because Poisson noise should be negligble to overall scRNA-seq variability.
+We also check the number of expressed genes between naive and primed cells.
+The primed cells have more-or-less the same number of expressed genes, which means that the number of genes isn't driving the difference in the number of HVGs.
+(This plot isn't particularly informative because differences in numbers of expressed genes would manifest as a non-zero log-fold change anyway.)
 
 ```{r}
-downprop <- median(by.pheno$Primed)/median(by.pheno$Naive)
-downprop
-set.seed(1000)
-mod_naive <- rbinom(length(counts(sce_naive)), p=downprop, size=counts(sce_naive))
-dim(mod_naive) <- dim(counts(sce_naive))
-sce_naive_copy <- sce_naive
-counts(sce_naive_copy) <- mod_naive
-
-# No need to adjust naive centered size factors, relative differences
-# between cells haven't changed, only their absolute size.
-sce_naive_copy <- normalize(sce_naive_copy) 
-
-all.fit_naive <- trendVar(sce_naive, use.spikes=FALSE, trend="loess", span=0.4)
-all.fit_primed <- trendVar(sce_primed, use.spikes=FALSE, trend="loess", span=0.4)
-mod.fit_naive <- trendVar(sce_naive_copy, use.spikes=FALSE, trend="loess", span=0.4)
-curve(all.fit_primed$trend(x), xlim=c(0, 10), col="dodgerblue", lwd=2)
-curve(all.fit_naive$trend(x), xlim=c(0, 10), col="orange", add=TRUE, lwd=2)
-curve(mod.fit_naive$trend(x), xlim=c(0, 10), col="orange", add=TRUE, lty=2, lwd=2)
-legend("topright", col=c("dodgerblue", "orange", "orange"), lwd=2,
-    lty=c(1,1,2), legend=c("Primed", "Naive (original)", "Naive (downsampled)"))
+naive.genenum <- sum(var.out_naive$mean > 0)
+primed.genenum <- sum(var.out_primed$mean > 0)
+barplot(cbind(Naive=naive.genenum, Primed=primed.genenum), ylab="Number of expressed genes")
 ```
 
 ```{r, echo=FALSE, results="hide"}
-rm(mod_naive, sce_naive_copy)
 gc()
 ```
 
@@ -271,6 +254,7 @@ There are some differences in the classification of cells by `cyclone`, which I 
 ```{r phasecheck}
 primed.col <- "#0072B2"
 naive.col <- "#e79f00"
+sce_naive <- readRDS("sce_naive.rds")
 primed.phases <- table(sce_primed$phase)
 naive.phases <- table(sce_naive$phase)
 barplot(rbind(primed.phases, naive.phases), beside = TRUE, 

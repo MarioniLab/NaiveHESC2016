@@ -83,30 +83,15 @@ dev.off()
 ### Supplements
 
 # A
-library(scater)
-sce_naive <- readRDS("sce_naive.rds")
-naive.num <- nexprs(sce_naive)
-sce_primed <- readRDS("sce_primed.rds")
-primed.num <- nexprs(sce_primed)
-sce_all <- readRDS("sce_all.rds")
+naive.genenum <- sum(var.naive$mean > 0)
+primed.genenum <- sum(var.primed$mean > 0)
 
-pdf(file=file.path(figdir, "s3a.pdf"), width=10, height=4)
-par(mfrow=c(1,1), mar = c(5.1, 5.1, 1.1, 0.5), las = 1)
-layout(cbind(1,2,3), width=c(1,1,0.6))
-boxplot(list(Primed=primed.num/1e3, Naive=naive.num/1e3), col = c(primed.col, naive.col),
-        ylab=expression("Number of expressed genes  ("*10^3*")"), cex.axis=1.2, cex.names=1.4, cex.lab=1.4, range=0)
-                 
-# Size factors not comparable after subsetting and re-centering in each object,
-# need to take them from the source object.
-by.pheno <- list(Primed=sizeFactors(sce_all)[sce_all$phenotype=="primed"], 
-                 Naive=sizeFactors(sce_all)[sce_all$phenotype=="naive"])
-boxplot(by.pheno, col = c(primed.col, naive.col), log="y",
-        ylab="Size factors", cex.axis=1.2, cex.names=1.4, cex.lab=1.4, range=0)
-
-num.mat <- c(Primed=unname(ncol(sce_primed)), Naive=unname(ncol(sce_naive)))
-out <- barplot(num.mat, beside = TRUE, col = c(primed.col, naive.col), ylab="Number of cells", space=0.2,
-               cex.axis=1.2, cex.lab=1.4, cex.names=1.4, ylim=c(0, 500))
-text(out, num.mat, num.mat, cex=1.2, pos=3)
+pdf(file=file.path(figdir, "s3a.pdf"), width=4)
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+gcounts <- c(Primed=primed.genenum, Naive=naive.genenum)
+out <- barplot(gcounts/1e3, col = c(primed.col, naive.col), ylim=c(0, 16), width=0.5,
+        ylab=expression("Number of expressed genes  ("*10^3*")"), cex.axis=1.2, cex.names=1.4, cex.lab=1.4)
+text(out, gcounts/1e3, gcounts, pos=3, cex=1.2)
 dev.off()
 
 # B
@@ -150,3 +135,23 @@ for (mode in 1:4) {
 }
 dev.off()
 
+# C
+
+pdf(file=file.path(figdir, "s3c.pdf"), width=12, height=6)
+par(mfrow=c(1,2), mar=c(5.1, 4.1, 2.1, 2.1))
+plot(var.primed$mean, var.primed$total, col="dodgerblue", pch=16, ylim=c(0, 15), 
+     xlab=expression("Average"~log[2]~"count"), ylab="Variance", cex.axis=1.2, cex.lab=1.4)
+o <- order(var.primed$mean)
+lines(var.primed$mean[o], var.primed$tech[o], col="red", lwd=2)
+legend(max(var.primed$mean), max(var.primed$total), xjust=1, yjust=1, 
+       legend=c("Total variance (primed)", 
+                "Total variance (naive)",
+                "Technical variance"), col=c(primed.col, naive.col, "red"),
+       pch=c(16, NA), lwd=(NA, 2))
+
+
+plot(var.naive$mean, var.naive$total, col="orange", pch=16, ylim=c(0, 15),
+     xlab=expression("Average"~log[2]~"count"), ylab="Variance",  cex.axis=1.2, cex.lab=1.4)
+o <- order(var.naive$mean)
+lines(var.naive$mean[o], var.naive$tech[o], col="red", lwd=2)
+dev.off()
