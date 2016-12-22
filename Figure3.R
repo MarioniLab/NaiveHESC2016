@@ -139,18 +139,27 @@ dev.off()
 
 pdf(file=file.path(figdir, "s3c.pdf"), width=12, height=6)
 par(mfrow=c(1,2), mar=c(5.1, 4.1, 2.1, 2.1))
-plot(var.primed$mean, var.primed$total, col=primed.col, pch=16, ylim=c(0, 15), 
+plot(var.primed$mean, var.primed$total, col="grey80", pch=16, ylim=c(0, 15), xlim=c(0, 16),
      xlab=expression("Average"~log[2]~"count"), ylab="Variance", cex.axis=1.2, cex.lab=1.4)
+is.hvg <- rownames(var.primed) %in% rownames(hvg.primed)
+points(var.primed$mean[is.hvg], var.primed$total[is.hvg], col=primed.col, pch=16)
 o <- order(var.primed$mean)
 lines(var.primed$mean[o], var.primed$tech[o], col="red", lwd=2)
-legend(max(var.primed$mean), 15, xjust=1, yjust=1, 
-       legend=c("Total variance (primed)", 
-                "Total variance (naive)",
-                "Technical variance"), col=c(primed.col, naive.col, "red"),
+legend(16, 15, xjust=1, yjust=1, 
+       legend=c("Not HVG",
+                "Primed HVG", 
+                "Technical"), col=c("grey80", primed.col, "red"),
        pch=c(16, 16, NA), lwd=c(NA, NA, 2))
 
-plot(var.naive$mean, var.naive$total, col=naive.col, pch=16, ylim=c(0, 15),
+plot(var.naive$mean, var.naive$total, col="grey80", pch=16, ylim=c(0, 15), xlim=c(0, 16),
      xlab=expression("Average"~log[2]~"count"), ylab="Variance",  cex.axis=1.2, cex.lab=1.4)
+is.hvg <- rownames(var.naive) %in% rownames(hvg.naive)
+points(var.naive$mean[is.hvg], var.naive$total[is.hvg], col=naive.col, pch=16)
 o <- order(var.naive$mean)
 lines(var.naive$mean[o], var.naive$tech[o], col="red", lwd=2)
+legend(16, 15, xjust=1, yjust=1, 
+       legend=c("Not HVG",
+                "Naive HVG", 
+                "Technical"), col=c("grey80", naive.col, "red"),
+       pch=c(16, 16, NA), lwd=c(NA, NA, 2))
 dev.off()
