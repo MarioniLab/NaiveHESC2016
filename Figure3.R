@@ -139,18 +139,17 @@ dev.off()
 
 pdf(file=file.path(figdir, "s3c.pdf"), width=12, height=6)
 par(mfrow=c(1,2), mar=c(5.1, 4.1, 2.1, 2.1))
-plot(var.primed$mean, var.primed$total, col="dodgerblue", pch=16, ylim=c(0, 15), 
+plot(var.primed$mean, var.primed$total, col=primed.col, pch=16, ylim=c(0, 15), 
      xlab=expression("Average"~log[2]~"count"), ylab="Variance", cex.axis=1.2, cex.lab=1.4)
 o <- order(var.primed$mean)
 lines(var.primed$mean[o], var.primed$tech[o], col="red", lwd=2)
-legend(max(var.primed$mean), max(var.primed$total), xjust=1, yjust=1, 
+legend(max(var.primed$mean), 15, xjust=1, yjust=1, 
        legend=c("Total variance (primed)", 
                 "Total variance (naive)",
                 "Technical variance"), col=c(primed.col, naive.col, "red"),
-       pch=c(16, NA), lwd=(NA, 2))
+       pch=c(16, 16, NA), lwd=c(NA, NA, 2))
 
-
-plot(var.naive$mean, var.naive$total, col="orange", pch=16, ylim=c(0, 15),
+plot(var.naive$mean, var.naive$total, col=naive.col, pch=16, ylim=c(0, 15),
      xlab=expression("Average"~log[2]~"count"), ylab="Variance",  cex.axis=1.2, cex.lab=1.4)
 o <- order(var.naive$mean)
 lines(var.naive$mean[o], var.naive$tech[o], col="red", lwd=2)
