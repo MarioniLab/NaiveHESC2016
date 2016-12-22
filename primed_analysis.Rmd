@@ -221,8 +221,13 @@ sce_naive <- readRDS("sce_naive.rds")
 naive.genenum <- nexprs(sce_naive) 
 primed.genenum <- nexprs(sce_primed) 
 boxplot(list(Naive=naive.genenum, Primed=primed.genenum), ylab="Number of expressed genes")
-boxplot(list(Naive=sizeFactors(sce_naive), Primed=sizeFactors(sce_primed)), 
-    log="y", ylab="Size factors")
+
+# Size factors not comparable after subsetting and re-centering in each object; 
+# need to go back to the source when comparing size factors.
+sce_all <- readRDS("sce_all.rds")
+by.pheno <- list(Naive=sizeFactors(sce_all)[sce_all$phenotype=="naive"],
+                 Primed=sizeFactors(sce_all)[sce_all$phenotype=="primed"])
+boxplot(by.pheno, log="y", ylab="Size factors")
 ```
 
 We can test if the reduced count size is purely responsible for the increase in variability, by downsampling counts in the naive state to match the mean size factors.
@@ -230,14 +235,18 @@ There doesn't seem to be a major difference in the total variance trends, so thi
 As one might expect, really, because Poisson noise should be negligble to overall scRNA-seq variability.
 
 ```{r}
-downprop <- median(sizeFactors(sce_primed))/median(sizeFactors(sce_naive))
+downprop <- median(by.pheno$Primed)/median(by.pheno$Naive)
 downprop
 set.seed(1000)
 mod_naive <- rbinom(length(counts(sce_naive)), p=downprop, size=counts(sce_naive))
 dim(mod_naive) <- dim(counts(sce_naive))
 sce_naive_copy <- sce_naive
 counts(sce_naive_copy) <- mod_naive
-sce_naive_copy <- normalize(sce_naive_copy)
+
+# No need to adjust naive centered size factors, relative differences
+# between cells haven't changed, only their absolute size.
+sce_naive_copy <- normalize(sce_naive_copy) 
+
 all.fit_naive <- trendVar(sce_naive, use.spikes=FALSE, trend="loess", span=0.4)
 all.fit_primed <- trendVar(sce_primed, use.spikes=FALSE, trend="loess", span=0.4)
 mod.fit_naive <- trendVar(sce_naive_copy, use.spikes=FALSE, trend="loess", span=0.4)
