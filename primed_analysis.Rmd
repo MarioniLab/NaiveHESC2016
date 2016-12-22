@@ -191,24 +191,25 @@ HVGs in each set are coloured separately, while HVGs detected in both conditions
 This result suggests that the heterogeneity is elevated in the primed subpopulation.
 Note that this is not purely driven by a change in the mean expression, as the shift in the biological components occurs mostly for genes at a log-fold change of zero.
 
-```{r varcomp}
+```{r varcomp, fig.width=10, fig.height=6}
 var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
 hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
-lfc <- var.out_primed$mean - var.out_naive$mean
 dbio <- var.out_primed$bio - var.out_naive$bio
-plot(lfc, dbio, xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), pch=16)
+
+# Expression values are not directly comparable between separately-normalized objects.
+# Pulling out primed-naive log-fold changes from the overall analysis instead.
+de.stats <- read.table(file.path("results-overall", "de.tsv"))
+lfc <- -de.stats[rownames(var.out_naive),"logFC"]
+
+par(mfrow=c(1,3))
+smoothScatter(lfc, dbio, xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), main="All genes")
 phvg <- match(rownames(hvg.out_primed), rownames(var.out_primed))
+smoothScatter(lfc[phvg], dbio[phvg], xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), main="Primed HVGs")
 nhvg <- match(rownames(hvg.out_naive), rownames(var.out_naive))
-all.hvgs <- c(nhvg, phvg)
-cols <- rep(c("orange", "dodgerblue"), c(length(nhvg), length(phvg)))
-set.seed(1000)
-shuffled <- sample(length(cols))
-all.hvgs <- all.hvgs[shuffled]
-cols <- cols[shuffled]
-points(lfc[all.hvgs], dbio[all.hvgs], col=cols, pch=16)
-in.both <- intersect(phvg, nhvg)
-points(lfc[in.both], dbio[in.both], col="salmon", pch=16)
+smoothScatter(lfc[nhvg], dbio[nhvg], xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), main="Naive HVGs")
 ```
 
 We also check the number of expressed genes and the size factors between naive and primed cells.
