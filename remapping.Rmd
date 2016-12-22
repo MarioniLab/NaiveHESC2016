@@ -10,6 +10,7 @@ output:
     number_sections: true
     theme: united 
     highlight: tango 
+    fig_caption: false
 ---
 
 ```{r, echo=FALSE, results="hide"}
@@ -114,8 +115,6 @@ We read in the counts for the Petropoulos hESCs.
 
 ```{r petroin}
 petro.counts <- as.matrix(read.table(file.path("counts", "petro.counts.txt")))
-colnames(petro.counts) <- sub("(\\.([0-9]|\\_)*\\.[0-9]*$|\\.[0-9]\\.([0-9]|\\_)*\\.[0-9]*$)", "", colnames(petro.counts))
-petro.counts <- petro.counts[,order(colnames(petro.counts))]
 dim(petro.counts)
 ```
 
