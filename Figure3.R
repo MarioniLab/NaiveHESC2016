@@ -145,18 +145,8 @@ for (mode in 1:4) {
         main <- "Naive-only HVGs"
     }
     smoothScatter(X, Y, main=main, xlim=xrange, ylim=yrange,
-                  ylab=expression(Delta~"bio. component (primed - naive)",
+                  ylab=expression(Delta~"bio. component (primed - naive)"),
                   xlab=expression(Log[2]~"fold change (primed/naive)")) 
 }
 dev.off()
-
-hvgs <- c(rownames(hvg.naive), rownames(hvg.primed))
-cols <- rep(c(naive.col, primed.col), c(nrow(hvg.naive), nrow(hvg.primed)))
-set.seed(100)
-s <- sample(length(cols))
-hvgs <- hvgs[s]
-cols <- cols[s]
-m <- match(hvgs, rownames(var.naive))
-points(x[m], y[m], col=cols, pch=16, cex=0.5)
-
 

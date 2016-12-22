@@ -102,7 +102,7 @@ for (ptype in c("naive", "transition", "primed")) {
 
 dev.off()
 
-# Figure 2C
+# Figure S2A
 chosen <- readRDS(file.path("results-overall", "cor_hvg.rds"))
 ugly.plot <- plotPCA(sce, exprs_values="norm_exprs", feature_set = chosen)
 plot_data <- ggplot_build(ugly.plot)
@@ -112,7 +112,7 @@ all.colors[pops$Type=="naive"] <- naive.col
 all.colors[pops$Type=="transition"] <- trans.col
 all.colors[pops$Type=="primed"] <- primed.col
 
-pdf(file=file.path(figdir, "2c.pdf"), width=8, height=6)
+pdf(file=file.path(figdir, "s2a.pdf"), width=8, height=6)
 layout(cbind(1,2), width=c(5, 1.5))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
 plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = all.colors,
