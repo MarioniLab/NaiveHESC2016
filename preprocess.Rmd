@@ -292,7 +292,7 @@ sce <- sce[keep,]
 summary(keep)
 ```
 
-### Improving interpretability of the gene names.
+### Improving interpretability of the gene names
 
 To enable a user-friendly analysis, it is convenient to exchange the ENSEMBL IDs with the name of the genes. 
 For duplicated gene names, we merge them with the ENSEMBL IDs to avoid confusion.

@@ -1,62 +1,107 @@
-# Methods
+---
+title: "hESC methods"
+author: Tobias Messmer and Aaron Lun
+bibliography: ref.bib
+---
 
-## Alignment and quality control
-### Alignment and read counting
-The raw FASTQ files were aligned to the human reference genome HG38 including ERCC sequences with the subread-align function in the subread package ([PMID: 23558742](https://www.ncbi.nlm.nih.gov/pubmed/23558742)).
-We specified the alignment to paired end RNA-sequencing data setting a phred offset to +33 and selected only uniquely mapped reads. 
-The output of aligned BAM files was summarised with featureCounts in Rsubread ([PMID: 24227677](https://www.ncbi.nlm.nih.gov/pubmed/24227677)) using 4 threads. 
-We merged resulting counts with SumTechReps in edgeR if they were technical replicates corresponding to the same cell.  
+## Alignment and read counting
 
-### QC
-Quality control and data analysis were conducted applying the single cell RNA sequencing analysis package scater following the developers suggested workflow ([doi: scater](http://dx.doi.org/10.1101/069633), [PMCID: PMC5112579](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5112579/)). 
-First, we converted the count matrix to a SCESet object, calculated QC metrics and defined spike-in transcripts. 
-We then filtered for high quality cells in both batches separately by removing cells with a total count number less than three median-absolute deviations    the total count median. 
-Cells were controlled for cell cycle phases with scran's cyclone function based on human cell cycle genes ([scran](https://bioconductor.org/packages/release/bioc/html/scran.html)). 
-As cells were not predominantly found in one cell cycle phase, all high quality cells were kept. 
-Next, we removed genes with a mean count less than 1 in order to only select genes of reasonable abundance.
-Read counts were normalised after computing size factors for endogenous genes and spike factors for spike-ins with the normalise function in scater.
+Read pairs were aligned to a reference consisting of the hg38 build of the human genome as well sequences for the ERCC spike-in transcripts. 
+This was performed using the `subread` aligner v1.5.0-p3 [@liao2013subread] in paired-end mode with unique alignment.
+Each read pair was then assigned to a gene in the Ensembl GRCh38 v83 annotation or to the spike-in transcripts.
+This was done using the `featureCounts` function in the _Rsubread_ package v1.24.0 [@liao2014featurecounts].
+Only reads with mapping quality scores above 10 were used for counting.
+Read counts from technical (sequencing) replicates of the same cell were added together prior to further analysis.
 
-## Data Analysis
-### Phenotype validation and characterisation
-We identified highly variable genes (HVGs) using the biological component of logged expression variance for each gene with scran’s decomposeVar function ([scranworkflow](http://bioconductor.org/packages/devel/bioc/vignettes/scran/inst/doc/scran.html)). 
-With a technical component based on the variance of the spike-ins and the respective mean expression of the genes, biological components were computed by subtracting the technical factor from the total variance of log~2~ expression values, indicating true biological variability.
-HVGs were considered having a biological fold change greater than or equal to 2 at a maximum false discovery rate (FDR) of 5%. We ranked genes by decreasing biological component to sort for most distinct HVGs.
-The identified and sorted HVGs were used to compute correlations based on Spearman’s rho with the correlatePairs function in scran.
-Against the null hypothesis that there were no gene correlations, we computed p values for each correlated pair and selected only the correlated genes with a FDR less than 0.05.
-This chosen set of correlated genes was then used to perform principal component analysis (PCA) in order to separate cells according to their biological variability (Figure 1B). 
+## Quality control on cells and genes 
 
-We pooled naive and primed cells respectively, treating both subpopulations as pseudo bulk data sets, and observed differential expression (DE) between both phenotypes to identify marker genes for each condition ([PMID: 27008025](https://www.ncbi.nlm.nih.gov/pubmed/27008025)). 
-Using the glmFit function in edgeR under the null hypothesis that there was no difference in gene expression between naïve and primed cells and setting a p value of 0.001, significantly up- or down-regulated genes were computed (Figure 1C).
+A range of quality metrics were computed for each cell using the `calculateQCMetrics` function in the _scater_ package v1.2.0 [@mccarthy2016scater].
+For each metric, outlier values were identified as those that were more than three median absolute deviations from the median.
+Low quality cells were identified in each batch, as those with small outlier values for the log-transformed total count;
+    small outliers for the log-transformed number of expressed genes;
+    large outliers for the proportion of read pairs assigned to mitochondrial genes;
+    or large outliers for the proportion of read pairs assigned to spike-in transcripts.
+These cells were removed from the data set prior to further analysis.
 
-### Naive subpopulation characterisation and cluster identification
-Similar to the identification of highly variable and significantly correlated genes for all cells, we determined HVGs and gene correlations for the naïve subpopulation with the only exception that we corrected for batch effects between the steps with the removeBatchEffect function in the Bioconductor package limma ([limma](https://bioconductor.org/packages/release/bioc/html/limma.html)).
-Computing Euclidian distances of the log2-expression values between naive cells for the correlated HVGs allowed hierarchical clustering within the subpopulation. Here, we used the hclust function of the package stats and the agglomeration method ward.D2 ([stats citation -> standard R package](https://cran.r-project.org/doc/FAQ/R-FAQ.html#Citing-R)).
-We used silhouette plots to determine the amount of clusters that resulted in most pronounced clusters.  
-We characterised resulting clusters by analysing DE genes between each cluster and all remaining clusters. 
-Clusters that showed only marginal differences in gene expression or whose distinction depended primarily on cell cycle effects were neglected. 
-For clusters that were more prominent, DE was performed against the residual cells of the naïve subpopulation and against the primed cells based on log2-expression values with the lmFIT, contrasts.fit and eBayes functions in limma ([limmaDE](https://www.ncbi.nlm.nih.gov/pubmed/25605792)).
-With the resultant DE genes, we assessed the grade of distinction of a particular cluster by visualising in a heat map the logFC of expression values for each gene against the gene's mean expression (Figure 2A).
-Additionally, obtained clusters were examined for their expression of specific marker genes, for instance previously discovered naïve markers (Figure 2B, [DOI](http://dx.doi.org/10.1016/j.stemcr.2016.02.005)) or eminent DE markers between naïve and primed subpopulation.
+The cell cycle phase for each cell was identified using the `cyclone` classifier [@scialdone2015computational] implemented in the _scran_ package v1.2.0. 
+This was performed with a set of human marker genes, identified by training the classifier on a pre-existing hESC data set [@leng2015oscope].
 
-Finally, identified cells in the most prominent cluster were visualised along with the original subpopulations in a PCA plot that was coloured accordingly and functional enrichment analysis was performed to assess the GO functions of DE genes between the cluster and the residual naïve subpopulation.
+Finally, low-abundance genes with mean counts less than 1 were filtered out [@lun2016step].
+This removes genes with low counts that contain little information for downstream methods such as normalization and HVG detection,
+    thus reducing computational work and the severity of any multiple testing corrections.
 
-### Primed subpopulation characterisation and variability analysis
-We repeated all the steps that were conducted for the naïve subpopulation for the primed cells.  
-Additionally, we compared the genetic heterogeneity of the naïve and the primed ESCs.
-Therefore, we examined the overall number of HVGs as well as the variance of log expression for genes that were found highly variable in both phenotypes and uniquely for each phenotype. (Figure 3)
-To exclude potential technical sources for gene expression variability, we counted the number of naïve and primed cells in each cell cycle and the total number of expressed genes in each population.
-Besides, we compared the mean expression and the distribution of size factors of the HVGs between both conditions (Supp. Figure 3).
+## Normalization of cell-specific biases 
+
+For the endogenous genes, cell-specific size factors were computed using the deconvolution method [@lun2016pooling] with pre-clustering.
+For each gene, the count for each cell was divided by the appropriate size factor.
+A pseudo-count of 1 was added, and the value was log~2~-transformed to obtain log-normalized expression values.
+This was repeated using the spike-in transcripts, where the size factor for each cell was proportional to the sum of counts for all spike-in transcripts.
+Note that different sets of size factors are necessary for different features, as spike-in transcripts are not subject to biases due to total RNA content [@lun2016step].
+
+## Detecting correlated HVGs
+
+To represent the technical variance, a mean-dependent trend was fitted to the variances of the spike-in transcripts using the `trendVar` function in the _scran_ package.
+HVGs were identified as genes with variances that were significantly greater than the trend, after using the `decomposeVar` function to decompose the variance components.
+Specifically, genes detected at a FDR of 5% and with biological components above 0.5 were considered to be HVGs [@lun2016step].
+This was done while blocking on the batch in which each cell was sequenced, to ensure that large variances were not driven by uninteresting batch effects.
+
+Correlations in the log-expression values between pairs of HVGs were also identified using the `correlatePairs` function in _scran_.
+Significant correlations were identified at a FDR of 5%, and the genes in the significantly correlated pairs were used to define a set of correlated HVGs.
+Again, blocking on the sequencing batch was performed during calculation of the correlations.
+
+Identification of correlated HVGs was first performed using all (high-quality) cells in the data set.
+The top 1000 HVGs with the largest biological components were identified, and the `removeBatchEffect` function from the _limma_ package v3.30.4 [@ritchie2015limma] was applied to eliminate the batch effect from their log-expression values.
+A PCA plot was constructed using the corrected values to visualize the structure in the cell population.
+Correlated HVGs were also identifed within the naive and primed conditions separately (see below).
+
+## Testing for differential expression
+
+Counts for the naive and primed cells within each batch were pooled to obtain four sets of pseudo-bulk counts [@lun2016overcoming].
+Genes were tested for differential expression (DE) between naive and primed conditions, using the quasi-likelihood framework in the _edgeR_ package v3.16.3 [@chen2016reads]. 
+The experimental design was parameterized using an additive design containing a condition term and the batch blocking factor.
+DE genes were defined as those with significant differences between conditions at a FDR of 5%.
+
+## Detecting the transition subpopulation 
+
+Correlated HVGs were detected as previously described, but using only the cells in the naive condition.
+The `removeBatchEffect` function was applied to remove the batch effect in the log-expression values of the correlated HVGs.
+The corrected values were used for hierarchical clustering of the cells with the `hclust` function in _R_, using Ward linkage on the Euclidean distances.
+Clusters of cells were identified using a tree cut, where the optimal number of clusters was determined by maximizing the average silhouette width.
+The cluster of cells located between the bulk of cells from the naive and primed conditions in the PCA plot was denoted as the "transition" population.
+
+The transition population was characterized by testing for differential expression relative to the other naive cells or to the primed cells.
+This was performed by treating the log-expression values as microarray intensities and performing linear modelling with methods in _limma_.
+(This corresponds to the "_limma_-trend" method described by @law2014voom, and is more stringent than `voom` or _edgeR_ for marker gene identification.)
+For each contrast, several candidates were chosen from the top set of DE genes for further validation by staining and FACS. 
+
+## Comparing transcriptional heterogeneity 
+
+Correlated HVGs were detected as previously described, but using only the cells in the primed condition.
+Clustering was not attempted as no clear separation between clusters was observed in the silhouette plots.
+Instead, the variability of expression was compared between naive and primed cells.
+We compared the total number of HVGs detected at a FDR of 5% in each condition;
+    the sizes of the biological components for HVGs detected in both conditions;
+    and the distribution of biological components for HVGs unique to each condition.
+The sets of shared and primed-only HVGs were also tested for enrichment of GO or KEGG terms, using the `goana` and `kegga` functions, respectively, from _limma_.
 
 ## External temporal trajectories on naïve/primed map 
 
-We created a transcriptional map that places cells of interest relative to their similarity to the expression profiles of naïve and primed cells.
-Here, we only focused on genes that were differentially expressed between the naïve and primed cells with a logFC greater than 10 (primed markers) and less than -10 (naïve markers).
-Similarity of cells of interest to the naive and the primed subpopulation was indicated by count values greater than an arbitrary threshold of 10 for those marker genes (or orthologous genes for other species after [HomoloGene](https://www.ncbi.nlm.nih.gov/homologene?itool=toolbar) database). We compared the similarities to each subpopulation by calculating the proportions of the expressed markers.
+Naive marker genes were defined as those that were DE relative to primed cells (using the pseudo-bulk statistics, above) at a FDR of 5% and with a log~2~-fold change of 10;
+    were present in at least 25% of naive cells; and were present in no more than 5% of primed cells.
+Similarly, primed marker genes were defined as those that were DE relative to naive cells at a FDR of 5% and with a log~2~-fold change of -10;
+    were present in at least 25% of primed cells; and were present in no more than 5% of naive cells.
 
-After testing this model for our own dataset (Supp. Figure 4), we downloaded raw count matrices of human ([PMID: 27062923](https://www.ncbi.nlm.nih.gov/pubmed/27062923)), mouse (Hisham, not yet published) and monkey ESCs ([PMID: 27556940 ](http://www.nature.com/nature/journal/v537/n7618/full/nature19096.html)) for various developmental stages and graphically contrasted naive against primed marker proportions (Figure 4).  
-  
+A marker gene was considered to be expressed in a cell if its (normalized) count or CPM was greater than 10.
+For each cell, we calculated the proportion of naive markers that were expressed.
+This was repeated for the primed markers. 
+Cells were mapped onto the "naive/primed axis" based on these proportions.
+Large naive proportions and small primed proportions indicate that the cell is naive, and vice versa for primed cells.
 
-***  
+Mapping onto the naive/primed axis was performed for cells collected from human pre-implantation embryos [@petropoulos2016single],
+mouse embryos [@mohammed2016transcriptional], and cynomolgus monkey embryos [@nakamura2016developmental].
+Mouse homologs for the marker genes were identified using the `getLDS` function from the _biomaRt_ package [@durinck2005biomart], using the homology relationships predicted by Ensembl.
+Monkey homologs for marker genes were identified as those with the same gene symbol.
+As a control, we also performed remapping using the naive, primed and transition cells in our own data set.
+
 ***
-
 
