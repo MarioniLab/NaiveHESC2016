@@ -4,6 +4,7 @@ hvg.naive <- read.table(file.path("results-naive", "hvg.tsv"), header=TRUE)
 hvg.primed <- read.table(file.path("results-primed", "hvg.tsv"), header=TRUE)
 var.naive <- read.table(file.path("results-naive", "var.tsv"), header=TRUE)
 var.primed <- read.table(file.path("results-primed", "var.tsv"), header=TRUE)
+sce_naive <- readRDS("sce_naive.rds")
 
 # Figure 3A
 pdf(file=file.path(figdir, "3a.pdf"), width = 4)
@@ -19,7 +20,6 @@ dev.off()
 library(org.Hs.eg.db)
 anno <- select(org.Hs.eg.db, key="GO:0000278", keytype="GOALL", column="ENSEMBL")
 library(scater)
-sce_naive <- readRDS("sce_naive.rds")
 stopifnot(identical(rownames(sce_naive), rownames(var.naive)))
 is.cycling <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 
@@ -85,13 +85,24 @@ dev.off()
 # A
 naive.genenum <- sum(var.naive$mean > 0)
 primed.genenum <- sum(var.primed$mean > 0)
+sce_all <- readRDS("sce_all.rds")
+sce_primed <- readRDS("sce_primed.rds")
 
-pdf(file=file.path(figdir, "s3a.pdf"), width=4)
-par(mar=c(5.1, 5.1, 4.1, 2.1))
+pdf(file=file.path(figdir, "s3a.pdf"), width=8, height=5)
+par(mar=c(5.1, 5.1, 4.1, 2.1), mfrow=c(1,3))
 gcounts <- c(Primed=primed.genenum, Naive=naive.genenum)
 out <- barplot(gcounts/1e3, col = c(primed.col, naive.col), ylim=c(0, 16), width=0.5,
         ylab=expression("Number of expressed genes  ("*10^3*")"), cex.axis=1.2, cex.names=1.4, cex.lab=1.4)
 text(out, gcounts/1e3, gcounts, pos=3, cex=1.2)
+
+gcounts <- c(Primed=unname(ncol(sce_primed)), Naive=unname(ncol(sce_naive)))
+out <- barplot(gcounts, col = c(primed.col, naive.col), ylim=c(0, 450), width=0.5,
+        ylab="Number of cells", cex.axis=1.2, cex.names=1.4, cex.lab=1.4)
+text(out, gcounts, gcounts, pos=3, cex=1.2)
+
+by.pheno <- list(Primed=sizeFactors(sce_all)[sce_all$phenotype=="primed"],
+                 Naive=sizeFactors(sce_all)[sce_all$phenotype=="naive"])
+boxplot(by.pheno, col=c(primed.col, naive.col), ylab="Size factor per cell", log="y", cex.axis=1.2, cex.names=1.4, cex.lab=1.4, range=0)
 dev.off()
 
 # B
