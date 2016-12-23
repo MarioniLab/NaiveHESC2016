@@ -84,7 +84,7 @@ We compared the total number of HVGs detected at a FDR of 5% in each condition;
     and the distribution of biological components for HVGs unique to each condition.
 The sets of shared and primed-only HVGs were also tested for enrichment of GO or KEGG terms, using the `goana` and `kegga` functions, respectively, from _limma_.
 
-## External temporal trajectories on naïve/primed map 
+## Mapping temporal trajectories in early embryos 
 
 Naive marker genes were defined as those that were DE relative to primed cells (using the pseudo-bulk statistics, above) at a FDR of 5% and with a log~2~-fold change of 10;
     were present in at least 25% of naive cells; and were present in no more than 5% of primed cells.
@@ -102,6 +102,10 @@ mouse embryos [@mohammed2016transcriptional], and cynomolgus monkey embryos [@na
 Mouse homologs for the marker genes were identified using the `getLDS` function from the _biomaRt_ package [@durinck2005biomart], using the homology relationships predicted by Ensembl.
 Monkey homologs for marker genes were identified as those with the same gene symbol.
 As a control, we also performed remapping using the naive, primed and transition cells in our own data set.
+
+## Code availability
+
+All analysis code is available at https://github.com/MarioniLab/NaiveHESC2016.
 
 ***
 
