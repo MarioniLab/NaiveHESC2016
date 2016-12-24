@@ -248,20 +248,7 @@ gc()
 
 ## Interpreting the increased heterogeneity
 
-We check whether the extra variability is caused by the cell cycle.
-There are some differences in the classification of cells by `cyclone`, which I suppose could be biologically meaningful.
-
-```{r phasecheck}
-primed.col <- "#0072B2"
-naive.col <- "#e79f00"
-sce_naive <- readRDS("sce_naive.rds")
-primed.phases <- table(sce_primed$phase)
-naive.phases <- table(sce_naive$phase)
-barplot(rbind(primed.phases, naive.phases), beside = TRUE, 
-    col = c(primed.col, naive.col), ylab="Number of cells")
-legend("topright", legend = c("primed", "naive"), 
-    fill = c(primed.col, naive.col), bty="n", cex=1.5)
-```
+### Gene set analyses
 
 We take the primed-only HVGs and use them in a gene set analysis.
 
@@ -304,6 +291,65 @@ topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
 ```
+
+### Effect of the cell cycle
+
+We check whether the extra variability is caused by the cell cycle.
+There are some differences in the classification of cells by `cyclone`, which might explain some of the heterogeneity.
+In particular, G2/M is quite different from G1/S, so increased numbers of G2/M cells in the primed condition may result in greater variability. 
+
+```{r phasecheck}
+primed.col <- "#0072B2"
+naive.col <- "#e79f00"
+sce_naive <- readRDS("sce_naive.rds")
+primed.phases <- table(sce_primed$phase)
+naive.phases <- table(sce_naive$phase)
+barplot(rbind(primed.phases, naive.phases), beside = TRUE, 
+    col = c(primed.col, naive.col), ylab="Number of cells")
+legend("topright", legend = c("primed", "naive"), 
+    fill = c(primed.col, naive.col), bty="n", cex=1.5)
+```
+
+We refocus our attention on the G1 cells, to see if there is also increased heterogeneity within the G1 phase.
+There are still differences in the number of HVGs, albeit smaller than before.
+(The total number increases in both conditions because G1 is the most heterogeneous phase.
+Inclusion of the other phases reduce power for detecting G1-specific HVGs.)
+
+```{r}
+g1_naive <- sce_naive[,sce_naive$phase=="G1"]
+design.g1_naive <- model.matrix(~0 + g1_naive$batch)
+fit.g1_naive <- trendVar(g1_naive, trend="loess", span=0.4, design=design.g1_naive)
+var.g1_naive <- decomposeVar(g1_naive, fit.g1_naive)
+hvg.g1_naive <- var.g1_naive[which(var.g1_naive$FDR <= 0.05 & var.g1_naive$bio > 0.5),]
+nrow(hvg.g1_naive)
+g1_primed <- sce_primed[,sce_primed$phase=="G1"]
+design.g1_primed <- model.matrix(~0 + g1_primed$batch)
+fit.g1_primed <- trendVar(g1_primed, trend="loess", span=0.4, design=design.g1_primed)
+var.g1_primed <- decomposeVar(g1_primed, fit.g1_primed)
+hvg.g1_primed <- var.g1_primed[which(var.g1_primed$FDR <= 0.05 & var.g1_primed$bio > 0.5),]
+nrow(hvg.g1_primed)
+```
+
+Differences in the sizes of the biological compoments for the shared HVGs are still present.
+
+```{r}
+shared.hvgs <- intersect(rownames(hvg.g1_naive), rownames(hvg.g1_primed))
+length(shared.hvgs)
+smoothScatter(var.g1_naive[shared.hvgs,]$bio, var.g1_primed[shared.hvgs,]$bio)
+abline(0, 1, col='red')
+```
+
+We also plot the technical trends to show that they're the same between conditions:
+
+```{r}
+par(mfrow=c(1,2))
+plot(var.g1_primed$mean, var.g1_primed$total, col="dodgerblue", pch=16)
+points(var.g1_primed$mean, var.g1_primed$tech, col="red", pch=16)
+plot(var.g1_naive$mean, var.g1_naive$total, col="orange", pch=16)
+points(var.g1_naive$mean, var.g1_naive$tech, col="red", pch=16)
+```
+
+So some, but not all, of the increase in heterogeneity is due to differences in the distribution across cell cycle phases.
 
 # Wrapping up
 

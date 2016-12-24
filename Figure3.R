@@ -5,6 +5,7 @@ hvg.primed <- read.table(file.path("results-primed", "hvg.tsv"), header=TRUE)
 var.naive <- read.table(file.path("results-naive", "var.tsv"), header=TRUE)
 var.primed <- read.table(file.path("results-primed", "var.tsv"), header=TRUE)
 sce_naive <- readRDS("sce_naive.rds")
+sce_primed <- readRDS("sce_primed.rds")
 
 # Figure 3A
 pdf(file=file.path(figdir, "3a.pdf"), width = 4)
@@ -173,4 +174,14 @@ legend(16, 15, xjust=1, yjust=1,
                 "Naive HVG", 
                 "Technical"), col=c("grey80", naive.col, "red"),
        pch=c(16, 16, NA), lwd=c(NA, NA, 2))
+dev.off()
+
+# D
+
+primed.phases <- table(sce_primed$phase)
+naive.phases <- table(sce_naive$phase)
+pdf(file=file.path(figdir, "s3d.pdf"), width=8, height=6)
+barplot(rbind(primed.phases, naive.phases), beside = TRUE, cex.axis=1.2, cex.names=1.5, cex.lab=1.5,
+            col = c(primed.col, naive.col), ylab="Number of cells")
+legend("topright", legend = c("Primed", "Naive"), fill = c(primed.col, naive.col), cex=1.5)
 dev.off()
