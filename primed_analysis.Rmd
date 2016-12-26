@@ -341,7 +341,7 @@ abline(0, 1, col='red')
 
 We also plot the technical trends to show that they're the same between conditions:
 
-```{r}
+```{r, fig.width=8, fig.height=6}
 par(mfrow=c(1,2))
 plot(var.g1_primed$mean, var.g1_primed$total, col="dodgerblue", pch=16)
 points(var.g1_primed$mean, var.g1_primed$tech, col="red", pch=16)

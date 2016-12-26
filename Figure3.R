@@ -45,40 +45,67 @@ is.cilia <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 
 unique.primed <- hvg.primed[!rownames(hvg.primed) %in% rownames(hvg.naive),]
 unique.naive <- hvg.naive[!rownames(hvg.naive) %in% rownames(hvg.primed),]
-op <- seq_len(nrow(unique.primed))/nrow(unique.primed) * 100
-on <- seq_len(nrow(unique.naive))/nrow(unique.naive) * 100
-yp <- sort(unique.primed$bio)
-yn <- sort(unique.naive$bio)
+yp <- density(unique.primed$bio)
+yn <- density(unique.naive$bio)
+yn$y <- yn$y * nrow(unique.naive)/nrow(unique.primed)
+
+MODIFY <- function(stuff, xrange=c(0, 8), xshift=6, xscale=2, yrange=c(0, 0.5), yshift=0.5, yscale=0.1) {
+    keep <- stuff$x > xrange[1] & stuff$x < xrange[2]
+    x <- stuff$x[keep] * xscale/diff(xrange) + xshift
+    y <- stuff$y[keep] * yscale/diff(yrange) + yshift
+    return(list(x=x, y=y))
+}
 
 pdf(file=file.path(figdir, "3c.pdf"))
 par(mar = c(5.1, 5.1, 4.1, 2.1))
-plot(on, yn, ylab="Biological component", col=naive.col, xlab="Relative rank (%)", type="l", lwd=3, cex.axis=1.2, cex.lab=1.4)
-lines(op, yp, col=primed.col, lwd=3)
-
-is.primed.brain <- is.brain[match(rownames(unique.primed), rownames(var.primed))]
-bonus <- 0.1
-primed.sub.col <- "royalblue3"
-naive.sub.col <- "goldenrod3"
-points(op[is.primed.brain], yp[is.primed.brain]+bonus, pch=25, bg=primed.sub.col)
+plot(yp$x, yp$y, xlab="Biological component", ylab="", yaxt="n", type="n", cex.axis=1.2, cex.lab=1.4, bty="n")
+polygon(c(min(yp$x), yp$x, max(yp$x)), c(0, yp$y, 0), border=NA, col="lightblue")
+lines(yp$x, yp$y, lwd=2, col=primed.col)
+text(1.3, max(yp$y)/2, sprintf("Primed\n(%i)", nrow(unique.primed)), cex=1.2)
+polygon(c(min(yn$x), yn$x, max(yn$x)), c(0, yn$y, 0), border=NA, col="gold1")
+lines(yn$x, yn$y, lwd=2, col=naive.col)
+text(0.9, 0, sprintf("Naive\n(%i)", nrow(unique.naive)), pos=3, cex=1.2)
+ 
+is.primed.brain <- is.brain[match(rownames(unique.primed), rownames(var.primed))] # Adding subplots for brain development.
+yp.brain <- density(unique.primed$bio[is.primed.brain])
 is.naive.brain <- is.brain[match(rownames(unique.naive), rownames(var.naive))]
-points(on[is.naive.brain], yn[is.naive.brain]+bonus, pch=25, bg=naive.sub.col)
+yn.brain <- density(unique.naive$bio[is.naive.brain])
 
-is.primed.cilia <- is.cilia[match(rownames(unique.primed), rownames(var.primed))]
-points(op[is.primed.cilia], yp[is.primed.cilia], pch=21, bg=primed.sub.col)
+yshift <- 0.05
+yscale <- 0.15
+xscale <- 3
+xshift <- 5 
+yp.brain.2 <- MODIFY(yp.brain, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale)
+polygon(c(min(yp.brain.2$x), yp.brain.2$x, max(yp.brain.2$x)), c(yshift, yp.brain.2$y, yshift), border=NA, col="lightblue")
+lines(yp.brain.2$x, yp.brain.2$y, col=primed.col, lwd=2)
+yn.brain.2 <- MODIFY(yn.brain, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale * sum(is.naive.brain)/sum(is.primed.brain))
+polygon(c(min(yn.brain.2$x), yn.brain.2$x, max(yn.brain.2$x)), c(yshift, yn.brain.2$y, yshift), border=NA, col="gold1")
+lines(yn.brain.2$x, yn.brain.2$y, col=naive.col, lwd=2)
+rect(xshift, yshift, xshift+xscale, yshift + yscale, lwd=2, border="grey50")
+text(xshift + xscale/2, yshift + yscale, pos=3, "Brain development", cex=1.2)
+text(xshift + xscale*0.9, yshift + yscale/2, pos=3, col=primed.col, labels=sum(is.primed.brain), cex=1.1)
+text(xshift + xscale*0.9, yshift + yscale/2, pos=1, col=naive.col, labels=sum(is.naive.brain), cex=1.1)
+
+is.primed.cilia <- is.cilia[match(rownames(unique.primed), rownames(var.primed))] # Same with the cilia.
+yp.cilia <- density(unique.primed$bio[is.primed.cilia])
 is.naive.cilia <- is.cilia[match(rownames(unique.naive), rownames(var.naive))]
-points(on[is.naive.cilia], yn[is.naive.cilia], pch=21, bg=naive.sub.col)
+yn.cilia <- density(unique.naive$bio[is.naive.cilia])
 
-legend(0, max(yp, yn), 
-       legend=c(sprintf("Primed-only HVG (%i)", length(op)),
-                sprintf("Primed-only + brain development"),
-                sprintf("Primed-only + cilia assembly"),
-                sprintf("Naive-only HVG (%i)", length(on)),
-                sprintf("Naive-only + brain development"),
-                sprintf("Naive-only + cilia assembly")),
-       col=c(primed.col, "black", "black", naive.col, "black", "black"),
-       pt.bg=c(primed.col, primed.sub.col, primed.sub.col, naive.col, naive.sub.col, naive.sub.col),
-       pch=c(NA, 25, 21, NA, 25, 21),
-       lwd=c(2,NA,NA,2,NA,NA), cex=1.2)
+yshift <- 0.3
+yscale <- 0.15
+xscale <- 3
+xshift <- 5 
+yp.cilia.2 <- MODIFY(yp.cilia, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale)
+polygon(c(min(yp.cilia.2$x), yp.cilia.2$x, max(yp.cilia.2$x)), c(yshift, yp.cilia.2$y, yshift), border=NA, col="lightblue")
+lines(yp.cilia.2$x, yp.cilia.2$y, col=primed.col, lwd=2)
+yn.cilia.2 <- MODIFY(yn.cilia, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale * sum(is.naive.cilia)/sum(is.primed.cilia))
+polygon(c(min(yn.cilia.2$x), yn.cilia.2$x, max(yn.cilia.2$x)), c(yshift, yn.cilia.2$y, yshift), border=NA, col="gold1")
+lines(yn.cilia.2$x, yn.cilia.2$y, col=naive.col, lwd=2)
+rect(xshift, yshift, xshift+xscale, yshift + yscale, lwd=2, border="grey50")
+text(xshift + xscale/2, yshift + yscale, pos=3, "Cilia assembly", cex=1.2)
+text(xshift + xscale*0.9, yshift + yscale/2, pos=3, col=primed.col, labels=sum(is.primed.cilia), cex=1.1)
+text(xshift + xscale*0.9, yshift + yscale/2, pos=1, col=naive.col, labels=sum(is.naive.cilia), cex=1.1)
+
 dev.off()
 
 ### Supplements
