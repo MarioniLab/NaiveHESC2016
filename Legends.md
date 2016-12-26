@@ -1,4 +1,4 @@
-# Figure Captures
+# Figure captions
 
 **Figure 1. Naive and primed human ESCs exhibit strong differences in gene expression.**
 (A) _Experimental setup (Ferdinand)_
@@ -33,20 +33,20 @@ Cells on the red line have equal proportions of expressed primed and naive marke
 
 **Figure 1.** No Figure 1 yet.
 
-**Figure 2. PCA plot of log-expression values of human ESCs coloured according to their respective subpopulation indicates a transition state from naive to primed cells.**
-The putative transition subpopulation was identified by clustering naive cells into three subsets based on euclidian distances and selecting the most protruded one.
-Initial naive cells in that transition cluster were coloured in green, suggesting the additional subpopulation between naive and primed.  
+**Figure 2. Cells in the transition state lie between the naive and primed populations.**
+Cells in the transition populations were identified after clustering on HVGs identified in the naive condition.
+These cells are highlighted in green, using the same PCA plot in Figure 1B.
 
-**Figure 3. Augmented variability of gene expression in primed than in naive subpopulation is not driven by cell cycle or technical effects.**  
-(A) Overall numbers of primed and naive cells in cell cycle phases G1, G2M and S. 
-Cells were categorised by means of human cell cycle genes and the cyclone function in scran.  
-(B) Total number of expressed genes in primed and naive ESCs and total number of expressed genes present in both subsets.
-Low-abundance genes with mean counts less than 1 were neglected.  
-(C) Histogram of logged means of all genes with a mean count equal to or greater than 1.   
-(D) Distribution of size factors of endogenous genes with a mean count equal to or greater than 1.   
+**Figure 3. Increased variability in primed cells is not driven by technical effects.**
+(A) Diagnostic plots showing the number of expressed genes, number of cells and size factors of cells in the naive and primed conditions.
+(B) Changes in the biological components between naive and primed conditions, plotted against the log~2~-fold change in expression.
+Density plots are shown for all genes, genes detected as HVGs in both conditions, and condition-specific HVGs.
+(C) Mean-variance relationships in the naive and primed conditions.
+The technical variance is represented by the red line fitted to spike-in variances.
+HVGs are detected in each condition as those genes with variances significantly greater than the trend, and are coloured.
+(D) Distribution of cells across cell cycle phases in each condition, as determined using the `cyclone` method. 
 
-**Figure 4. Proportions of significant expression of naive and primed markers for naive, transition and primed cells demonstrate proof of concept.** 
-Expression was considered significant if counts for respective marker genes were greater than 10. 
-The red line indicates an equilibrium of significantly expressed primed and naive markers.
-Colouring shows the number of cells with the exact same proportions.
+**Figure 4. Proof of concept of naive/primed mapping with naive, transition and primed hESCs.** 
+For each plot, the density of cells is represented by the colour of the pixels.
+Cells on the red line have equal proportions of expressed primed and naive markers.
 
