@@ -115,7 +115,8 @@ We download annotation from BioMart and store it along with the length informati
 
 ```{r featureData}
 library(biomaRt)
-ensembl <- useMart("ensembl", dataset="hsapiens_gene_ensembl")
+ensembl <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset="hsapiens_gene_ensembl", 
+    host="dec2015.archive.ensembl.org") # Ensembl version 83.
 ensemblGenes <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 
                                    'external_gene_name', 'entrezgene'), filters="ensembl_gene_id", 
                                    values=gene.names, mart=ensembl) 
