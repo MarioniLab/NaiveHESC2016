@@ -1,5 +1,5 @@
 ---
-title: "Single-cell RNA-seq of primed/primed embryonic stem cells: primed-only analysis"
+title: "Single-cell RNA-seq of primed/primed embryonic stem cells: G1-only, primed-only analysis"
 author: Tobias Messmer and Aaron Lun
 date: 17 December 2016
 output: 
@@ -14,8 +14,8 @@ output:
 ---
 
 ```{r, echo=FALSE, results="hide"}
-dir.create("figure-primed/", showWarning=FALSE)
-knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-primed/")
+dir.create("figure-g1_primed/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-g1_primed/")
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
@@ -25,10 +25,12 @@ register(SerialParam())
 
 We select only the primed cells and attempt to identify subpopulations within the primed condition.
 This is more sensitive than doing so on the entire data set, where the naive/primed differences dominate.
+We subset to only use G1 cells, to check that the cell cycle phase does not have any effect on the analysis.
 
 ```{r primedin}
 library(scran)
 sce <- readRDS("sce_all.rds")
+sce <- sce[,sce$phase=="G1"]
 sce_primed <- sce[,pData(sce)$phenotype=="primed"] 
 dim(sce_primed)
 ```
@@ -292,27 +294,9 @@ write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", qu
 head(topkegg)
 ```
 
-### Effect of the cell cycle
-
-We check whether the extra variability is caused by the cell cycle.
-There are some differences in the classification of cells by `cyclone`, which might explain some of the heterogeneity.
-In particular, G2/M is quite different from G1/S, so increased numbers of G2/M cells in the primed condition may result in greater variability. 
-
-```{r phasecheck}
-primed.col <- "#0072B2"
-naive.col <- "#e79f00"
-sce_naive <- readRDS("sce_naive.rds")
-primed.phases <- table(sce_primed$phase)
-naive.phases <- table(sce_naive$phase)
-barplot(rbind(primed.phases, naive.phases), beside = TRUE, 
-    col = c(primed.col, naive.col), ylab="Number of cells")
-legend("topright", legend = c("primed", "naive"), 
-    fill = c(primed.col, naive.col), bty="n", cex=1.5)
-```
-
 # Wrapping up
 
-We save our object for later use and report the session information.
+We report the session information.
 
 ```{r}
 saveRDS(sce_primed, file="sce_primed.rds")

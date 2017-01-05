@@ -1,0 +1,479 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: G1-only, naive-only analysis"
+author: Tobias Messmer and Aaron Lun
+date: 17 December 2016
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-g1_naive/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-g1_naive/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+```
+
+# Selecting only the naive subpopulations
+
+We select only the naive cells and attempt to identify subpopulations within the naive condition.
+This is more sensitive than doing so on the entire data set, where the naive/primed differences dominate.
+We subset to only use G1 cells, to check that the cell cycle phase does not have any effect on the analysis.
+
+```{r naivein}
+library(scran)
+sce <- readRDS("sce_all.rds")
+sce <- sce[,sce$phase=="G1"]
+sce_naive <- sce[,pData(sce)$phenotype=="naive"] 
+dim(sce_naive)
+```
+
+We adjust the `batch` factor to get rid of the now-unnecessary "primed" level. 
+We also re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
+
+```{r}
+sce_naive$batch <- factor(sce_naive$batch)
+sce_naive <- normalize(sce_naive)
+```
+
+We can examine the expression of the various ESC markers in more detail.
+
+```{r naiveExpMarker}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"),
+    colour_by="batch") + fontsize
+```
+
+We also set up an output directory for the results.
+
+```{r naiveout}
+resdir <- "results-naive"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Detecting naive-only HVGs
+
+We detect HVGs in the naive population, using the variance of the normalized log-expression values.
+A trend is fitted to the spike-in variances and represents the technical aspect of variability.
+This generally fits quite well, though some deviation of the spike-ins is attributable to amplification-induced variability.
+
+```{r naive.design}
+design_naive <- model.matrix(~0 + sce_naive$batch)
+var.fit_naive <- trendVar(sce_naive, trend="loess", span=0.4, design = design_naive)
+var.out_naive <- decomposeVar(sce_naive, var.fit_naive, assay="exprs", get.spikes=TRUE)
+plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-expression",
+     ylab="Variance of log-expression")
+points(var.fit_naive$mean, var.fit_naive$var, col="red", pch=16)
+curve(var.fit_naive$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+```
+
+The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
+Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
+
+```{r var.naive}
+write.table(file=file.path(resdir, "var.tsv"), var.out_naive, sep="\t", quote=FALSE, col.names = NA) 
+hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
+hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
+nrow(hvg.out_naive)
+write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
+head(hvg.out_naive)
+```
+
+We check that the HVGs are not being driven by outliers or batch effects.
+
+```{r violin.hvg}
+plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], alpha=0.05, 
+    colour_by="batch", jitter="jitter") + fontsize
+```
+
+# Detecting correlated HVGs
+
+We also assess the pairwise correlations between the genes across the naive cells.
+Again, the usual suspects dominate the top set of correlations.
+
+```{r, cor.naive}
+set.seed(100) 
+var.cor_naive <- correlatePairs(sce_naive, design = design_naive, subset.row=rownames(hvg.out_naive)) 
+head(var.cor_naive)
+```
+
+We focus on the genes that have significantly large correlations.
+This happens to be the majority of HVGs that were originally detected.
+
+```{r, sig.naive}
+sig.cor_naive <- var.cor_naive$FDR <= 0.05
+summary(sig.cor_naive)
+chosen_naive <- unique(c(var.cor_naive$gene1[sig.cor_naive], var.cor_naive$gene2[sig.cor_naive]))
+saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_naive)
+length(chosen_naive)
+```
+
+# Performing dimensionality reduction
+
+We remove the batch effect prior to performing dimensionality reduction.
+
+```{r}
+library(limma)
+norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
+```
+
+We then create _t_-SNE plots, using only the set of correlated HVGs.
+
+```{r tsne.naive, fig.width=15, fig.height=6}
+tsne1_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1],
+    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+tsne2_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="KLF4",
+    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+tsne3_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="batch",
+    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+multiplot(tsne1_naive, tsne2_naive, tsne3_naive, cols=3)
+```
+
+And again, for PCA plots.
+
+```{r pca.naive, fig.width=15, fig.height=6}
+pca1_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1], 
+    feature_set = chosen_naive) + fontsize
+pca2_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="KLF4", 
+    feature_set = chosen_naive) + fontsize
+pca3_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="batch", 
+    feature_set = chosen_naive) + fontsize
+multiplot(pca1_naive, pca2_naive, pca3_naive, cols=3)
+```
+
+Both plots suggest that there is a small subpopulation off the main bulk of cells.
+
+# Clustering on Euclidean distance
+
+We perform hierarchical clustering on the Euclidean distance, using the correlated HVGs identified previously and the batch-corrected expression values.
+
+```{r naiveclust}
+chosen.exprs_naive <- norm_exprs(sce_naive)[chosen_naive,]
+my.dist_naive <- dist(t(chosen.exprs_naive))
+my.tree_naive <- hclust(my.dist_naive, method="ward.D2")
+```
+
+To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
+These suggest that `k=3` is the best, with the third cluster being genuinely separated from the others.
+
+```{r silhouette, fig.width=10, fig.height=10}
+library(cluster)
+par(mfrow=c(2,2))
+for (k in 2:5){
+    my.clusters_naive <- unname(cutree(my.tree_naive, k=k))
+    col <- rainbow(k)
+    sil <- silhouette(my.clusters_naive, dist = my.dist_naive)
+    sil.cols <- col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
+    sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
+    plot(sil, main = paste(k, "clusters"), border=sil.cols, 
+        col=sil.cols, do.col.sort=FALSE)
+}
+```
+
+So, we go on to cluster the cells and to visualize the results in a heatmap.
+
+```{r heat.naive}
+my.clusters_naive <- unname(cutree(my.tree_naive, k = 3)) 
+heat.vals_naive <- chosen.exprs_naive - rowMeans(chosen.exprs_naive) 
+clust.col_naive <- rainbow(max(my.clusters_naive))
+library(gplots)
+heatmap.2(heat.vals_naive, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3, 
+    breaks = seq(-10, 10, 1), ColSideColors=clust.col_naive[my.clusters_naive], 
+    Colv=as.dendrogram(my.tree_naive), dendrogram='column')
+``` 
+
+We can have a look at the clustering result on our PCA plots from before, and on the overall PCA plot with all cells in the data set.
+
+```{r naive_PCA}
+sce_naive$cluster <- factor(my.clusters_naive)
+plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="cluster", 
+    feature_set = chosen_naive) + fontsize
+```
+
+# Characterising the third cluster
+
+## Checking some diagnostics
+
+Cluster 3 seems like the most interesting cluster, with a number of cells breaking away from the bulk primed population.
+We examine the expression of marker genes for this cluster.
+
+```{r naiveexpclust}
+plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
+    colour_by="cluster") + fontsize
+```
+
+We also examine the distribution of size factors and number of expressed genes for each cluster.
+Nothing particularly untoward.
+
+```{r, fig.width=10, fig.height=6}
+par(mfrow=c(1,2))
+boxplot(split(sizeFactors(sce_naive), sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
+boxplot(split(sce_naive$total_features, sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
+```
+
+Most cells in cluster 3 are in batch 2, but so are most cells in general, so that's not really a problem.
+
+```{r}
+lapply(split(sce_naive$batch, my.clusters_naive), table)
+```
+
+We also examine the location of cluster 3 on the overall PCA plot.
+As expected, they show up in the middle, so we will describe this as a "transition" subpopulation.
+
+```{r}
+all.pheno <- as.character(sce$phenotype)
+all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==3]] <- "transition"
+write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
+    row.names=FALSE, quote=FALSE, sep="\t")
+sce$phenotype <- all.pheno
+plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
+    feature_set = readRDS("results-overall/cor_hvg.rds")) + fontsize
+```
+
+## Identifying marker genes for cluster 3
+
+With these clusters identified, we can assess DE of each cluster relative to each other cluster. 
+To do so, we set up a new design matrix containing the three clusters and the batch numbers.
+
+```{r, design.mat.naive}
+cluster_naive <- factor(my.clusters_naive)
+de.design_naive <- model.matrix(~0 + cluster_naive + sce_naive$batch) 
+```
+
+We use the _edgeR_ machinery to estimate cell-to-cell variability.
+
+```{r}
+library(edgeR)
+y_naive <- convertTo(sce_naive, type="edgeR")
+y_naive <- estimateDisp(y_naive, de.design_naive) 
+fit_naive <- glmFit(y_naive, de.design_naive)
+summary(y_naive$tagwise.dispersion)
+```
+
+We then identify DE genes between cluster 3 and every other cluster.
+The results are consolidated into a single list of DE genes, representing candidate markers for characterising cluster 3.
+
+```{r marker_clust_naive}
+clust.num_naive <- "3"
+result.logFC_naive <- result.PValue_naive <- list()
+chosen.clust_naive <- which(levels(cluster_naive)==clust.num_naive)
+for (clust in seq_len(nlevels(cluster_naive))) {
+    if (clust==chosen.clust_naive) { next }
+    contrast <- numeric(ncol(de.design_naive))
+    contrast[chosen.clust_naive] <- 1
+    contrast[clust] <- -1
+    res_naive <- glmLRT(fit_naive, contrast=contrast)
+    con.name <- paste0('vs.', levels(cluster_naive)[clust]) 
+    result.logFC_naive[[con.name]] <- res_naive$table$logFC 
+    result.PValue_naive[[con.name]] <- res_naive$table$PValue
+}
+collected.ranks_naive <- lapply(result.PValue_naive, rank, ties="first")
+min.rank_naive <- do.call(pmin, collected.ranks_naive)
+marker.set_naive <- data.frame(Top=min.rank_naive, Gene=rownames(y_naive),
+    logFC=do.call(cbind, result.logFC_naive), stringsAsFactors=FALSE)
+marker.set_naive <- marker.set_naive[order(marker.set_naive$Top),]
+write.table(marker.set_naive, file=file.path(resdir, paste0("markers_", clust.num_naive, ".tsv")), 
+    sep="\t", quote=FALSE, col.names=NA) 
+head(marker.set_naive)
+```
+
+We create a heatmap that shows differentially expressed genes relative to the chosen cluster.
+
+```{r, clust.naiv2}
+top.markers_naive <- marker.set_naive$Gene[marker.set_naive$Top <= 100]
+top.exprs_naive <- norm_exprs(sce_naive)[top.markers_naive,,drop=FALSE]
+heat.vals_naive <- top.exprs_naive - rowMeans(top.exprs_naive)
+heatmap.2(heat.vals_naive, col=bluered, symbreak=TRUE, trace='none', 
+    cexRow=0.6, breaks = seq(-5,5, 1), ColSideColors=clust.col_naive[my.clusters_naive], 
+    Colv=as.dendrogram(my.tree_naive), dendrogram='column')
+legend("bottomleft", col=clust.col_naive, legend=sort(unique(my.clusters_naive)), pch=16)
+```
+
+## Identifying markers relative to primed/naive cells
+
+We do the same for the transition population against the other naive or primed cells in general.
+This is done using _limma_, which seems to provide more protection against outliers than _edgeR_ as you go down the list.
+
+```{r}
+collected <- list()
+for (mode in c("naive", "primed")) {
+    current <- all.pheno %in% c("transition", mode)
+    curE <- exprs(sce)[!isSpike(sce),current]
+    curB <- factor(sce$batch[current])
+    curP <- factor(all.pheno[current])
+    curX <- model.matrix(~0 + curP + curB)
+    fit <- lmFit(curE, curX)
+    con <- makeContrasts(contrasts=sprintf("curPtransition - curP%s", mode), levels=curX)
+    fit2 <- contrasts.fit(fit, con)
+    fit2 <- eBayes(fit2, robust=TRUE, trend=TRUE)
+    res <- topTable(fit2, n=Inf, sort.by="p")
+    collected[[mode]] <- res
+    write.table(file=file.path(resdir, sprintf("markers_trans_vs_%s.tsv", mode)), res, 
+        sep="\t", quote=FALSE, col.names = NA) 
+}
+```
+
+We briefly examine the top candidate markers in each comparison.
+There's both up- and down-regulation, which indicates that the transition population isn't just a bunch of dead cells with low global expression.
+
+```{r}
+table(sign(collected$naive$logFC[1:100]))
+head(collected$naive)
+table(sign(collected$primed$logFC[1:100]))
+head(collected$primed)
+```
+
+We make a heatmap to visualize the expression of these candidates.
+
+```{r heatNvPvT}
+use.markers <- unique(c(rownames(collected$naive)[1:50], rownames(collected$primed)[1:50]))
+o <- order(all.pheno)
+top.exprs <- norm_exprs(sce)[use.markers,o,drop=FALSE]
+re.pheno <- factor(all.pheno[o])
+clust.cols <- c("black", "grey", "red")
+heat.vals <- top.exprs - rowMeans(top.exprs)
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, dendrogram='row',
+    breaks = seq(-5, 5, 1), Colv=FALSE, ColSideColors=clust.cols[re.pheno])
+legend("topright", col=clust.cols, legend=levels(re.pheno), pch=16)
+```
+
+We also have a look at the top genes that are uniquely expressed in the transition population.
+These genes must be DE against both naive and primed cells, _and_ in the same direction against both.
+
+```{r}
+norder <- collected$naive[order(rownames(collected$naive)),]
+porder <- collected$primed[order(rownames(collected$primed)),]
+maxp <- pmax(porder$P.Value, norder$P.Value)
+maxp <- ifelse(sign(norder$logFC)==sign(porder$logFC), maxp, 1)
+unique.marker <- data.frame(vsNaive=norder$logFC, vsPrimed=porder$logFC,
+    AveExpr=norder$AveExpr, P.Value=maxp, row.names=rownames(porder))
+unique.marker <-  unique.marker[order(maxp),]
+write.table(unique.marker, file=file.path(resdir, "markers_unique_trans.tsv"),
+    sep="\t", quote=FALSE, col.names=NA)
+head(unique.marker, 20)
+```
+
+## Gene set analysis on unique transition genes
+
+We do gene set analyses on the top set of genes that are uniquely expressed in this transition population.
+First, gene ontology terms:
+
+```{r naivego}
+unique.genes <- rownames(unique.marker)[1:200]
+is.unique <- rownames(sce) %in% unique.genes
+entreznames <- fData(sce)$entrezgene
+has.entrez <- !is.na(entreznames)
+go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_unique_trans.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+```
+
+And again with KEGG terms:
+
+```{r naivekegg}
+kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_unique_trans.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We also do this for the top set of genes that are DE between the transition and naive populations.
+
+```{r geneset_vs_naive}
+vs.naive.genes <- rownames(collected$naive)[1:200]
+vs.naive <- rownames(sce) %in% vs.naive.genes
+go <- goana(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_trans_vs_naive.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+kegg <- kegga(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_trans_vs_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We repeat this for the top set of genes that are DE between transition and primed populations.
+
+```{r geneset_vs_primed}
+vs.primed.genes <- rownames(collected$primed)[1:200]
+vs.primed <- rownames(sce) %in% vs.primed.genes
+go <- goana(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_trans_vs_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+kegg <- kegga(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_trans_vs_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+## Looking for imprinted genes
+
+Here, we examine a set of imprinted genes supplied by Ferdinand.
+The idea is to see if these genes change in expression between naive, transition and primed cells.
+If the transition cells have naive-like levels of these genes, it suggests that they once were naive cells themselves.
+
+```{r}
+imprinted <- c("ENSG00000162595", # DIRAS3
+               "ENSG00000177432", # NAP1L5
+               "ENSG00000145945", # FAM50B 
+               "ENSG00000118495", # PLAGL1
+               "ENSG00000197081", # IGF2R
+               "ENSG00000106070", # GRB10
+               "ENSG00000242265", # PEG10
+               "ENSG00000106484", # MEST
+               "ENSG00000167632", # TRAPPC9
+               "ENSG00000198825", # INPP5F
+               "ENSG00000139687", # RB1
+               "ENSG00000179455", # MKRN3
+               "ENSG00000265673", # MIR4508
+               "ENSG00000254585", # MAGEL2
+               "ENSG00000182636", # NDN
+               "ENSG00000128739", # SNRPN
+               "ENSG00000273173", # SNURF
+               "ENSG00000140443", # IGF1R
+               "ENSG00000130844", # ZNF331
+               "ENSG00000198300", # PEG3
+               "ENSG00000101898", # MCTS2P
+               "ENSG00000101294", # HM13
+               "ENSG00000166619", # BLCAP
+               "ENSG00000053438", # NNAT
+               "ENSG00000185513", # L3MBTL
+               "ENSG00000235590", # GNAS-AS1
+               "ENSG00000087460", # GNAS
+               "ENSG00000204186", # ZDBF2
+               "ENSG00000130600", # H19
+               "ENSG00000167244", # IGF2
+               "ENSG00000214548", # MEG3
+               "ENSG00000167981", # ZNF597
+               "ENSG00000122390") # NAA60
+```
+
+Making the heatmap of expression values for these guys.
+
+```{r}
+o <- order(all.pheno)
+top.exprs <- norm_exprs(sce)[fData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
+re.pheno <- factor(all.pheno[o])
+clust.cols <- c("black", "grey", "red")
+heat.vals <- top.exprs - rowMeans(top.exprs)
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, dendrogram='row',
+    breaks = seq(-5, 5, 1), Colv=FALSE, ColSideColors=clust.cols[re.pheno])
+```
+
+# Wrapping up
+
+We report the session information.
+
+```{r}
+saveRDS(sce_naive, file="sce_naive.rds")
+sessionInfo()
+```
