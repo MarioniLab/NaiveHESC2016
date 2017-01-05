@@ -54,7 +54,7 @@ plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42
 We also set up an output directory for the results.
 
 ```{r naiveout}
-resdir <- "results-naive"
+resdir <- "results-g1_naive"
 dir.create(resdir, showWarning=FALSE)
 ```
 
@@ -474,6 +474,6 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, dendr
 We report the session information.
 
 ```{r}
-saveRDS(sce_naive, file="sce_naive.rds")
+
 sessionInfo()
 ```

@@ -1,5 +1,5 @@
 ---
-title: "Single-cell RNA-seq of primed/primed embryonic stem cells: G1-only, primed-only analysis"
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: G1-only, primed-only analysis"
 author: Tobias Messmer and Aaron Lun
 date: 17 December 2016
 output: 
@@ -54,7 +54,7 @@ plotExpression(sce_primed, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP4
 We also set up an output directory for the results.
 
 ```{r primedout}
-resdir <- "results-primed"
+resdir <- "results-g1_primed"
 dir.create(resdir, showWarning=FALSE)
 ```
 
@@ -299,6 +299,6 @@ head(topkegg)
 We report the session information.
 
 ```{r}
-saveRDS(sce_primed, file="sce_primed.rds")
+
 sessionInfo()
 ```
