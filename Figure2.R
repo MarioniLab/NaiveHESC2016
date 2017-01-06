@@ -7,10 +7,8 @@ pops <- read.table(file.path("results-naive", "groups.tsv"), stringsAsFactors=FA
 m <- match(colnames(sce), pops$Cell)
 pops <- pops[m,]
 
+###############################
 # Figure 2A
-library(pheatmap)
-library(gridExtra)
-library(grid)
 
 # Loading in the DE marker genes.
 de.naive <- read.table(file.path("results-naive", "markers_trans_vs_naive.tsv"), header=TRUE, nrows=50)
@@ -79,6 +77,7 @@ abline(h=0, col=primed.col, lwd=5)
 text(0.5, 0.5, sprintf("Primed cells (%i)", sum(pops$Type=="primed")), cex=1.5)
 dev.off()
 
+###############################
 # Figure 2B
 pdf(file=file.path(figdir, "2b.pdf"), width = 6, height = 10)
 markers <- c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG")
@@ -102,6 +101,7 @@ for (ptype in c("naive", "transition", "primed")) {
 
 dev.off()
 
+###############################
 # Figure S2A
 chosen <- readRDS(file.path("results-overall", "cor_hvg.rds"))
 ugly.plot <- plotPCA(sce, exprs_values="norm_exprs", feature_set = chosen)
@@ -121,3 +121,53 @@ par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
 legend("topleft", legend=c("Naive", "Transition", "Primed"), col=c(naive.col, trans.col, primed.col), pch=16, cex=1.5)
 dev.off()
+
+###############################
+# Figure S2B
+
+imprinted <- c("ENSG00000140443", # IGF1R
+               "ENSG00000128739", # SNRPN
+               "ENSG00000198300", # PEG3
+               "ENSG00000101294", # HM13
+               "ENSG00000053438", # NNAT
+               "ENSG00000214548") # MEG3
+
+heat.imprint.vals <- exprs(sce)[match(imprinted, fData(sce)$ensembl_gene_id),]
+heat.imprint.vals <- heat.imprint.vals - rowMeans(heat.imprint.vals)
+
+pdf(file=file.path(figdir, "s2b.pdf"), width = 10, height = 10)
+layout(rbind(c(9,6,7,8,9), c(5,1,2,3,4)), widths=c(0.2, 1, 1, 1, 0.2), heights=c(0.1, 1, 1))
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+image(t(heat.imprint.vals[,pops$Type=="naive"]), axes=FALSE, col=colramp, breaks=colbreaks)
+image(t(heat.imprint.vals[,pops$Type=="transition"]), axes=FALSE, col=colramp, breaks=colbreaks)
+image(t(heat.imprint.vals[,pops$Type=="primed"]), axes=FALSE, col=colramp, breaks=colbreaks)
+
+# Adding the colorbar.
+par(mar=c(1.1, 0.5, 1.1, 2))
+plot(c(0, 10), range(colbreaks)*2, type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='')
+axis(4, at=(-bound):bound, las=1)
+for (i in seq_along(colramp)){ 
+    rect(0,colbreaks[i],10,colbreaks[i+1], col=colramp[i], border=colramp[i])
+}
+
+# Adding references to the type of gene.
+par(mar=c(0.5, 0.5, 0.5, 0.2))
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+ypts <- seq(coords[3], coords[4], length.out=length(imprinted)*2+1)
+text(x=0.5, y=ypts[seq_along(imprinted)*2], rownames(heat.imprint.vals), cex=1.2)
+
+# Adding references to the type of cells.
+par(mar=c(0.2, 0.5, 0.5, 0.5))
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(h=0, col=naive.col, lwd=5)
+text(0.5, 0.5, sprintf("Naive cells (%i)", sum(pops$Type=="naive")), cex=1.5)
+
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(h=0, col=trans.col, lwd=5)
+text(0.5, 0.5, sprintf("Transition cells (%i)", sum(pops$Type=="transition")), cex=1.5)
+
+plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+abline(h=0, col=primed.col, lwd=5)
+text(0.5, 0.5, sprintf("Primed cells (%i)", sum(pops$Type=="primed")), cex=1.5)
+dev.off()
+
