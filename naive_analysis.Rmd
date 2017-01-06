@@ -420,6 +420,62 @@ write.table(file=file.path(resdir, "kegg_trans_vs_primed.tsv"), topkegg, sep="\t
 head(topkegg)
 ```
 
+## Looking for imprinted genes
+
+Here, we examine a set of imprinted genes supplied by Ferdinand.
+The idea is to see if these genes change in expression between naive, transition and primed cells.
+If the transition cells have naive-like levels of these genes, it suggests that they once were naive cells themselves.
+
+```{r}
+imprinted <- c("ENSG00000162595", # DIRAS3
+               "ENSG00000177432", # NAP1L5
+               "ENSG00000145945", # FAM50B 
+               "ENSG00000118495", # PLAGL1
+               "ENSG00000197081", # IGF2R
+               "ENSG00000106070", # GRB10
+               "ENSG00000242265", # PEG10
+               "ENSG00000106484", # MEST
+               "ENSG00000167632", # TRAPPC9
+               "ENSG00000198825", # INPP5F
+               "ENSG00000139687", # RB1
+               "ENSG00000179455", # MKRN3
+               "ENSG00000265673", # MIR4508
+               "ENSG00000254585", # MAGEL2
+               "ENSG00000182636", # NDN
+               "ENSG00000128739", # SNRPN
+               "ENSG00000273173", # SNURF
+               "ENSG00000140443", # IGF1R
+               "ENSG00000130844", # ZNF331
+               "ENSG00000198300", # PEG3
+               "ENSG00000101898", # MCTS2P
+               "ENSG00000101294", # HM13
+               "ENSG00000166619", # BLCAP
+               "ENSG00000053438", # NNAT
+               "ENSG00000185513", # L3MBTL
+               "ENSG00000235590", # GNAS-AS1
+               "ENSG00000087460", # GNAS
+               "ENSG00000204186", # ZDBF2
+               "ENSG00000130600", # H19
+               "ENSG00000167244", # IGF2
+               "ENSG00000214548", # MEG3
+               "ENSG00000167981", # ZNF597
+               "ENSG00000122390") # NAA60
+```
+
+Making the heatmap of expression values for these guys.
+It seems like there's changes in expression both ways, not just an increase in naive cells upon loss of imprinting.
+Apparently, this is due to loss of imprinting for the antisense locus that leads to silencing of the corresponding gene.
+
+```{r, fig.height=10, fig.width=6, dpi=150}
+o <- order(all.pheno)
+top.exprs <- norm_exprs(sce)[fData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
+re.pheno <- factor(all.pheno[o])
+clust.cols <- c("black", "grey", "red")
+heat.vals <- top.exprs - rowMeans(top.exprs)
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, dendrogram='row',
+    breaks = seq(-5, 5, 1), Colv=FALSE, ColSideColors=clust.cols[re.pheno])
+```
+
 # Wrapping up
 
 We save our object for later use and report the session information.

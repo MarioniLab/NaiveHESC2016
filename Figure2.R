@@ -127,15 +127,15 @@ dev.off()
 
 imprinted <- c("ENSG00000140443", # IGF1R
                "ENSG00000128739", # SNRPN
-               "ENSG00000198300", # PEG3
-               "ENSG00000101294", # HM13
                "ENSG00000053438", # NNAT
+               "ENSG00000101294", # HM13
+               "ENSG00000198300", # PEG3
                "ENSG00000214548") # MEG3
 
 heat.imprint.vals <- exprs(sce)[match(imprinted, fData(sce)$ensembl_gene_id),]
 heat.imprint.vals <- heat.imprint.vals - rowMeans(heat.imprint.vals)
 
-pdf(file=file.path(figdir, "s2b.pdf"), width = 10, height = 10)
+pdf(file=file.path(figdir, "s2b.pdf"), width = 10, height = 5)
 layout(rbind(c(9,6,7,8,9), c(5,1,2,3,4)), widths=c(0.2, 1, 1, 1, 0.2), heights=c(0.1, 1, 1))
 par(mar=c(0.5, 0.5, 0.5, 0.5))
 image(t(heat.imprint.vals[,pops$Type=="naive"]), axes=FALSE, col=colramp, breaks=colbreaks)
