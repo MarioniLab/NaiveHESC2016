@@ -4,6 +4,8 @@ hvg.naive <- read.table(file.path("results-naive", "hvg.tsv"), header=TRUE)
 hvg.primed <- read.table(file.path("results-primed", "hvg.tsv"), header=TRUE)
 var.naive <- read.table(file.path("results-naive", "var.tsv"), header=TRUE)
 var.primed <- read.table(file.path("results-primed", "var.tsv"), header=TRUE)
+
+library(scater)
 sce_naive <- readRDS("sce_naive.rds")
 sce_primed <- readRDS("sce_primed.rds")
 
@@ -20,7 +22,6 @@ dev.off()
 # Figure 3B
 library(org.Hs.eg.db)
 anno <- select(org.Hs.eg.db, key="GO:0000278", keytype="GOALL", column="ENSEMBL")
-library(scater)
 stopifnot(identical(rownames(sce_naive), rownames(var.naive)))
 is.cycling <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 
@@ -42,6 +43,8 @@ anno <- select(org.Hs.eg.db, key="GO:0007420", keytype="GOALL", column="ENSEMBL"
 is.brain <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 anno <- select(org.Hs.eg.db, key="GO:0042384", keytype="GOALL", column="ENSEMBL")
 is.cilia <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
+anno <- select(org.Hs.eg.db, key="GO:0007389", keytype="GOALL", column="ENSEMBL")
+is.pattern <- fData(sce_naive)$ensembl %in% anno$ENSEMBL
 
 unique.primed <- hvg.primed[!rownames(hvg.primed) %in% rownames(hvg.naive),]
 unique.naive <- hvg.naive[!rownames(hvg.naive) %in% rownames(hvg.primed),]
@@ -57,7 +60,7 @@ MODIFY <- function(stuff, xrange=c(0, 8), xshift=6, xscale=2, yrange=c(0, 0.5), 
 }
 
 pdf(file=file.path(figdir, "3c.pdf"))
-par(mar = c(5.1, 5.1, 4.1, 2.1))
+par(mar = c(5.1, 5.1, 4.1, 2.1), xpd=TRUE)
 plot(yp$x, yp$y, xlab="Biological component", ylab="", yaxt="n", type="n", cex.axis=1.2, cex.lab=1.4, bty="n")
 polygon(c(min(yp$x), yp$x, max(yp$x)), c(0, yp$y, 0), border=NA, col="lightblue")
 lines(yp$x, yp$y, lwd=2, col=primed.col)
@@ -71,10 +74,10 @@ yp.brain <- density(unique.primed$bio[is.primed.brain])
 is.naive.brain <- is.brain[match(rownames(unique.naive), rownames(var.naive))]
 yn.brain <- density(unique.naive$bio[is.naive.brain])
 
-yshift <- 0.05
+yshift <- 0.2
 yscale <- 0.15
 xscale <- 3
-xshift <- 5 
+xshift <- 6 
 yp.brain.2 <- MODIFY(yp.brain, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale)
 polygon(c(min(yp.brain.2$x), yp.brain.2$x, max(yp.brain.2$x)), c(yshift, yp.brain.2$y, yshift), border=NA, col="lightblue")
 lines(yp.brain.2$x, yp.brain.2$y, col=primed.col, lwd=2)
@@ -91,10 +94,8 @@ yp.cilia <- density(unique.primed$bio[is.primed.cilia])
 is.naive.cilia <- is.cilia[match(rownames(unique.naive), rownames(var.naive))]
 yn.cilia <- density(unique.naive$bio[is.naive.cilia])
 
-yshift <- 0.3
+yshift <- 0.4
 yscale <- 0.15
-xscale <- 3
-xshift <- 5 
 yp.cilia.2 <- MODIFY(yp.cilia, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale)
 polygon(c(min(yp.cilia.2$x), yp.cilia.2$x, max(yp.cilia.2$x)), c(yshift, yp.cilia.2$y, yshift), border=NA, col="lightblue")
 lines(yp.cilia.2$x, yp.cilia.2$y, col=primed.col, lwd=2)
@@ -102,9 +103,28 @@ yn.cilia.2 <- MODIFY(yn.cilia, xshift=xshift, xscale=xscale, yshift=yshift, ysca
 polygon(c(min(yn.cilia.2$x), yn.cilia.2$x, max(yn.cilia.2$x)), c(yshift, yn.cilia.2$y, yshift), border=NA, col="gold1")
 lines(yn.cilia.2$x, yn.cilia.2$y, col=naive.col, lwd=2)
 rect(xshift, yshift, xshift+xscale, yshift + yscale, lwd=2, border="grey50")
-text(xshift + xscale/2, yshift + yscale, pos=3, "Cilia assembly", cex=1.2)
+text(xshift + xscale/2, yshift + yscale, pos=3, "Cilium assembly", cex=1.2)
 text(xshift + xscale*0.9, yshift + yscale/2, pos=3, col=primed.col, labels=sum(is.primed.cilia), cex=1.1)
 text(xshift + xscale*0.9, yshift + yscale/2, pos=1, col=naive.col, labels=sum(is.naive.cilia), cex=1.1)
+
+is.primed.pattern <- is.pattern[match(rownames(unique.primed), rownames(var.primed))] # Same with the pattern specification process.
+yp.pattern <- density(unique.primed$bio[is.primed.pattern])
+is.naive.pattern <- is.pattern[match(rownames(unique.naive), rownames(var.naive))]
+yn.pattern <- density(unique.naive$bio[is.naive.pattern])
+
+yshift <- 0.4 
+yscale <- 0.15
+xshift <- 2 
+yp.pattern.2 <- MODIFY(yp.pattern, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale, yrange=c(0, 0.6))
+polygon(c(min(yp.pattern.2$x), yp.pattern.2$x, max(yp.pattern.2$x)), c(yshift, yp.pattern.2$y, yshift), border=NA, col="lightblue")
+lines(yp.pattern.2$x, yp.pattern.2$y, col=primed.col, lwd=2)
+yn.pattern.2 <- MODIFY(yn.pattern, xshift=xshift, xscale=xscale, yshift=yshift, yscale=yscale * sum(is.naive.pattern)/sum(is.primed.pattern))
+polygon(c(min(yn.pattern.2$x), yn.pattern.2$x, max(yn.pattern.2$x)), c(yshift, yn.pattern.2$y, yshift), border=NA, col="gold1")
+lines(yn.pattern.2$x, yn.pattern.2$y, col=naive.col, lwd=2)
+rect(xshift, yshift, xshift+xscale, yshift + yscale, lwd=2, border="grey50")
+text(xshift + xscale/2, yshift + yscale, pos=3, "Pattern specification process", cex=1.2)
+text(xshift + xscale*0.9, yshift + yscale/2, pos=3, col=primed.col, labels=sum(is.primed.pattern), cex=1.1)
+text(xshift + xscale*0.9, yshift + yscale/2, pos=1, col=naive.col, labels=sum(is.naive.pattern), cex=1.1)
 
 dev.off()
 

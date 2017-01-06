@@ -19,7 +19,7 @@ Each point represents a cell in the corresponding population.
 Each point is a gene, coloured based on whether it is detected as a HVG in both conditions (black) and if it is involved in the cell cycle (GO:0000278, pink).
 The red line represents equality between biological components.
 (C) Distribution of biological components for genes detected as HVGs only in the primed or naive conditions.
-Inset plots show the distribution of biological components for HVGs in each condition that are involved in cilia assembly (GO:0042384) or brain development (GO:0007420).
+Inset plots show the distribution of biological components for HVGs in each condition that are involved in pattern specification (GO:0007389), cilium assembly (GO:0042384) or brain development (GO:0007420).
 The number of condition-specific HVGs in each plot is also shown.
 
 **Figure 4. Cells shift from a naive-like to a primed-like expression pattern during early embryonic development.**
