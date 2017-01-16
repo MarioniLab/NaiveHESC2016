@@ -61,7 +61,7 @@ output[[paste0(rep(c("Protocol REF", "Performer"), 6), collapse="\t")]] <- paste
                                                                                     ), collapse="\t")
 output[["Extract Name"]] <- collected$Sample
 output[["Comment[LIBRARY_LAYOUT]"]] <- "PAIRED"
-output[["Comment[LIBRARY_SELECTION]"]] <- "PolyA"
+output[["Comment[LIBRARY_SELECTION]"]] <- "Oligo-dT"
 output[["Comment[LIBRARY_SOURCE]"]] <- "TRANSCRIPTOMIC"
 output[["Comment[LIBRARY_STRAND]"]] <- "not applicable"
 output[["Comment[LIBRARY_STRATEGY]"]] <- "RNA-seq"
