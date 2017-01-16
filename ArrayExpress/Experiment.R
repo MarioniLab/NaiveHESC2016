@@ -1,6 +1,6 @@
 all.out <- list()
 all.out[["MAGE-TAB Version"]] <- "1.1"
-all.out[["Investigation Title"]] <- "Project Capricorn"
+all.out[["Investigation Title"]] <- "Single-cell RNA-seq of naive and primed human embryonic stem cells"
 all.out[["Experiment Description"]] <- "This study aims to profile the transcriptomes of single naive and primed human embryonic stem cells. Cells from the H9 line were cultured to select for naive or primed phenotypes, and a sequencing library was generated from each single cell using the Smart-seq2 method. This was performed across multiple experimental batches (i.e., independent cultures) and high-throughput sequencing runs. Transcriptional profiles for all cells were obtained from the sequencing data and used to explore substructure and heterogeneity in the population for each phenotype."
 
 all.out[["Experimental Design"]] <- c("cell type comparison design")
