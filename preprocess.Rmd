@@ -311,7 +311,7 @@ rownames(sce) <- new.row.names
 
 Inspecting the 50 most highly expressed genes should show constitutively expressed genes like mitochondrial transcripts, ribosomal proteins, actin and other usual suspects.
 
-```{r, highEx, fig.cap="**Figure 5:** The 50 highest expressed genes in the data set in decreasing order."}
+```{r highEx}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
