@@ -201,25 +201,21 @@ head(colnames(pData(sce)))
 
 Assuming that most cells are high-quality, we remove cells with outlier values for technical metrics.
 We start with the library sizes and the number of expressed genes.
-Cells with small library sizes (below 100,000) or few expressed genes (below 5000) are considered to be of low quality.
+Cells with small library sizes (below ~100,000) or few expressed genes (below ~5000) are considered to be of low quality.
 
 ```{r histoSize, fig.width=10, fig.height=6}
-par(mfrow=c(1,2))
-hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="",
-     breaks=50, col="grey80", ylab="Number of cells", xlim = c(0,5))
-hist(sce$total_features, xlab="Number of expressed genes", main="",
-     breaks=50, col="grey80", ylab="Number of cells")
+multiplot(cols=2, 
+    plotPhenoData(sce, aes(x = sample, y = total_counts)),
+    plotPhenoData(sce, aes(x = sample, y = total_features)))
 ```
 
 We do the same for the proportion of reads mapped to mitochondrial and spike-in transcripts.
 Cells with high values for either metric are likely to be poor-quality, as cytoplasmic/nuclear RNA has been lost.
 
 ```{r mitoAndSpikes, fig.width=10, fig.height=6}
-par(mfrow=c(1,2))
-hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)",
-     ylab="Number of cells", breaks=20, main="", col="grey80")
-hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)",
-     ylab="Number of cells", breaks=20, main="", col="grey80")
+multiplot(cols=2, 
+    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Mito)),
+    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Spike)))
 ```
 
 To filter out low-quality cells, we identify those with outlier values for any of the above metrics.
