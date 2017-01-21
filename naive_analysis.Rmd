@@ -60,27 +60,49 @@ dir.create(resdir, showWarning=FALSE)
 
 We detect HVGs in the naive population, using the variance of the normalized log-expression values.
 A trend is fitted to the spike-in variances and represents the technical aspect of variability.
-This generally fits quite well, though some deviation of the spike-ins is attributable to amplification-induced variability.
+This is done separately for each batch due to the differences in spike-in quantity.
+The trend generally fits quite well, though some deviation of the spike-ins is attributable to amplification-induced variability.
 
-```{r naive.design}
-design_naive <- model.matrix(~0 + sce_naive$batch)
-var.fit_naive <- trendVar(sce_naive, trend="loess", span=0.4, design = design_naive)
-var.out_naive <- decomposeVar(sce_naive, var.fit_naive, assay="exprs", get.spikes=TRUE)
-plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-expression",
-     ylab="Variance of log-expression")
-points(var.fit_naive$mean, var.fit_naive$var, col="red", pch=16)
-curve(var.fit_naive$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+```{r naive.vartrend, fig.height=6, fig.width=10}
+par(mfrow=c(1,2))
+collected.var_naive <- list()
+for (b in levels(sce_naive$batch)) {
+    cur.sce <- sce_naive[,b==sce_naive$batch]
+    cur.sce <- normalize(cur.sce)
+    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit, assay="exprs")
+    collected.var_naive[[b]] <- var.out 
+    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
+        ylab="Variance of log-expression", main=paste("Batch", b))
+    points(var.fit$mean, var.fit$var, pch=16, col="red")
+    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+}
 ```
 
+We combine statistics across batches and save them to file.
+We also look at the distribution of the gene-wise variances.
 The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
+
+```{r naive.varplot}
+var.out_naive <- do.call(combineVar, collected.var_naive)
+write.table(file=file.path(resdir, "var.tsv"), var.out_naive, 
+    sep="\t", quote=FALSE, col.names=NA) 
+plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-expression",
+    ylab="Variance of log-expression")
+is <- which(isSpike(sce_naive))
+points(var.out_naive$mean[is], var.out_naive$total[is], col="red", pch=16)
+o <- is[order(var.out_naive$mean[is])]
+lines(var.out_naive$mean[o], var.out_naive$tech[o], col="dodgerblue", lwd=2)
+```
+
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
 
 ```{r var.naive}
-write.table(file=file.path(resdir, "var.tsv"), var.out_naive, sep="\t", quote=FALSE, col.names = NA) 
 hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
 hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
 nrow(hvg.out_naive)
-write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_naive, 
+    sep="\t", quote=FALSE, col.names = NA) 
 head(hvg.out_naive)
 ```
 
@@ -96,19 +118,21 @@ plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], alpha=0.05,
 We also assess the pairwise correlations between the genes across the naive cells.
 Again, the usual suspects dominate the top set of correlations.
 
-```{r, cor.naive}
-set.seed(100) 
-var.cor_naive <- correlatePairs(sce_naive, design = design_naive, subset.row=rownames(hvg.out_naive)) 
+```{r cor.naive}
+set.seed(100)
+design_naive <- model.matrix(~0 + sce_naive$batch)
+var.cor_naive <- correlatePairs(sce_naive, design = design_naive, 
+    subset.row=rownames(hvg.out_naive), per.gene=TRUE) 
 head(var.cor_naive)
 ```
 
 We focus on the genes that have significantly large correlations.
 This happens to be the majority of HVGs that were originally detected.
 
-```{r, sig.naive}
+```{r sig.naive}
 sig.cor_naive <- var.cor_naive$FDR <= 0.05
 summary(sig.cor_naive)
-chosen_naive <- unique(c(var.cor_naive$gene1[sig.cor_naive], var.cor_naive$gene2[sig.cor_naive]))
+chosen_naive <- var.cor_naive$gene[sig.cor_naive]
 saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_naive)
 length(chosen_naive)
 ```
@@ -134,7 +158,8 @@ tsne3_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="batch",
 multiplot(tsne1_naive, tsne2_naive, tsne3_naive, cols=3)
 ```
 
-And again, for PCA plots.
+All plots suggest that there is a small subpopulation off the main bulk of cells.
+We repeat this for PCA plots, though this is not so clear - dominated by variance along the larger population, perhaps?
 
 ```{r pca.naive, fig.width=15, fig.height=6}
 pca1_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1], 
@@ -145,8 +170,6 @@ pca3_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="batch",
     feature_set = chosen_naive) + fontsize
 multiplot(pca1_naive, pca2_naive, pca3_naive, cols=3)
 ```
-
-Both plots suggest that there is a small subpopulation off the main bulk of cells.
 
 # Clustering on Euclidean distance
 
@@ -159,7 +182,7 @@ my.tree_naive <- hclust(my.dist_naive, method="ward.D2")
 ```
 
 To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
-These suggest that `k=3` is the best, with the third cluster being genuinely separated from the others.
+These suggest that `k=3` is the best, with cluster 3 being genuinely separated from the others.
 
 ```{r silhouette, fig.width=10, fig.height=10}
 library(cluster)
@@ -191,11 +214,11 @@ We can have a look at the clustering result on our PCA plots from before, and on
 
 ```{r naive_PCA}
 sce_naive$cluster <- factor(my.clusters_naive)
-plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="cluster", 
-    feature_set = chosen_naive) + fontsize
+plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="cluster", 
+    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
 ```
 
-# Characterising the third cluster
+# Characterising cluster 3
 
 ## Checking some diagnostics
 
@@ -216,25 +239,26 @@ boxplot(split(sizeFactors(sce_naive), sce_naive$cluster), xlab="Cluster", ylab="
 boxplot(split(sce_naive$total_features, sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
 ```
 
-Most cells in cluster 3 are in batch 2, but so are most cells in general, so that's not really a problem.
+Most cells in this cluster are in batch 2, but so are most cells in general, so that's not really a problem.
 
 ```{r}
 lapply(split(sce_naive$batch, my.clusters_naive), table)
 ```
 
-We also check the cell cycle phase for each of the three clusters.
+We also check the cell cycle phase for each of the clusters.
 It's a fairly decent mix, so it's unlikely to be driven by cell cycle phase alone.
 
 ```{r}
 lapply(split(sce_naive$phase, my.clusters_naive), table)
 ```
 
-We also examine the location of cluster 3 on the overall PCA plot.
+We also examine the location of this cluster on the overall PCA plot.
 As expected, they show up in the middle, so we will describe this as a "transition" subpopulation.
 
 ```{r}
+trans.cluster <- 3
 all.pheno <- as.character(sce$phenotype)
-all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==3]] <- "transition"
+all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==trans.cluster]] <- "transition"
 write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
     row.names=FALSE, quote=FALSE, sep="\t")
 sce$phenotype <- all.pheno
@@ -244,7 +268,7 @@ plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype",
 
 ## Identifying marker genes for cluster 3
 
-With these clusters identified, we can assess DE of each cluster relative to each other cluster. 
+With these clusters identified, we can assess DE of cluster 3 relative to each other cluster. 
 To do so, we set up a new design matrix containing the three clusters and the batch numbers.
 
 ```{r, design.mat.naive}
@@ -266,7 +290,7 @@ We then identify DE genes between cluster 3 and every other cluster.
 The results are consolidated into a single list of DE genes, representing candidate markers for characterising cluster 3.
 
 ```{r marker_clust_naive}
-clust.num_naive <- "3"
+clust.num_naive <- as.character(trans.cluster)
 result.logFC_naive <- result.PValue_naive <- list()
 chosen.clust_naive <- which(levels(cluster_naive)==clust.num_naive)
 for (clust in seq_len(nlevels(cluster_naive))) {

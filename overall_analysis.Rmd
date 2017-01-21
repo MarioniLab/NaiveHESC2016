@@ -64,27 +64,45 @@ dir.create(resdir, showWarning=FALSE)
 We fit a trend to the variances of the spike-ins.
 This represents the technical variance at any given mean count.
 For each endogenous gene, the difference between the technical and total variance is the biological component of variability.
+We do this separately for each batch, as there is at least an order of magnitude difference in the amount of spike-in added to each batch.
 
-```{r }
-var.fit <- trendVar(sce, trend="loess", span=0.4, design = design)
-var.out <- decomposeVar(sce, var.fit, assay="exprs")
+```{r trendvarfit, fig.height=6, fig.width=10}
+par(mfrow=c(1,2))
+collected.var <- list()
+for (b in levels(sce$batch)) {
+    cur.sce <- sce[,b==sce$batch]
+    cur.sce <- normalize(cur.sce)
+    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
+    plot(var.fit$mean, var.fit$var, pch=16, col="grey", xlab="Mean log-expression",
+         ylab="Variance of log-expression", ylim=c(0, 10), xlim=c(0, 15), main=paste("Batch", b))
+    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+    collected.var[[b]] <- decomposeVar(cur.sce, var.fit, assay="exprs")
+}
 ```
 
 The trend passes through the bulk of the spike-ins, which is reassuring.
+We combine the statistics across batches (using Berger's IUT to select genes that are HVG in all batches) and save them to file.
+
+```{r combinevar}
+var.out <- do.call(combineVar, c(collected.var, method="berger"))
+write.table(file=file.path(resdir, "var.tsv"), var.out, sep="\t", quote=FALSE, col.names = NA) 
+```
+
+We examine the distribution of variances for the endogenous genes.
 Many genes have variances above this trend, corresponding to strong heterogeneity across the population.
 
-```{r}
+```{r plotvar}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
      ylab="Variance of log-expression")
-points(var.fit$mean, var.fit$var, col="red", pch=16)
-o <- order(var.out$mean)
+is <- which(isSpike(sce))
+points(var.out$mean[is], var.out$total[is], col="red", pch=16)
+o <- is[order(var.out$mean[is])]
 lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
 ```
 
 The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
 
 ```{r highvar}
-write.table(file=file.path(resdir, "var.tsv"), var.out, sep="\t", quote=FALSE, col.names = NA) 
 hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),]
 nrow(hvg.out)
 hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),]
@@ -101,23 +119,23 @@ plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.5,
 
 # Detecting highly correlated genes.
 
-We identify pairs of HVGs with strong correlations.
+We identify HVGs with strong correlations to at least one other HVG.
 These genes are most likely to be driving substructure in the data, though there are also correlations due to tightly coordinated pathways (ribosomal) and mapping spillover.
 For convenience, we only take the top 1000 genes with the largest biological components.
 
 ```{r correlation}
 set.seed(100) 
-var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)[1:1000]) 
+var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)[1:1000], per.gene=TRUE) 
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
 summary(sig.cor)
 ```
 
 We save these correlated HVGs for later use. 
-As it happens, all (or almost all) HVGs were detected as being correlated with at least one other HVG, so it ends up that we use all of them.
+As it happens, all (or almost all) of the top HVGs were detected as being correlated with at least one other HVG, so it ends up that we use all of them.
 
 ```{r chosencor}
-chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
+chosen <- var.cor$gene[sig.cor]
 length(chosen)
 saveRDS(chosen, file = file.path(resdir, "cor_hvg.rds"))
 ```
