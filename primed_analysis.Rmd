@@ -60,23 +60,43 @@ dir.create(resdir, showWarning=FALSE)
 
 We detect HVGs in the primed population, using the variance of the normalized log-expression values.
 A trend is fitted to the spike-in variances and represents the technical aspect of variability.
-The fit is okay, though there is a lot of deviation, again probably due to amplification-induced variability.
+This is done separately for each batch due to the differences in spike-in quantity.
+The trend is okay, though some deviation of the spike-ins is attributable to amplification-induced variability.
 
-```{r primed.design}
-design_primed <- model.matrix(~0 + sce_primed$batch)
-var.fit_primed <- trendVar(sce_primed, trend="loess", span=0.4, design = design_primed)
-var.out_primed <- decomposeVar(sce_primed, var.fit_primed, assay="exprs", get.spikes=TRUE)
-plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-expression",
-     ylab="Variance of log-expression")
-points(var.fit_primed$mean, var.fit_primed$var, col="red", pch=16)
-curve(var.fit_primed$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+```{r primed.vartrend, fig.height=6, fig.width=10}
+par(mfrow=c(1,2))
+collected.var_primed <- list()
+for (b in levels(sce_primed$batch)) {
+    cur.sce <- sce_primed[,b==sce_primed$batch]
+    cur.sce <- normalize(cur.sce)
+    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit, assay="exprs")
+    collected.var_primed[[b]] <- var.out 
+    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
+        ylab="Variance of log-expression")
+    points(var.fit$mean, var.fit$var, pch=16, col="red")
+    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+}
 ```
 
+We combine statistics across batches (requiring a gene to be HVG in both batches in order to be detected) and save them to file.
+We also look at the distribution of the gene-wise variances.
 The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
+
+```{r primed.varplot}
+var.out_primed <- do.call(combineVar, collected.var_primed)
+write.table(file=file.path(resdir, "var.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA) 
+plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-expression",
+     ylab="Variance of log-expression")
+is <- which(isSpike(sce_primed))
+points(var.out_primed$mean[is], var.out_primed$total[is], col="red", pch=16)
+o <- is[order(var.out_primed$mean[is])]
+lines(var.out_primed$mean[o], var.out_primed$tech[o], col="dodgerblue", lwd=2)
+```
+
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
 
 ```{r var.primed}
-write.table(file=file.path(resdir, "var.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names = NA) 
 hvg.out_primed <- var.out_primed[which(var.out_primed$FDR <= 0.05 & var.out_primed$bio >= 0.5),]
 hvg.out_primed <- hvg.out_primed[order(hvg.out_primed$bio, decreasing=TRUE),]
 nrow(hvg.out_primed)
@@ -98,7 +118,9 @@ Again, the usual suspects dominate the top set of correlations.
 
 ```{r, cor.primed}
 set.seed(100) 
-var.cor_primed <- correlatePairs(sce_primed, design = design_primed, subset.row=rownames(hvg.out_primed)) 
+design_primed <- model.matrix(~ 0 + sce_primed$batch)
+var.cor_primed <- correlatePairs(sce_primed, design = design_primed, 
+    subset.row=rownames(hvg.out_primed), per.gene=TRUE)
 head(var.cor_primed)
 ```
 
@@ -108,13 +130,12 @@ This happens to be the majority of HVGs that were originally detected.
 ```{r, sig.primed}
 sig.cor_primed <- var.cor_primed$FDR <= 0.05
 summary(sig.cor_primed)
-chosen_primed <- unique(c(var.cor_primed$gene1[sig.cor_primed], var.cor_primed$gene2[sig.cor_primed]))
+chosen_primed <- var.cor_primed$gene[sig.cor_primed]
 saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_primed)
 length(chosen_primed)
 ```
 
 ```{r, echo=FALSE, results="hide"}
-rm(var.cor_primed)
 gc()
 ```
 
@@ -187,21 +208,25 @@ for (k in 2:5){
 ## Between naive and primed conditions
 
 We compare the variability of the naive and primed populations to each other.
-There are more HVGs detected in the primed population.
+We first look at the number of HVGs detected in each population.
+The number is slightly lower in the primed population, though that's probably due to loss of power from increases in the technical variance.
 
 ```{r}
 var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
 hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
 nrow(hvg.out_primed)
 nrow(hvg.out_naive)
+plot(var.out_primed$mean, var.out_primed$tech, col="dodgerblue", pch=16, cex=0.5,
+    xlab="Mean log-expression", ylab="Technical variance")
+points(var.out_naive$mean, var.out_naive$tech, col="orange", pch=16, cex=0.5)
 ```
 
-We also plot the differences in the biological component between conditions, for all genes and primed/naive HVGs.
-This result suggests that the heterogeneity is elevated in the primed subpopulation.
-Note that this is not purely driven by a change in the mean expression, as the shift in the biological components occurs mostly for genes at a log-fold change of zero.
+A simpler view is that of the differences in the biological component between conditions.
+This is not affected by the technical variance, at least with respect to loss of power.
+We plot the difference against the change in the mean expression to see whether DE is driving the change in variance.
 (Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.)
 
-```{r varcomp, fig.width=10, fig.height=6}
+```{r varcomp, fig.width=15, fig.height=6}
 dbio <- var.out_primed$bio - var.out_naive$bio
 
 # Expression values are not directly comparable between separately-normalized objects.
@@ -210,30 +235,21 @@ de.stats <- read.table(file.path("results-overall", "de.tsv"))
 lfc <- -de.stats[rownames(var.out_naive),"logFC"]
 
 par(mfrow=c(1,3))
-smoothScatter(lfc, dbio, xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="All genes")
 phvg <- match(rownames(hvg.out_primed), rownames(var.out_primed))
-smoothScatter(lfc[phvg], dbio[phvg], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Primed HVGs")
 nhvg <- match(rownames(hvg.out_naive), rownames(var.out_naive))
-smoothScatter(lfc[nhvg], dbio[nhvg], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Naive HVGs")
-```
-
-We can look further at the distribution of total and technical variances with respect to the mean.
-The technical trends are quite similar.
-It's also quite obvious that the bulk of genes are more heterogeneous in the primed condition.
-
-```{r, fig.width=10, fig.height=6}
-par(mfrow=c(1,2))
-plot(var.out_primed$mean, var.out_primed$total, col="dodgerblue", pch=16)
-points(var.out_primed$mean, var.out_primed$tech, col="red", pch=16)
-plot(var.out_naive$mean, var.out_naive$total, col="orange", pch=16)
-points(var.out_naive$mean, var.out_naive$tech, col="red", pch=16)
+both.hvg <- intersect(phvg, nhvg)
+smoothScatter(lfc[both.hvg], dbio[both.hvg], xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), main="Both HVGs")
+phvg.only <- setdiff(phvg, nhvg)
+smoothScatter(lfc[phvg.only], dbio[phvg.only], xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), main="Primed-only HVGs")
+nhvg.only <- setdiff(nhvg, phvg)
+smoothScatter(lfc[nhvg.only], dbio[nhvg.only], xlab=expression(Log[2]~"fold change"), 
+    ylab=expression(Delta*"biological component"), main="Naive-only HVGs")
 ```
 
 We also check the number of expressed genes between naive and primed cells.
-The primed cells have more-or-less the same number of expressed genes, which means that the number of genes isn't driving the difference in the number of HVGs.
+The primed cells have more-or-less the same number of expressed genes, which means that the number of genes isn't driving the differences.
 (This plot isn't particularly informative because differences in numbers of expressed genes would manifest as a non-zero log-fold change anyway.)
 
 ```{r}
@@ -250,53 +266,92 @@ gc()
 
 ### Gene set analyses
 
-We take the primed-only HVGs and use them in a gene set analysis.
+We assemble genes in every GO term.
 
-```{r primedgo}
-unique.genes <- rownames(var.out_primed)[setdiff(phvg, nhvg)]
-is.unique <- rownames(sce_primed) %in% unique.genes
-entreznames <- fData(sce_primed)$entrezgene
-has.entrez <- !is.na(entreznames)
-go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
-topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go_unique_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
-head(topgo)
+```{r gosetup}
+library(org.Hs.eg.db)
+EG.GO <- toTable(org.Hs.egGO2ALLEGS)
+EG.GO <- EG.GO[EG.GO$Ontology=="BP",]
+all.sets <- split(EG.GO$gene_id, EG.GO$go_id)
 ```
 
-And again with KEGG terms:
+We run a one-sided sign-test to identify genes that are more variable in one condition compared to the other.
+For example, the p-value for `poutput` represents the probability of obtaining fewer genes that are less variable in the primed condition (i.e., more variability in primed cells).
 
-```{r primedkegg}
-kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species = "Hs")
-topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg_unique_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
-head(topkegg)
+```{r runsigntest}
+poutput <- list()
+noutput <- list()
+numgenes <- list()
+for (entry in names(all.sets)) {
+    m <- which(fData(sce_primed)$entrezgene %in% all.sets[[entry]])
+    pbio <- var.out_primed$bio[m]
+    nbio <- var.out_naive$bio[m]
+    keep <- (nbio > 0 | pbio > 0) & nbio!=pbio
+    pbio <- pbio[keep]
+    nbio <- nbio[keep]
+    numgenes[[entry]] <- sum(keep)
+    poutput[[entry]] <- pbinom(sum(pbio < nbio), p=0.5, sum(keep))
+    noutput[[entry]] <- pbinom(sum(nbio < pbio), p=0.5, sum(keep))
+}
+numgenes <- unlist(numgenes)
+poutput <- unlist(poutput)
+noutput <- unlist(noutput)
 ```
 
-We also have a look at the shared HVGs and see what they look like.
+We summarize the GO terms and save the results to file.
 
-```{r primedgo.shared}
-shared.genes <- rownames(var.out_primed)[intersect(phvg, nhvg)]
-is.shared <- rownames(sce_primed) %in% shared.genes
-go <- goana(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
-topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go_shared_hvg.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
-head(topgo)
+```{r gosumup}
+library(GO.db)
+go.names <- select(GO.db, keys = names(all.sets), columns = "TERM")
+p.res <- data.frame(Term=names(poutput), Description=go.names$TERM, 
+    N=numgenes, P=poutput, FDR=p.adjust(poutput, method="BH"))
+p.res <- p.res[order(p.res$P),]
+write.table(file=file.path(resdir, "go_primed.tsv"), p.res, 
+    row.names=FALSE, sep="\t", quote=FALSE)
+head(p.res)
+n.res <- data.frame(Term=names(noutput), Description=go.names$TERM, 
+    N=numgenes, P=noutput, FDR=p.adjust(noutput, method="BH"))
+n.res <- n.res[order(n.res$P),]
+write.table(file=file.path(resdir, "go_naive.tsv"), n.res, 
+    row.names=FALSE, sep="\t", quote=FALSE)
+head(n.res)
 ```
 
-And again with KEGG terms:
+Doing the same for the KEGG terms.
 
-```{r primedkegg.shared}
-kegg <- kegga(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species = "Hs")
-topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
-head(topkegg)
+```{r}
+EG.KEGG <- toTable(org.Hs.egPATH2EG)
+all.sets <- split(EG.KEGG$gene_id, EG.KEGG$path_id)
+```
+
+Running the sign tests again.
+
+```{r, ref.label="runsigntest"}
+```
+
+Summarizing the results.
+
+```{r keggsumup}
+kegg.names <- getKEGGPathwayNames()
+kegg.names <- kegg.names[match(paste0("path:map", names(all.sets)), kegg.names$PathwayID),]
+p.res <- data.frame(Path=names(poutput), Description=kegg.names$Description, 
+     N=numgenes, P=poutput, FDR=p.adjust(poutput, method="BH"))
+p.res <- p.res[order(p.res$P),]
+write.table(file=file.path(resdir, "kegg_primed.tsv"), p.res, 
+    row.names=FALSE, sep="\t", quote=FALSE)
+head(p.res)
+n.res <- data.frame(Path=names(noutput), Description=kegg.names$Description, 
+     N=numgenes, P=noutput, FDR=p.adjust(noutput, method="BH"))
+n.res <- n.res[order(n.res$P),]
+write.table(file=file.path(resdir, "kegg_naive.tsv"), n.res, 
+    row.names=FALSE, sep="\t", quote=FALSE)
+head(n.res)
 ```
 
 ### Effect of the cell cycle
 
 We check whether the extra variability is caused by the cell cycle.
 There are some differences in the classification of cells by `cyclone`, which might explain some of the heterogeneity.
-In particular, G2/M is quite different from G1/S, so increased numbers of G2/M cells in the primed condition may result in greater variability. 
 
 ```{r phasecheck}
 primed.col <- "#0072B2"
