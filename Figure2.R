@@ -153,6 +153,7 @@ for (i in seq_along(colramp)){
 # Adding references to the type of gene.
 par(mar=c(0.5, 0.5, 0.5, 0.2))
 plot(0,0,type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', xlim=c(0, 1), ylim=c(0, 1))
+coords <- par()$usr
 ypts <- seq(coords[3], coords[4], length.out=length(imprinted)*2+1)
 text(x=0.5, y=ypts[seq_along(imprinted)*2], rownames(heat.imprint.vals), cex=1.2)
 
