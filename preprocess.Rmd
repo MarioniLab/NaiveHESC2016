@@ -195,7 +195,7 @@ We also specify the set of feature controls that correspond to spike-in transcri
 ```{r QCMetrics}
 library(scran)
 sce <- calculateQCMetrics(sce, feature_controls = list(Spike=is.spike, Mt=is.mito))
-isSpike(sce) <- "Spike"
+setSpike(sce) <- "Spike"
 head(colnames(pData(sce)))
 ```
 
@@ -205,8 +205,8 @@ Cells with small library sizes (below ~100,000) or few expressed genes (below ~5
 
 ```{r histoSize, fig.width=10, fig.height=6}
 multiplot(cols=2, 
-    plotPhenoData(sce, aes(x = sample, y = total_counts)),
-    plotPhenoData(sce, aes(x = sample, y = total_features)))
+    plotPhenoData(sce, aes(x = sample, y = total_counts, colour_by = phenotype)),
+    plotPhenoData(sce, aes(x = sample, y = total_features, colour_by = phenotype)))
 ```
 
 We do the same for the proportion of reads mapped to mitochondrial and spike-in transcripts.
@@ -214,8 +214,8 @@ Cells with high values for either metric are likely to be poor-quality, as cytop
 
 ```{r mitoAndSpikes, fig.width=10, fig.height=6}
 multiplot(cols=2, 
-    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Mito)),
-    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Spike)))
+    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Mt, colour_by = phenotype)),
+    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Spike, colour_by = phenotype)))
 ```
 
 To filter out low-quality cells, we identify those with outlier values for any of the above metrics.
