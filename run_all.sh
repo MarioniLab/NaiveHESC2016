@@ -1,10 +1,10 @@
 set -e
 set -u
-echo "knitr::knit('preprocess.Rmd')" | R --no-save --vanilla
-echo "knitr::knit('overall_analysis.Rmd')" | R --no-save --vanilla
-echo "knitr::knit('naive_analysis.Rmd')" | R --no-save --vanilla
-echo "knitr::knit('primed_analysis.Rmd')" | R --no-save --vanilla
-echo "knitr::knit('remapping.Rmd')" | R --no-save --vanilla
+echo "knitr::knit('preprocess.Rmd')" | Rdevel --no-save --vanilla
+echo "knitr::knit('overall_analysis.Rmd')" | Rdevel --no-save --vanilla
+echo "knitr::knit('naive_analysis.Rmd')" | Rdevel --no-save --vanilla
+echo "knitr::knit('primed_analysis.Rmd')" | Rdevel --no-save --vanilla
+echo "knitr::knit('remapping.Rmd')" | Rdevel --no-save --vanilla
 
 echo "rmarkdown::render('preprocess.md')" | R --no-save --vanilla
 echo "rmarkdown::render('overall_analysis.md')" | R --no-save --vanilla
