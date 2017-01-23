@@ -79,7 +79,7 @@ dev.off()
 
 ###############################
 # Figure 2B
-pdf(file=file.path(figdir, "2b.pdf"), width = 6, height = 10)
+pdf(file=file.path(figdir, "2b.pdf"), width = 6, height = 10, useDingbats=FALSE)
 markers <- c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG")
 
 par(las=1, mar = c(2.1, 4.5, 0.1, 0.5), mfrow=c(3,1))
@@ -112,7 +112,7 @@ all.colors[pops$Type=="naive"] <- naive.col
 all.colors[pops$Type=="transition"] <- trans.col
 all.colors[pops$Type=="primed"] <- primed.col
 
-pdf(file=file.path(figdir, "s2a.pdf"), width=8, height=6)
+pdf(file=file.path(figdir, "s2a.pdf"), width=8, height=6, useDingbats=FALSE)
 layout(cbind(1,2), width=c(5, 1.5))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
 plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = all.colors,

@@ -4,12 +4,12 @@ source("central.R")
 hvg.naive <- read.table(file.path("results-naive", "hvg.tsv"), header=TRUE)
 hvg.primed <- read.table(file.path("results-primed", "hvg.tsv"), header=TRUE)
 
-pdf(file=file.path(figdir, "3a.pdf"), width=5)
+pdf(file=file.path(figdir, "3a.pdf"), width=5, useDingbats=FALSE)
 ylimit <- c(0, 6)
 nb <- hvg.naive$bio
 pb <- hvg.primed$bio
 boxplot(list(Naive=nb, Primed=pb), pch=16, cex=0.5,
-        col=c(naive.col, primed.col), ylim=ylimit, main="Top 1000 HVGs",
+        col=c(naive.col, primed.col), ylim=ylimit, 
         ylab="Biological component", cex.axis=1.2, cex.lab=1.4, cex.names=1.4)
 text(1, min(nb), pos=1, nrow(hvg.naive), cex=1.2)
 text(2, min(pb), pos=1, nrow(hvg.primed), cex=1.2)
@@ -114,7 +114,7 @@ dev.off()
 
 # B
 
-pdf(file=file.path(figdir, "s3b.pdf"), width=10, height=6)
+pdf(file=file.path(figdir, "s3b.pdf"), width=10, height=6, useDingbats=FALSE)
 par(mfrow=c(1,2))
 for (mode in 1:2) { 
     if (mode==1) {
@@ -122,11 +122,13 @@ for (mode in 1:2) {
         pb <- sort(hvg.primed$bio)
         ylimits <- c(0, 6)
         ylab <- "Biological component"
+        xlab <- "by component"
     } else {
         nb <- sort(hvg.naive$bio/hvg.naive$tech)
         pb <- sort(hvg.primed$bio/hvg.primed$tech)
         ylimits <- c(0, 4)
         ylab <- "Biological:technical ratio"
+        xlab <- "by ratio"
     }    
 
     N <- 4
@@ -140,7 +142,7 @@ for (mode in 1:2) {
     }
 
     xcoords <- rbind(seq_len(N)*2.5, seq_len(N)*2.5 + 1)
-    boxplot(to.plot, at=xcoords, xaxt="n", xlab="Quartile", ylab=ylab, ylim=ylimits,
+    boxplot(to.plot, at=xcoords, xaxt="n", xlab=sprintf("Quartile %s", xlab), ylab=ylab, ylim=ylimits,
             col=c(naive.col, primed.col), pch=16, cex=0.5, cex.axis=1.2, cex.lab=1.4)
     axis(1, at=colMeans(xcoords), label=seq_len(N), cex.axis=1.2)    
     legend(xcoords[1]-0.5, ylimits[2], fill=c(naive.col, primed.col), legend=c("Naive", "Primed"), cex=1.2)

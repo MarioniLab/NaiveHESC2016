@@ -7,7 +7,7 @@ library(scater)
 ugly.plot <- plotPCA(sce, exprs_values="norm_exprs", feature_set = chosen)
 plot_data <- ggplot_build(ugly.plot)
 
-pdf(file=file.path(figdir, "1b.pdf"), width=9, height=8)
+pdf(file=file.path(figdir, "1b.pdf"), width=9, height=8, useDingbats=FALSE)
 layout(cbind(1,2), width=c(5, 1))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
 plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = ifelse(sce$phenotype=="naive", naive.col, primed.col),
@@ -27,7 +27,7 @@ main.col <- "grey50"
 naive.genes <- c("KLF4", "KLF17", "DPPA3", "DNMT3L", "DPPA5")
 primed.genes <- c("DUSP6", "THY1")
 
-pdf(file=file.path(figdir, "1c.pdf"))
+pdf(file=file.path(figdir, "1c.pdf"), useDingbats=FALSE)
 par(mar = c(5.1, 5.1, 4.1, 2.1), las=1)
 plot(x, y, cex=0.3, ylim=c(-22.5,22.5), pch = 16, ylab=expression(Log[2]~"fold change"), 
      xlab=expression("Average"~Log[2]~"CPM"), cex.lab=1.5, col=main.col, cex.axis=1.2)
