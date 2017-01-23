@@ -28,20 +28,48 @@ in.both <- rownames(sce_all) %in% intersect(rownames(hvg.naive), rownames(hvg.pr
 var.naive <- read.table(file.path("results-naive", "var.tsv"), header=TRUE)
 var.primed <- read.table(file.path("results-primed", "var.tsv"), header=TRUE)
 
-pdf(file=file.path(figdir, "3b.pdf"), width=7)
-x <- var.naive$bio[in.cell.cycle]
-y <- var.primed$bio[in.cell.cycle]
-limits <- c(0, max(c(x, y)))
-plot(x, y, xlim=limits, ylim=limits, pch=16, col="grey", cex.axis=1.2, cex.lab=1.4,
-     xlab="Biological component (naive)", ylab="Biological component (primed)")
-x <- var.naive$bio[in.cell.cycle & in.both]
-y <- var.primed$bio[in.cell.cycle & in.both]
-points(x, y, pch=16, col="black")
-abline(0,1,col="red", lwd=2, lty=2)
+cycle.naive <- var.naive[in.cell.cycle & in.both,]
+cycle.primed <- var.primed[in.cell.cycle & in.both,]
+rn <- rank(-cycle.naive$bio)
+rp <- rank(-cycle.primed$bio)
+is <- which(is.na(var.naive$FDR))
+osn <- is[order(var.naive$bio[is], decreasing=TRUE)]
+osp <- is[order(var.primed$bio[is], decreasing=TRUE)]
 
-legend(limits[1], limits[2], legend=c("Not shared HVG", "Shared HVG"), col=c("grey", "black"), pch=16, cex=1.2)
-text(9, 10,  labels=sum(x < y), col=primed.col, cex=1.2)
-text(10, 9,  labels=sum(x > y), col=naive.col, cex=1.2)
+pdf(file=file.path(figdir, "3b.pdf"), width=7, useDingbats=FALSE)
+ylimits <- c(0, 12)
+xlimits <- c(0, 50)
+plot(rn, cycle.naive$bio, pch=16, col=naive.col, ylim=ylimits, xlim=xlimits,
+     xlab="Rank", ylab="Biological component", cex.axis=1.2, cex.lab=1.4)
+points(rp, cycle.primed$bio, pch=16, col=primed.col)
+o <- order(rn)
+lines(rn[o], cycle.naive$bio[o], col=naive.col)
+o <- order(rp)
+lines(rp[o], cycle.primed$bio[o], col=primed.col)
+points(var.naive$bio[osn], pch=1, col=naive.col, ylim=c(0, 12))
+points(var.primed$bio[osp], pch=1, col=primed.col)
+
+legend(xlimits[2], ylimits[2], xjust=1, yjust=1, lty=c(1, 1, 0, 0),
+       legend=c("Cell cycle HVG (naive)", "Cell cycle HVG (primed)", 
+                "Spike-in transcript (naive)", "Spike-in transcript (primed)"),
+       col=c(naive.col, primed.col), pch=c(16, 16, 1, 1), cex=1.2)
+
+#intersect(rownames(cycle.primed[rp <= 50,]), rownames(cycle.naive[rn <= 50,]))
+to.annotate <- c("CDK1", "PLK1", "CCNA2", "CENPE", "NUF2")
+xoffset <- c(5,  2, -1,  5, 10)  
+yoffset <- c(1, -2, -1, -1, 2)     
+positions <- c(4, 1, 1, 1, 4)
+mn <- match(to.annotate, rownames(cycle.naive))
+hostx <- rn[mn]
+extrax <- hostx + xoffset
+hosty <- cycle.naive$bio[mn]
+extray <- hosty + yoffset
+text(extrax, extray, to.annotate, pos=positions)
+segments(hostx, hosty, extrax, extray)
+mp <- match(to.annotate, rownames(cycle.primed))
+hostx2 <- rp[mp]
+hosty2 <- cycle.primed$bio[mp]
+segments(hostx2, hosty2, extrax, extray)
 dev.off()
 
 # Figure 3C
