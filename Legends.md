@@ -14,13 +14,14 @@ Each point represents a cell in the corresponding population.
 (C) _FaCS (Ferdinand)_
 
 **Figure 3. The primed population has greater transcriptional heterogeneity than the naive population.**
-(A) Number of highly variable genes detected in each condition at a FDR of 5% and with a biological component of the variance greater than or equal to 0.5. 
-(B) Estimates of the biological component of the variance in the primed condition, plotted against the corresponding estimates in the naive condition.
-Each point is a gene, coloured based on whether it is detected as a HVG in both conditions (black) and if it is involved in the cell cycle (GO:0000278, pink).
-The red line represents equality between biological components.
-(C) Distribution of biological components for genes detected as HVGs only in the primed or naive conditions.
-Inset plots show the distribution of biological components for HVGs in each condition that are involved in pattern specification (GO:0007389), cilium assembly (GO:0042384) or brain development (GO:0007420).
-The number of condition-specific HVGs in each plot is also shown.
+(A) Estimates of the biological component of the variance for highly variable genes detected in each condition.
+The number below each boxplot represents the total number of detected HVGs.
+Points represent HVGs with biological components that are more than 1.5 interquartile ranges from the third quartile.
+(B) Biological component of the variance for cell cycle HVGs detected in both conditions, ranked by the magnitude of the component.
+Association with the cell cycle is determined by GO annotation (GO:0007049), and some key genes are highlighted.
+Biological components of ERCC spike-in transcripts are shown as a control.
+(C) GO terms and KEGG pathways that are differentially enriched in the set of HVGs between conditions.
+The proportion of HVGs associated with each term/pathway are shown for each condition, along with the actual number of genes.
 
 **Figure 4. Cells shift from a naive-like to a primed-like expression pattern during early embryonic development.**
 Naive and primed markers were identified from the DE analysis of the hESC data.
@@ -38,13 +39,10 @@ Cells in the transition populations were identified after clustering on HVGs ide
 These cells are highlighted in green, using the same PCA plot in Figure 1B.
 
 **Figure 3. Increased variability in primed cells is not driven by technical effects.**
-(A) Diagnostic plots showing the number of expressed genes, number of cells and size factors of cells in the naive and primed conditions.
-(B) Changes in the biological components between naive and primed conditions, plotted against the log~2~-fold change in expression.
-Density plots are shown for all genes, genes detected as HVGs in both conditions, and condition-specific HVGs.
-(C) Mean-variance relationships in the naive and primed conditions.
-The technical variance is represented by the red line fitted to spike-in variances.
-HVGs are detected in each condition as those genes with variances significantly greater than the trend, and are coloured.
-(D) Distribution of cells across cell cycle phases in each condition, as determined using the `cyclone` method. 
+(A) The number of expressed genes, number of cells and size factors of cells in the naive and primed conditions.
+(B) Left: the distribution of biological components for all HVGs in each condition, separated into quartiles for greater resolution.
+Right: the distribution of the ratio of the total variance to the technical component for all HVGs in each condition, separated into quartiles.
+(C) Distribution of cells across cell cycle phases in each condition, as determined using the `cyclone` method. 
 
 **Figure 4. Proof of concept of naive/primed mapping with naive, transition and primed hESCs.** 
 For each plot, the density of cells is represented by the colour of the pixels.

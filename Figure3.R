@@ -152,10 +152,10 @@ for (mode in 1:2) {
         ylab <- "Biological component"
         xlab <- "by component"
     } else {
-        nb <- sort(hvg.naive$bio/hvg.naive$tech)
-        pb <- sort(hvg.primed$bio/hvg.primed$tech)
-        ylimits <- c(0, 4)
-        ylab <- "Biological:technical ratio"
+        nb <- sort(hvg.naive$total/hvg.naive$tech)
+        pb <- sort(hvg.primed$total/hvg.primed$tech)
+        ylimits <- c(1, 5)
+        ylab <- "Total:technical ratio"
         xlab <- "by ratio"
     }    
 
