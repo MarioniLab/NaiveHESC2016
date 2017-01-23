@@ -87,9 +87,9 @@ We compared the total number of HVGs detected in each condition, and the sizes o
 Shared HVGs were tested for enrichment of GO or KEGG terms using the `goana` and `kegga` functions, respectively, from _limma_.
 
 We also tested for differential enrichment of these terms in the set of HVGs from each condition.
-For each GO or KEGG term, we counted the number of HVGs that were associated with that term in each condition.
-This was used to assemble a 2-by-2 contingency table, with rows representing the annotated/unannotated status and columns representing the naive/primed conditions.
-We used Fisher's exact test to determine if there was a significant difference in the proportion of associated HVGs between conditions.
+For each GO or KEGG term, we counted the number of HVGs detected in each condition that were associated with that term.
+This was used to assemble a 2-by-2 contingency table containing the number of associated/unassociated HVGs in each condition.
+We applied Fisher's exact test to determine if there was a significant difference in the proportion of associated HVGs between conditions.
 
 ## Mapping temporal trajectories in early embryos 
 
