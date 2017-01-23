@@ -205,26 +205,42 @@ for (k in 2:5){
 
 # Comparison of subpopulation heterogeneity
 
-## Between naive and primed conditions
+## Overall changes between naive and primed conditions
 
 We compare the variability of the naive and primed populations to each other.
 We first look at the number of HVGs detected in each population.
-The number is slightly lower in the primed population, though that's probably due to loss of power from increases in the technical variance.
+
 
 ```{r}
 var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
 hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
 nrow(hvg.out_primed)
 nrow(hvg.out_naive)
+```
+
+The number is slightly lower in the primed population, though that's probably due to loss of power from increases in the technical variance.
+
+```{r}
 plot(var.out_primed$mean, var.out_primed$tech, col="dodgerblue", pch=16, cex=0.5,
     xlab="Mean log-expression", ylab="Technical variance")
 points(var.out_naive$mean, var.out_naive$tech, col="orange", pch=16, cex=0.5)
 ```
 
-A simpler view is that of the differences in the biological component between conditions.
-This is not affected by the technical variance, at least with respect to loss of power.
-We plot the difference against the change in the mean expression to see whether DE is driving the change in variance.
-(Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.)
+In any case, we look at the biological components to compare the variability of the HVGs in each condition.
+We do this for the absolute values of components and as a ratio against the technical variance.
+(This is because the size of the technical variance can affect the value of the biological component, e.g., scaling of the estimate's sampling distribution.)
+
+```{r compcomp, fig.height=7, fig.width=10}
+par(mfrow=c(1,2))
+boxplot(list(Primed=hvg.out_primed$bio, Naive=hvg.out_naive$bio), 
+    ylab="Biological component", ylim=c(0, 5))
+boxplot(list(Primed=hvg.out_primed$bio/hvg.out_primed$tech, 
+             Naive=hvg.out_naive$bio/hvg.out_naive$tech), 
+    ylab="Biological:technical ratio", ylim=c(0, 5))
+```
+
+We also plot the difference against the change in the mean expression to see whether DE is driving the change in variance.
+Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.
 
 ```{r varcomp, fig.width=15, fig.height=6}
 dbio <- var.out_primed$bio - var.out_naive$bio
@@ -248,25 +264,31 @@ smoothScatter(lfc[nhvg.only], dbio[nhvg.only], xlab=expression(Log[2]~"fold chan
     ylab=expression(Delta*"biological component"), main="Naive-only HVGs")
 ```
 
-We also check the number of expressed genes between naive and primed cells.
-The primed cells have more-or-less the same number of expressed genes, which means that the number of genes isn't driving the differences.
-(This plot isn't particularly informative because differences in numbers of expressed genes would manifest as a non-zero log-fold change anyway.)
-
-```{r}
-naive.genenum <- sum(var.out_naive$mean > 0)
-primed.genenum <- sum(var.out_primed$mean > 0)
-barplot(cbind(Naive=naive.genenum, Primed=primed.genenum), ylab="Number of expressed genes")
-```
-
 ```{r, echo=FALSE, results="hide"}
 gc()
 ```
 
-## Interpreting the increased heterogeneity
+## Examining the genes that change in heterogeneity
 
-### Gene set analyses
+We perform a gene set analysis on the genes that are detected as HVGs in both conditions.
 
-We assemble genes in every GO term.
+```{r}
+shared.genes <- rownames(var.out_primed)[both.hvg]
+is.shared <- rownames(sce_primed) %in% shared.genes
+entreznames <- fData(sce_primed)$entrezgene
+has.entrez <- !is.na(entreznames)
+go <- goana(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_shared_hvg.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+kegg <- kegga(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+We also see what terms are enriched between the two sets.
+First, we set up the GO terms.
 
 ```{r gosetup}
 library(org.Hs.eg.db)
@@ -275,83 +297,63 @@ EG.GO <- EG.GO[EG.GO$Ontology=="BP",]
 all.sets <- split(EG.GO$gene_id, EG.GO$go_id)
 ```
 
-We run a one-sided sign-test to identify genes that are more variable in one condition compared to the other.
-For example, the p-value for `poutput` represents the probability of obtaining fewer genes that are less variable in the primed condition (i.e., more variability in primed cells).
+We apply Fisher's exact test to see whether any terms are enriched in the primed HVGs compared to the naive HVGs.
 
-```{r runsigntest}
-poutput <- list()
-noutput <- list()
-numgenes <- list()
+```{r runfisher}
+out.stats <- list()
 for (entry in names(all.sets)) {
-    m <- which(fData(sce_primed)$entrezgene %in% all.sets[[entry]])
-    pbio <- var.out_primed$bio[m]
-    nbio <- var.out_naive$bio[m]
-    keep <- (nbio > 0 | pbio > 0) & nbio!=pbio
-    pbio <- pbio[keep]
-    nbio <- nbio[keep]
-    numgenes[[entry]] <- sum(keep)
-    poutput[[entry]] <- pbinom(sum(pbio < nbio), p=0.5, sum(keep))
-    noutput[[entry]] <- pbinom(sum(nbio < pbio), p=0.5, sum(keep))
+    curgenes <- all.sets[[entry]]
+    mat <- cbind(c(sum(entreznames[phvg] %in% curgenes, na.rm=TRUE), 
+                   sum(!entreznames[phvg] %in% curgenes, na.rm=TRUE)),
+                 c(sum(entreznames[nhvg] %in% curgenes, na.rm=TRUE),
+                   sum(!entreznames[nhvg] %in% curgenes, na.rm=TRUE)))
+    fout <- fisher.test(mat)
+    out.stats[[entry]] <- c(mat[1,]/mat[2,], mat[1,], fout$p.value)
 }
-numgenes <- unlist(numgenes)
-poutput <- unlist(poutput)
-noutput <- unlist(noutput)
+out.stats <- do.call(rbind, out.stats)                  
+colnames(out.stats) <- c("Prop.primed", "Prop.naive", "Num.primed", "Num.naive", "P")
 ```
 
-We summarize the GO terms and save the results to file.
+Finally, annotating the GO terms.
 
-```{r gosumup}
+```{r gosummary}
 library(GO.db)
-go.names <- select(GO.db, keys = names(all.sets), columns = "TERM")
-p.res <- data.frame(Term=names(poutput), Description=go.names$TERM, 
-    N=numgenes, P=poutput, FDR=p.adjust(poutput, method="BH"))
-p.res <- p.res[order(p.res$P),]
-write.table(file=file.path(resdir, "go_primed.tsv"), p.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(p.res)
-n.res <- data.frame(Term=names(noutput), Description=go.names$TERM, 
-    N=numgenes, P=noutput, FDR=p.adjust(noutput, method="BH"))
-n.res <- n.res[order(n.res$P),]
-write.table(file=file.path(resdir, "go_naive.tsv"), n.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(n.res)
+go.names <- select(GO.db, keys = rownames(out.stats), columns = "TERM")
+go.res <- data.frame(Description=go.names$TERM, out.stats)
+go.res <- go.res[order(go.res$P),]
+write.table(file=file.path(resdir, "go_diff_hvg.tsv"), go.res, 
+    col.names=NA, sep="\t", quote=FALSE)
+head(go.res)
 ```
 
-Doing the same for the KEGG terms.
+We repeat the dose with KEGG pathways.
+First, setting up the gene sets.
 
 ```{r}
 EG.KEGG <- toTable(org.Hs.egPATH2EG)
 all.sets <- split(EG.KEGG$gene_id, EG.KEGG$path_id)
 ```
 
-Running the sign tests again.
+Running through the FET again.
 
-```{r, ref.label="runsigntest"}
+```{r, ref.label="runfisher"}
 ```
 
-Summarizing the results.
+Adding annotation.
 
-```{r keggsumup}
+```{r}
 kegg.names <- getKEGGPathwayNames()
 kegg.names <- kegg.names[match(paste0("path:map", names(all.sets)), kegg.names$PathwayID),]
-p.res <- data.frame(Path=names(poutput), Description=kegg.names$Description, 
-     N=numgenes, P=poutput, FDR=p.adjust(poutput, method="BH"))
-p.res <- p.res[order(p.res$P),]
-write.table(file=file.path(resdir, "kegg_primed.tsv"), p.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(p.res)
-n.res <- data.frame(Path=names(noutput), Description=kegg.names$Description, 
-     N=numgenes, P=noutput, FDR=p.adjust(noutput, method="BH"))
-n.res <- n.res[order(n.res$P),]
-write.table(file=file.path(resdir, "kegg_naive.tsv"), n.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(n.res)
+kegg.res <- data.frame(Description=kegg.names$Description, out.stats)
+kegg.res <- kegg.res[order(kegg.res$P),]
+write.table(file=file.path(resdir, "kegg_diff_hvg.tsv"), kegg.res, 
+    col.names=NA, sep="\t", quote=FALSE)
+head(kegg.res)
 ```
 
-### Effect of the cell cycle
+## Effect of the cell cycle
 
-We check whether the extra variability is caused by the cell cycle.
-There are some differences in the classification of cells by `cyclone`, which might explain some of the heterogeneity.
+We check whether the differences in variability are caused by the cell cycle.
 
 ```{r phasecheck}
 primed.col <- "#0072B2"
