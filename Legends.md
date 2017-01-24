@@ -17,11 +17,11 @@ Each point represents a cell in the corresponding population.
 (A) Estimates of the biological component of the variance for highly variable genes detected in each condition.
 The number below each boxplot represents the total number of detected HVGs.
 Points represent HVGs with biological components that are more than 1.5 interquartile ranges from the third quartile.
-(B) Biological component of the variance for cell cycle HVGs detected in both conditions, ranked by the magnitude of the component.
+(B) Biological components for cell cycle HVGs in each condition, ranked by the magnitude of the component.
 Association with the cell cycle is determined by GO annotation (GO:0007049), and some key genes are highlighted.
 Biological components of ERCC spike-in transcripts are shown as a control.
-(C) GO terms and KEGG pathways that are differentially enriched in the set of HVGs between conditions.
-The proportion of HVGs associated with each term/pathway are shown for each condition, along with the actual number of genes.
+(C) Distribution of biological components for splicing HVGs detected in either condition.
+The number of genes is shown in brackets, and some key genes are highlighted.
 
 **Figure 4. Cells shift from a naive-like to a primed-like expression pattern during early embryonic development.**
 Naive and primed markers were identified from the DE analysis of the hESC data.
