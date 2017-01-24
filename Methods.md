@@ -86,12 +86,13 @@ Correlated HVGs were detected as previously described, but using only the cells 
 Clustering was not attempted as no clear separation between clusters was observed in the silhouette plots.
 Instead, the variability of expression was compared between naive and primed cells.
 We compared the total number of HVGs detected in each condition, and the sizes of their biological components.
-Shared HVGs were tested for enrichment of GO or KEGG terms using the `goana` and `kegga` functions, respectively, from _limma_.
+The set of HVGs detected in both conditions was tested for enrichment of GO or KEGG terms using the `goana` and `kegga` functions, respectively, from _limma_.
 
 We also tested for differential enrichment of these terms in the set of HVGs from each condition.
 For each GO or KEGG term, we counted the number of HVGs detected in each condition that were associated with that term.
 This was used to assemble a 2-by-2 contingency table containing the number of associated/unassociated HVGs in each condition.
 We applied Fisher's exact test to determine if there was a significant difference in the proportion of associated HVGs between conditions.
+Gene sets with significant differential enrichment were detected at a FDR of 5%.
 
 ## Mapping temporal trajectories in early embryos 
 

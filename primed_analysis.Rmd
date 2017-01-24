@@ -279,10 +279,12 @@ entreznames <- fData(sce_primed)$entrezgene
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
+topgo$FDR <- p.adjust(topgo$P.DE, method="BH")
 write.table(file=file.path(resdir, "go_shared_hvg.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
 kegg <- kegga(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
 topkegg <- topKEGG(kegg, n=Inf)
+topkegg$FDR <- p.adjust(topkegg$P.DE, method="BH")
 write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
 ```
@@ -310,8 +312,9 @@ for (entry in names(all.sets)) {
     fout <- fisher.test(mat)
     out.stats[[entry]] <- c(mat[1,]/mat[2,], mat[1,], fout$p.value)
 }
-out.stats <- do.call(rbind, out.stats)                  
+out.stats <- data.frame(do.call(rbind, out.stats))
 colnames(out.stats) <- c("Prop.primed", "Prop.naive", "Num.primed", "Num.naive", "P")
+out.stats$FDR <- p.adjust(out.stats$P, method="BH")
 ```
 
 Finally, annotating the GO terms.
