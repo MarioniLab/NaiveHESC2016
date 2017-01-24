@@ -301,6 +301,16 @@ all.sets <- split(EG.GO$gene_id, EG.GO$go_id)
 
 We apply Fisher's exact test to see whether any terms are enriched in the primed HVGs compared to the naive HVGs.
 
+<!--
+This probably isn't the right test.
+There are the obvious complaints, of course - genes aren't independent of each other, and the marginals are not fixed.
+However, there's also the assumption that the same gene is independent between conditions, in terms of whether it is detected as a HVG.
+This is unlikely to be true, as the true variance will be positively correlated across conditions to some extent.
+Dependencies will result in conservativeness as the proportions between conditions will be more similar than expected.
+I can't think of a better test, though, that attacks the same hypothesis, i.e., the __number__ of HVGs.
+Other tests would use the relative sizes of the biological components, which will be affected by small changes at non-HVGs.
+-->
+
 ```{r runfisher}
 out.stats <- list()
 for (entry in names(all.sets)) {

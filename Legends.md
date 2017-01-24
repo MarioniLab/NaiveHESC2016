@@ -20,7 +20,7 @@ Points represent HVGs with biological components that are more than 1.5 interqua
 (B) Biological components for cell cycle HVGs in each condition, ranked by the magnitude of the component.
 Association with the cell cycle is determined by GO annotation (GO:0007049), and some key genes are highlighted.
 Biological components of ERCC spike-in transcripts are shown as a control.
-(C) Distribution of biological components for splicing HVGs detected in either condition.
+(C) Distribution of biological components for HVGs detected in either condition that are associated with splicing (KEGG 03040).
 The number of genes is shown in brackets, and some key genes are highlighted.
 
 **Figure 4. Cells shift from a naive-like to a primed-like expression pattern during early embryonic development.**
