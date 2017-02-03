@@ -380,6 +380,69 @@ legend("topright", legend = c("primed", "naive"),
     fill = c(primed.col, naive.col), bty="n", cex=1.5)
 ```
 
+## Testing with the CV^2^
+
+We see if our results are recapitulated with the CV^2^ method.
+For simplicity, we just apply `technicalCV2` to the results of the second batch.
+
+```{r testcv2, fig.width=10, fig.height=6}
+sub.sce <- sce_naive[,sce_naive$batch=="2"]
+sub.sce <- normalize(sub.sce)
+cv2_naive <- technicalCV2(sub.sce)
+sub.sce <- sce_primed[,sce_primed$batch=="2"]
+sub.sce <- normalize(sub.sce)
+cv2_primed <- technicalCV2(sub.sce, cv2.tol=0.5)
+par(mfrow=c(1,2))
+is <- isSpike(sce_naive)
+plot(cv2_naive$mean, cv2_naive$cv2, log="xy", xlab="Mean", ylab="CV2", 
+     main="Naive", ylim=c(0.05, 500))
+points(cv2_naive$mean[is], cv2_naive$cv2[is], col="red", pch=16)
+points(cv2_naive$mean, cv2_naive$trend, col="red", pch=16, cex=0.5)
+plot(cv2_primed$mean, cv2_primed$cv2, log="xy", xlab="Mean", ylab="CV2", 
+     main="Primed", ylim=c(0.05, 500))
+points(cv2_primed$mean[is], cv2_primed$cv2[is], col="red", pch=16)
+points(cv2_primed$mean, cv2_primed$trend, col="red", pch=16, cex=0.5)
+```
+
+It seems like there's a systematic increase in the biological CV^2^, in both relative and absolute terms.
+This supports the previous results with the log-variance method.
+
+```{r hvgstatscv2, fig.width=10, fig.height=6}
+par(mfrow=c(1,2))
+abs.primed <- cv2_primed$cv2-cv2_primed$trend
+abs.naive <- cv2_naive$cv2-cv2_naive$trend
+primed.hvg <- cv2_primed$FDR <= 0.05
+sum(primed.hvg, na.rm=TRUE)
+naive.hvg <- cv2_naive$FDR <= 0.05
+sum(naive.hvg, na.rm=TRUE)
+boxplot(list(Primed=abs.primed[primed.hvg], Naive=abs.naive[naive.hvg]), log='y', 
+        ylab="Residual CV2 to the trend for HVGs", col=c("dodgerblue", "orange"))
+rel.primed <- cv2_primed$cv2/cv2_primed$trend
+rel.naive <- cv2_naive$cv2/cv2_naive$trend
+boxplot(list(Primed=rel.primed[primed.hvg], Naive=rel.naive[naive.hvg]), log='y', 
+        ylab="Ratio of CV2 to the trend for HVGs", col=c("dodgerblue", "orange"))
+```
+
+However, I suspect that this is partially driven by the liberalness of the HVG detection.
+Previous work suggests that the chi-squared test in `technicalCV2` doesn't seem to properly model the variance of the CV^2^ estimate.
+This means that an increase in the technical dispersion will result in more HVGs detected, as the extra estimation variance is not accounted for.
+
+To handle this, I'll repeat the plots above using the top 1000 genes for each statistic.
+This avoids any effects of incorrect HVG calling within each condition.
+Fortunately, we still see a difference in both the absolute and relative differences between conditions.
+
+```{r topstatscv2, fig.width=10, fig.height=6}
+par(mfrow=c(1,2))
+top.abs.primed <- order(-abs.primed)[1:1000]
+top.abs.naive <- order(-abs.naive)[1:1000]
+boxplot(list(Primed=abs.primed[top.abs.primed], Naive=abs.naive[top.abs.naive]),
+        log='y', ylab="Top residual CV2 to the trend", col=c("dodgerblue", "orange"))
+top.rel.primed <- order(-rel.primed)[1:1000]
+top.rel.naive <- order(-rel.naive)[1:1000]
+boxplot(list(Primed=rel.primed[top.rel.primed], Naive=rel.naive[top.rel.naive]),
+        log='y', ylab="Top ratio of CV2 to the trend", col=c("dodgerblue", "orange"))
+```
+
 # Wrapping up
 
 We save our object for later use and report the session information.
