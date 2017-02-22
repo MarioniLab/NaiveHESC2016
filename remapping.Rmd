@@ -25,9 +25,17 @@ We want to relate the naive/primed axis identified in this data set to other sin
 To do so, we use the DE genes between naive/primed cells as markers, and we examine how other cells express (or do not express) these marker genes.
 We do this on three separate data sets:
 
-- Human ESCs from Petropoulos et al., 2016. Single-Cell RNA-Seq Reveals Lineage and X Chromosome Dynamics in Human Preimplantation Embryos. [Cell. 2016]
-- Mouse ESCs from Mohammed & Reik, 2017. ((Not yet published))
-- Monkey ESCs from Nakamura et al., 2016. A developmental coordinate of pluripotency among mice, monkeys and humans. [Nature, 2016]
+```{r kable}
+library("knitr")
+escs <- c("Human ESCs", "Mouse ESCs", "Monkey ESCs")
+Authors <- c("Petropoulos et al.", "Mohammed & Reik", "Nakamura et al.")
+Paper <- c("Single-Cell RNA-Seq Reveals Lineage and X Chromosome Dynamics in Human Preimplantation Embryos", "Not yet published", "A developmental coordinate of pluripotency among mice, monkeys and humans.")
+Journal <- c("Cell. 2016", "tba. 2017", "Nature. 2016")
+Datatype <- c(".txt", ".txt", ".txt")
+Url <- c("http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929", "tba.", "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767")
+annotable <- data.frame(Authors, Paper, Journal, Datatype, Url, row.names = escs)
+kable(annotable)
+```
 
 The aim is to study when the naive-primed transition occurs in each of these organisms.
 
