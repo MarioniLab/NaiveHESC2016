@@ -23,23 +23,20 @@ options(bitmapType="cairo", width=100)
 
 We want to relate the naive/primed axis identified in this data set to other single-cell data sets examining early mammalian development.
 To do so, we use the DE genes between naive/primed cells as markers, and we examine how other cells express (or do not express) these marker genes.
-We do this on three separate data sets:
+We do this on three separate data sets, listed below.
 
-```{r kable}
-library("knitr")
-escs <- c("Human ESCs", "Mouse ESCs", "Monkey ESCs")
-Authors <- c("Petropoulos et al.", "Mohammed & Reik", "Nakamura et al.")
-Paper <- c("Single-Cell RNA-Seq Reveals Lineage and X Chromosome Dynamics in Human Preimplantation Embryos", "Not yet published", "A developmental coordinate of pluripotency among mice, monkeys and humans.")
-Journal <- c("Cell. 2016", "tba. 2017", "Nature. 2016")
-Datatype <- c(".txt", ".txt", ".txt")
-Url <- c("http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929", "tba.", "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767")
-annotable <- data.frame(Authors, Paper, Journal, Datatype, Url, row.names = escs)
-kable(annotable)
-```
+- Human ESCs (`petro.counts.txt`): 
+  * __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
+  * __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
+- Mouse ESCs (`mouse.counts.txt`):
+  * __Publication:__ Mohammed et al. (2017). Not yet published.
+  * __Data source:__ Supplied by Ferdinand von Meyenn and Wolf Reik.
+- Monkey ESCs (`monkey.counts.txt`):
+  * __Publication:__ Nakamura et al. (2016), _Nature_. A developmental coordinate of pluripotency among mice, monkeys and humans.
+  * __Data source:__ `GSE74767_SC3seq_Cy_ProcessedData.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767
 
 The aim is to study when the naive-primed transition occurs in each of these organisms.
-
-We create a directory to save various results in.
+We first create a directory to save various results in.
 
 ```{r}
 resdir <- "results-remapping"
