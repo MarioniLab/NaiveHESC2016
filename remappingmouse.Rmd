@@ -1,0 +1,99 @@
+---
+title: "Mouse remapping"
+author: "Tobias Messmer & Aaron Lun"
+date: "17 3 2017"
+output: html_document
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("mouse-remapping/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="mouse-remapping/")
+options(bitmapType="cairo", width=100)
+resdir <- 'mouse-remapping'
+```
+
+
+First, we read in the previously saved naive and primed markers
+
+```{r}
+library(scran)
+naive.markers <- readRDS("mouse.objects/naive_markers.rds")
+primed.markers <- readRDS('mouse.objects/primed_markers.rds')
+```
+
+## Mapping of Stephen Clark Mouse ESCs
+
+```{r mousein}
+mouse.counts.raw <- as.matrix(read.table("mouse.objects/genic_counts.tsv", sep="\t", header=TRUE, row.names=1))
+mouse.counts <- mouse.counts.raw[,-1]
+mouse.counts <- mouse.counts[,!colSums(mouse.counts)==0]
+dim(mouse.counts)
+```
+
+First, we need to dentify the homologous genes the mouse counts.
+
+```{r homomouse}
+library(biomaRt)    
+human.mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+mouse.mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl") 
+
+mouse.ensembl <- rownames(mouse.counts)
+mouse.genes <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
+    values = mouse.ensembl, mart = mouse.mart, attributesL="external_gene_name", martL = human.mart)
+
+mouse.counts <- mouse.counts[!is.na(match(mouse.ensembl, mouse.genes[,1])),]
+mouse.genenames <- mouse.genes[match(intersect(rownames(mouse.counts), mouse.genes[,1]), mouse.genes[,1]),2]
+rownames(mouse.counts) <- mouse.genenames
+```
+
+We also do a bit of normalization.
+
+```{r mousenorm}
+#m <- apply(mouse.counts, 2, as.numeric)
+any(is.na(mouse.counts)|is.nan(mouse.counts)|is.infinite(mouse.counts))
+small.clust <- quickCluster(mouse.counts, min.size=110)   # Error: "NA/NaN/Inf in foreing function call (arg11)"
+sf.out <- computeSumFactors(mouse.counts, positive = TRUE)
+norm.mouse.counts <- log2(t(t(m)/sf.out + 1))
+plot(colSums(m)/1e6, sf.out, log="xy", 
+    xlab="Library size (millions)", ylab="Size factors")
+```
+
+We compute naive/primed proportions using the previously identified homologues.
+
+```{r mouseprop}
+naive.exprs <- mouse.counts[mouse.genenames %in% naive.markers,]
+nrow(naive.exprs)
+primed.exprs <- mouse.counts[mouse.genenames %in% primed.markers,]
+nrow(primed.exprs)
+threshold = log2(10)
+naive.num <- colMeans(naive.exprs >= threshold)
+primed.num <- colMeans(primed.exprs >= threshold)
+
+write.table(file=file.path(resdir, "primed_mouse_coords.tsv"), 
+    data.frame(naive=naive.num, primed=primed.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+We also make a plot [for each stage, as was previously done].
+
+```{r mouseplotting}
+plot(naive.num, primed.num, xlim = c(0,0.5), ylim = c(0,0.5), main = "Primed mouse cells", pch=16,
+       xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+abline(0,1, col = "red")
+```
+
+
+```{r mouseplot, fig.height=12, fig.width=6}
+#par(mfrow=c(3,2))
+#for (stage in unique(stages)) {
+#    current <- stages==stage
+#    plot(naive.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+#        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+#    abline(0,1, col = "red")
+#}
+```
+
+```{r, results="hide", echo=FALSE}
+rm(mouse.counts, norm.mouse.counts)
+gc()
+```
