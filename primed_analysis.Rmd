@@ -210,7 +210,6 @@ for (k in 2:5){
 We compare the variability of the naive and primed populations to each other.
 We first look at the number of HVGs detected in each population.
 
-
 ```{r}
 var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
 hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))

@@ -268,46 +268,13 @@ plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype",
 
 ## Identifying marker genes for cluster 3
 
-With these clusters identified, we can assess DE of cluster 3 relative to each other cluster. 
-To do so, we set up a new design matrix containing the three clusters and the batch numbers.
-
-```{r, design.mat.naive}
-cluster_naive <- factor(my.clusters_naive)
-de.design_naive <- model.matrix(~0 + cluster_naive + sce_naive$batch) 
-```
-
-We use the _edgeR_ machinery to estimate cell-to-cell variability.
-
-```{r}
-library(edgeR)
-y_naive <- convertTo(sce_naive, type="edgeR")
-y_naive <- estimateDisp(y_naive, de.design_naive) 
-fit_naive <- glmFit(y_naive, de.design_naive)
-summary(y_naive$tagwise.dispersion)
-```
-
-We then identify DE genes between cluster 3 and every other cluster.
-The results are consolidated into a single list of DE genes, representing candidate markers for characterising cluster 3.
+With these clusters identified, we can assess DE of cluster 3 relative to each other cluster using the `findMarkers` function.
 
 ```{r marker_clust_naive}
-clust.num_naive <- as.character(trans.cluster)
-result.logFC_naive <- result.PValue_naive <- list()
-chosen.clust_naive <- which(levels(cluster_naive)==clust.num_naive)
-for (clust in seq_len(nlevels(cluster_naive))) {
-    if (clust==chosen.clust_naive) { next }
-    contrast <- numeric(ncol(de.design_naive))
-    contrast[chosen.clust_naive] <- 1
-    contrast[clust] <- -1
-    res_naive <- glmLRT(fit_naive, contrast=contrast)
-    con.name <- paste0('vs.', levels(cluster_naive)[clust]) 
-    result.logFC_naive[[con.name]] <- res_naive$table$logFC 
-    result.PValue_naive[[con.name]] <- res_naive$table$PValue
-}
-collected.ranks_naive <- lapply(result.PValue_naive, rank, ties="first")
-min.rank_naive <- do.call(pmin, collected.ranks_naive)
-marker.set_naive <- data.frame(Top=min.rank_naive, Gene=rownames(y_naive),
-    logFC=do.call(cbind, result.logFC_naive), stringsAsFactors=FALSE)
-marker.set_naive <- marker.set_naive[order(marker.set_naive$Top),]
+blocking <- model.matrix(~sce_naive$batch)
+all.markers_naive <- findMarkers(sce_naive, clusters=my.clusters_naive, block=blocking)
+clust.num_naive <- "3"
+marker.set_naive <- all.markers_naive[[clust.num_naive]]
 write.table(marker.set_naive, file=file.path(resdir, paste0("markers_", clust.num_naive, ".tsv")), 
     sep="\t", quote=FALSE, col.names=NA) 
 head(marker.set_naive)
