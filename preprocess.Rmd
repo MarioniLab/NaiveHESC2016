@@ -142,7 +142,7 @@ We then add information about the phenotype of the cells.
 The cells are either in a native or primed state. 
 Furthermore, cells are categorized by their respective batch number.
 
-```{r, phenData}
+```{r phenData}
 sample <- sub("^([0-9]+)\\..*", "\\1", colnames(combined.counts))
 phenotype <- character(ncol(combined.counts))
 phenotype[sample %in% c("2383", "2677", "2678")] <- "naive"
