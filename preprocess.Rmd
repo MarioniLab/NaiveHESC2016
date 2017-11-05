@@ -27,7 +27,7 @@ The former should generally be at least 70-80% while the latter should be at lea
 
 ```{r statcheck}
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){  
-    cur.file <- list.files("counts", pattern=paste0("my_qual_", sample), full=TRUE)
+    cur.file <- list.files("./Raw Files", pattern=paste0("my_qual_", sample), full=TRUE)
     qual.data <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
     total <- rowSums(qual.data)
     reads.mapped <- total - qual.data$Unassigned_Unmapped - qual.data$Unassigned_MappingQuality
@@ -53,7 +53,7 @@ all.counts <- list()
 gene.names <- NULL
 gene.length <- NULL
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
-    cur.file <- list.files("counts", pattern=paste0("genic_counts_", sample), full=TRUE)
+    cur.file <- list.files("./Raw Files", pattern=paste0("genic_counts_", sample), full=TRUE)
     current_counts <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
 
     # Checking gene names and length are the same as those in other files.
@@ -161,15 +161,15 @@ pheno <- data.frame(phenotype, batch, sample, row.names = colnames(combined.coun
 head(pheno)
 ```
 
-## Constructing the `SCESet` object
+## Constructing the `SingleCellExperiment Set (SCESet)` object
 
 We create a `SCESet` object to facilitate further processing of the data.
 
 ```{r, newSCESet}
 library(scater)
-sce <- newSCESet(countData=combined.counts, 
-                 featureData=AnnotatedDataFrame(features), 
-                 phenoData=AnnotatedDataFrame(pheno))
+sce <- SingleCellExperiment(list(counts=as.matrix(combined.counts)), 
+                 rowData=as.matrix(features), 
+                 colData=as.matrix(pheno))
 sce
 ```
 
@@ -194,28 +194,28 @@ We also specify the set of feature controls that correspond to spike-in transcri
 
 ```{r QCMetrics}
 library(scran)
-sce <- calculateQCMetrics(sce, feature_controls = list(Spike=is.spike, Mt=is.mito))
-setSpike(sce) <- "Spike"
-head(colnames(pData(sce)))
+isSpike(sce, "ERCC") <- is.spike
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
+colnames(colData(sce))
 ```
 
 Assuming that most cells are high-quality, we remove cells with outlier values for technical metrics.
 We start with the library sizes and the number of expressed genes.
 Cells with small library sizes (below ~100,000) or few expressed genes (below ~5000) are considered to be of low quality.
-
-```{r histoSize, fig.width=10, fig.height=6}
-multiplot(cols=2, 
-    plotPhenoData(sce, aes(x = sample, y = total_counts, colour_by = phenotype)),
-    plotPhenoData(sce, aes(x = sample, y = total_features, colour_by = phenotype)))
-```
-
 We do the same for the proportion of reads mapped to mitochondrial and spike-in transcripts.
 Cells with high values for either metric are likely to be poor-quality, as cytoplasmic/nuclear RNA has been lost.
 
-```{r mitoAndSpikes, fig.width=10, fig.height=6}
-multiplot(cols=2, 
-    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Mt, colour_by = phenotype)),
-    plotPhenoData(sce, aes(x=sample, y=pct_counts_feature_controls_Spike, colour_by = phenotype)))
+
+```{r histoSize, fig.width=10, fig.height=10}
+par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
+hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="", 
+    breaks=20, col="grey80", ylab="Number of cells")
+hist(sce$total_features, xlab="Number of expressed genes", main="", 
+    breaks=20, col="grey80", ylab="Number of cells")
+hist(sce$pct_counts_ERCC, xlab="ERCC proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
+hist(sce$pct_counts_Mt, xlab="Mitochondrial proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
 To filter out low-quality cells, we identify those with outlier values for any of the above metrics.
@@ -227,8 +227,8 @@ for (b in levels(sce$batch)) {
     cur.batch <- which(sce$batch==b)
     libsize.drop <- isOutlier(sce$total_counts[cur.batch], nmads=3, type="lower", log=TRUE) 
     feature.drop <- isOutlier(sce$total_features[cur.batch], nmads=3, type="lower", log=TRUE) 
-    mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt[cur.batch], nmads=3, type="higher")
-    spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike[cur.batch], nmads=3, type="higher")
+    mito.drop <- isOutlier(sce$pct_counts_Mt[cur.batch], nmads=3, type="higher")
+    spike.drop <- isOutlier(sce$pct_counts_ERCC[cur.batch], nmads=3, type="higher")
     discard <- cur.batch[(libsize.drop | feature.drop | spike.drop | mito.drop)]
     cat("Current batch is %s:\n", b)
     print(data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop), ByMito=sum(mito.drop), 
@@ -295,13 +295,13 @@ To enable a user-friendly analysis, it is convenient to exchange the ENSEMBL IDs
 For duplicated gene names, we merge them with the ENSEMBL IDs to avoid confusion.
 
 ```{r nameForID}
-new.row.names <- fData(sce)$external_gene_name
+new.row.names <- as.vector(rowData(sce)$external_gene_name)
 missing.name <- is.na(new.row.names)
-new.row.names[missing.name] <- fData(sce)$ensembl_gene_id[missing.name]
+new.row.names[missing.name] <- as.vector(rowData(sce)$ensembl_gene_id[missing.name])
 dup.name <- duplicated(new.row.names)
 new.row.names[dup.name] <-
-  paste0(fData(sce)$external_gene_name[dup.name], "_",
-         fData(sce)$ensembl_gene_id[dup.name])
+  as.vector(paste0(rowData(sce)$external_gene_name[dup.name], "_",
+         rowData(sce)$ensembl_gene_id[dup.name]))
 rownames(sce) <- new.row.names
 ```
 
@@ -335,8 +335,8 @@ Spike-in transcripts are normalized separately, because they aren't subject to t
 Here, the correlation is worse, which is also expected.
 
 ```{r spikenorm}
-sce <- computeSpikeFactors(sce, type="Spike", general.use=FALSE) 
-plot(sizeFactors(sce), sizeFactors(sce, type="Spike"), log="xy", ylab="Spike-in size factor", 
+sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE) 
+plot(sizeFactors(sce), sizeFactors(sce, type="ERCC"), log="xy", ylab="Spike-in size factor", 
     xlab="Deconvolution size factor", col=ifelse(sce$pheno=="naive", "black", "grey"))
 ```
 
@@ -363,8 +363,8 @@ After doing so, you can see that there's not a lot of leftover bias.
 ```{r}
 library(limma)
 norm_exprs(sce) <- removeBatchEffect(exprs(sce), sce$batch)
-plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike",
-    "log10_counts_feature_controls_Spike"), exprs_values="norm_exprs") + fontsize
+plotExplanatoryVariables(sce, variables=c("total_counts_ERCC",
+    "log10_total_counts_ERCC"), exprs_values="norm_exprs") + fontsize
 ```
 
 # Wrapping up
