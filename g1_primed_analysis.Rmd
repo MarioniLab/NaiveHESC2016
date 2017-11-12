@@ -31,7 +31,7 @@ We subset to only use G1 cells, to check that the cell cycle phase does not have
 library(scran)
 sce <- readRDS("sce_all.rds")
 sce <- sce[,sce$phase=="G1"]
-sce_primed <- sce[,pData(sce)$phenotype=="primed"] 
+sce_primed <- sce[,colData(sce)$phenotype=="primed"] 
 dim(sce_primed)
 ```
 
@@ -71,8 +71,8 @@ collected.var_primed <- list()
 for (b in levels(sce_primed$batch)) {
     cur.sce <- sce_primed[,b==sce_primed$batch]
     cur.sce <- normalize(cur.sce)
-    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit, assay="exprs")
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit)
     collected.var_primed[[b]] <- var.out 
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
         ylab="Variance of log-expression")
@@ -93,7 +93,7 @@ plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-
 is <- which(isSpike(sce_primed))
 points(var.out_primed$mean[is], var.out_primed$total[is], col="red", pch=16)
 o <- is[order(var.out_primed$mean[is])]
-lines(var.out_primed$mean[o], var.out_primed$tech[o], col="dodgerblue", lwd=2)
+curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -285,7 +285,7 @@ poutput <- list()
 noutput <- list()
 numgenes <- list()
 for (entry in names(all.sets)) {
-    m <- which(fData(sce_primed)$entrezgene %in% all.sets[[entry]])
+    m <- which(rowData(sce_primed)$entrezgene %in% all.sets[[entry]])
     pbio <- var.out_primed$bio[m]
     nbio <- var.out_naive$bio[m]
     keep <- (nbio > 0 | pbio > 0) & nbio!=pbio

@@ -70,14 +70,14 @@ We do this separately for each batch, as there is at least an order of magnitude
 par(mfrow=c(1,2))
 collected.var <- list()
 for (b in levels(sce$batch)) {
-    cur.sce <- sce[,b==sce$batch]
+    cur.sce <- sce[,sce$batch==b]
     cur.sce <- normalize(cur.sce)
-    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    collected.var[[b]] <- decomposeVar(cur.sce, var.fit)
     plot(var.fit$mean, var.fit$var, pch=16, col="grey", xlab="Mean log-expression",
          ylab="Variance of log-expression", ylim=c(0, 10), xlim=c(0, 15), main=paste("Batch", b))
     curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
-    collected.var[[b]] <- decomposeVar(cur.sce, var.fit, assay="exprs")
-}
+    }
 ```
 
 The trend passes through the bulk of the spike-ins, which is reassuring.
@@ -92,12 +92,13 @@ We examine the distribution of variances for the endogenous genes.
 Many genes have variances above this trend, corresponding to strong heterogeneity across the population.
 
 ```{r plotvar}
+par(mfrow=c(1,1))
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
      ylab="Variance of log-expression")
 is <- which(isSpike(sce))
 points(var.out$mean[is], var.out$total[is], col="red", pch=16)
 o <- is[order(var.out$mean[is])]
-lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
+curve(var.fit$trend(x), col='dodgerblue', lwd=2, add=TRUE)
 ```
 
 The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
@@ -252,9 +253,11 @@ We use the DE genes for gene set analyses.
 First, we take the set of genes that were upregulated in naive over primed.
 
 ```{r upgo}
+library(GO.db)
+library(org.Hs.eg.db)
 up.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC > 0]
 is.up <- rownames(sce) %in% up.genes
-entreznames <- fData(sce)$entrezgene
+entreznames <- data.frame(rowData(sce)$entrezgene)
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.up], universe=entreznames[has.entrez], species = "Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 

@@ -31,7 +31,7 @@ We subset to only use G1 cells, to check that the cell cycle phase does not have
 library(scran)
 sce <- readRDS("sce_all.rds")
 sce <- sce[,sce$phase=="G1"]
-sce_naive <- sce[,pData(sce)$phenotype=="naive"] 
+sce_naive <- sce[,colData(sce)$phenotype=="naive"] 
 dim(sce_naive)
 ```
 
@@ -71,8 +71,8 @@ collected.var_naive <- list()
 for (b in levels(sce_naive$batch)) {
     cur.sce <- sce_naive[,b==sce_naive$batch]
     cur.sce <- normalize(cur.sce)
-    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit, assay="exprs")
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit)
     collected.var_naive[[b]] <- var.out 
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
         ylab="Variance of log-expression", main=paste("Batch", b))
@@ -94,7 +94,7 @@ plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-ex
 is <- which(isSpike(sce_naive))
 points(var.out_naive$mean[is], var.out_naive$total[is], col="red", pch=16)
 o <- is[order(var.out_naive$mean[is])]
-lines(var.out_naive$mean[o], var.out_naive$tech[o], col="dodgerblue", lwd=2)
+curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -399,7 +399,7 @@ First, gene ontology terms:
 ```{r naivego}
 unique.genes <- rownames(unique.marker)[1:200]
 is.unique <- rownames(sce) %in% unique.genes
-entreznames <- fData(sce)$entrezgene
+entreznames <- as.vector(rowData(sce)$entrezgene)
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
@@ -494,7 +494,7 @@ Apparently, this is due to loss of imprinting for the antisense locus that leads
 
 ```{r, fig.height=10, fig.width=6, dpi=150}
 o <- order(all.pheno)
-top.exprs <- norm_exprs(sce)[fData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
+top.exprs <- norm_exprs(sce)[rowData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
 re.pheno <- factor(all.pheno[o])
 clust.cols <- c("black", "grey", "red")
 heat.vals <- top.exprs - rowMeans(top.exprs)

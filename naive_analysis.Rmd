@@ -29,7 +29,7 @@ This is more sensitive than doing so on the entire data set, where the naive/pri
 ```{r naivein}
 library(scran)
 sce <- readRDS("sce_all.rds")
-sce_naive <- sce[,pData(sce)$phenotype=="naive"] 
+sce_naive <- sce[,colData(sce)$phenotype=="naive"] 
 dim(sce_naive)
 ```
 
@@ -69,8 +69,8 @@ collected.var_naive <- list()
 for (b in levels(sce_naive$batch)) {
     cur.sce <- sce_naive[,b==sce_naive$batch]
     cur.sce <- normalize(cur.sce)
-    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit, assay="exprs")
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit)
     collected.var_naive[[b]] <- var.out 
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
         ylab="Variance of log-expression", main=paste("Batch", b))
@@ -92,7 +92,7 @@ plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-ex
 is <- which(isSpike(sce_naive))
 points(var.out_naive$mean[is], var.out_naive$total[is], col="red", pch=16)
 o <- is[order(var.out_naive$mean[is])]
-lines(var.out_naive$mean[o], var.out_naive$tech[o], col="dodgerblue", lwd=2)
+curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -256,7 +256,7 @@ We also examine the location of this cluster on the overall PCA plot.
 As expected, they show up in the middle, so we will describe this as a "transition" subpopulation.
 
 ```{r}
-trans.cluster <- 3
+trans.cluster <- 2
 all.pheno <- as.character(sce$phenotype)
 all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==trans.cluster]] <- "transition"
 write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
@@ -266,14 +266,14 @@ plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype",
     feature_set = readRDS("results-overall/cor_hvg.rds")) + fontsize
 ```
 
-## Identifying marker genes for cluster 3
+## Identifying marker genes for cluster 2
 
-With these clusters identified, we can assess DE of cluster 3 relative to each other cluster using the `findMarkers` function.
+With these clusters identified, we can assess DE of cluster 2 relative to each other cluster using the `findMarkers` function.
 
 ```{r marker_clust_naive}
 blocking <- model.matrix(~sce_naive$batch)
-all.markers_naive <- findMarkers(sce_naive, clusters=my.clusters_naive, block=blocking)
-clust.num_naive <- "3"
+all.markers_naive <- findMarkers(sce_naive, clusters=my.clusters_naive, design=blocking)
+clust.num_naive <- "2"
 marker.set_naive <- all.markers_naive[[clust.num_naive]]
 write.table(marker.set_naive, file=file.path(resdir, paste0("markers_", clust.num_naive, ".tsv")), 
     sep="\t", quote=FALSE, col.names=NA) 
@@ -364,7 +364,7 @@ First, gene ontology terms:
 ```{r naivego}
 unique.genes <- rownames(unique.marker)[1:200]
 is.unique <- rownames(sce) %in% unique.genes
-entreznames <- fData(sce)$entrezgene
+entreznames <- as.vector(rowData(sce)$entrezgene)
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
@@ -459,7 +459,7 @@ Apparently, this is due to loss of imprinting for the antisense locus that leads
 
 ```{r, fig.height=10, fig.width=6, dpi=150}
 o <- order(all.pheno)
-top.exprs <- norm_exprs(sce)[fData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
+top.exprs <- norm_exprs(sce)[rowData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
 re.pheno <- factor(all.pheno[o])
 clust.cols <- c("black", "grey", "red")
 heat.vals <- top.exprs - rowMeans(top.exprs)

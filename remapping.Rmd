@@ -53,9 +53,9 @@ and be expressed in less than 5% of cells in the other condition.
 ```{r}
 library(scran)
 sce <- readRDS("sce_all.rds")
-naive.cells <- sce$pheno=='naive'
+naive.cells <- sce$phenotype=='naive'
 naive.prop <- nexprs(sce[,naive.cells], byrow=TRUE)/sum(naive.cells)
-primed.cells <- sce$pheno=='primed'
+primed.cells <- sce$phenotype=='primed'
 primed.prop <- nexprs(sce[,primed.cells], byrow=TRUE)/sum(primed.cells)
 de.genes <- read.table("results-overall/de.tsv", header=TRUE, row.names=1)
 ```
@@ -175,12 +175,12 @@ We repeat the dose with mouse ESCs, after identifying the homologous genes for a
 library(biomaRt)
 human.mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 mouse.mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl") 
-naive.ensembl <- fData(sce)$ensembl_gene_id[match(naive.markers, rownames(sce))]
+naive.ensembl <- rowData(sce)$ensembl_gene_id[match(naive.markers, rownames(sce))]
 naive.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
     values = naive.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
 naive.mm.markers <- unique(naive.homo[,2])
 length(naive.mm.markers)
-primed.ensembl <- fData(sce)$ensembl_gene_id[match(primed.markers, rownames(sce))]
+primed.ensembl <- rowData(sce)$ensembl_gene_id[match(primed.markers, rownames(sce))]
 primed.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
     values = primed.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
 primed.mm.markers <- unique(primed.homo[,2])
