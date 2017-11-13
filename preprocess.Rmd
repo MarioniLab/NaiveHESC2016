@@ -1,7 +1,7 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: data preprocessing"
 author: Tobias Messmer and Aaron Lun
-date: 17 December 2016
+date: 13 November 2017
 output: 
   html_document:
     toc: true
@@ -40,7 +40,7 @@ for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
 }
 ```
 
-# Creating a `SCESet` object
+# Creating a `SingleCellExperiment` object
 
 ## Reading in the counts 
 
@@ -78,7 +78,7 @@ for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
     }
 
     # Adding to the list.
-    all.counts[[sample]] <- current_counts
+    all.counts[[sample]] <- as.matrix(current_counts)
 }  
 sapply(all.counts, ncol)
 ```
@@ -99,6 +99,11 @@ Finally, we `cbind`  everything together into one large matrix.
 This automatically adds the batch labels in front of the cell names.
 
 ```{r cbindmat}
+for (sample in names(all.counts)) {
+    current <- all.counts[[sample]] 
+    colnames(current) <- paste0(sample, ".", colnames(current))
+    all.counts[[sample]] <- current
+}
 combined.counts <- do.call(cbind, all.counts)
 dim(combined.counts)
 ```
@@ -113,13 +118,33 @@ gc()
 Next, we add information such as gene symbols and chromosome locations.
 We download annotation from BioMart and store it along with the length information.
 
-```{r featureData}
+```{r, echo=FALSE, results="asis"}
+library(BiocFileCache)
+bfc <- BiocFileCache("biomart")
+out <- bfcquery(bfc, "hg38.ensGene")
+already.present <- nrow(out) > 0
+```
+
+```{r biomarting, eval=!already.present}
 library(biomaRt)
 ensembl <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset="hsapiens_gene_ensembl", 
-    host="dec2015.archive.ensembl.org") # Ensembl version 83.
+                   host="aug2017.archive.ensembl.org") # Ensembl version 90.
 ensemblGenes <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 
                                    'external_gene_name', 'entrezgene'), filters="ensembl_gene_id", 
                                    values=gene.names, mart=ensembl) 
+```
+
+```{r, echo=FALSE}
+if (already.present) {
+    ensemblGenes <- readRDS(bfc[[out$rid[1]]])
+} else {
+    rpath <- bfcnew(bfc, "hg38.ensGene", ext="rds")
+    saveRDS(file=rpath, ensemblGenes)
+}
+```
+
+
+```{r featureData}
 features <- ensemblGenes[match(gene.names, ensemblGenes$ensembl_gene_id),]
 features$ensembl_gene_id <- gene.names
 row.names(features) <- gene.names
@@ -161,15 +186,16 @@ pheno <- data.frame(phenotype, batch, sample, row.names = colnames(combined.coun
 head(pheno)
 ```
 
-## Constructing the `SingleCellExperiment Set (SCESet)` object
+## Constructing the `SingleCellExperiment` object
 
-We create a `SCESet` object to facilitate further processing of the data.
+We create a object to facilitate further processing of the data.
+We need to specify the spike-in set at this point.
 
-```{r, newSCESet}
-library(scater)
+```{r newSCESet}
+library(SingleCellExperiment)
 sce <- SingleCellExperiment(list(counts=as.matrix(combined.counts)), 
-                 rowData=as.matrix(features), 
-                 colData=as.matrix(pheno))
+    rowData=as.matrix(features), colData=as.matrix(pheno))
+isSpike(sce, "ERCC") <- is.spike 
 sce
 ```
 
@@ -185,112 +211,6 @@ rm(combined.counts)
 gc()
 ```
 
-# Quality Control
-
-## Removing low-quality cells
-
-A number of QC metrics are calculated for each cell using the `calculateQCMetrics` function.
-We also specify the set of feature controls that correspond to spike-in transcripts.
-
-```{r QCMetrics}
-library(scran)
-isSpike(sce, "ERCC") <- is.spike
-sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
-colnames(colData(sce))
-```
-
-Assuming that most cells are high-quality, we remove cells with outlier values for technical metrics.
-We start with the library sizes and the number of expressed genes.
-Cells with small library sizes (below ~100,000) or few expressed genes (below ~5000) are considered to be of low quality.
-We do the same for the proportion of reads mapped to mitochondrial and spike-in transcripts.
-Cells with high values for either metric are likely to be poor-quality, as cytoplasmic/nuclear RNA has been lost.
-
-
-```{r histoSize, fig.width=10, fig.height=10}
-par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
-hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="", 
-    breaks=20, col="grey80", ylab="Number of cells")
-hist(sce$total_features, xlab="Number of expressed genes", main="", 
-    breaks=20, col="grey80", ylab="Number of cells")
-hist(sce$pct_counts_ERCC, xlab="ERCC proportion (%)", 
-    ylab="Number of cells", breaks=20, main="", col="grey80")
-hist(sce$pct_counts_Mt, xlab="Mitochondrial proportion (%)", 
-    ylab="Number of cells", breaks=20, main="", col="grey80")
-```
-
-To filter out low-quality cells, we identify those with outlier values for any of the above metrics.
-We do this for each batch separately due to differences in sequencing depth and spike-in proportion between batches.
-
-```{r, remOutliers1}
-discards <- list()
-for (b in levels(sce$batch)) { 
-    cur.batch <- which(sce$batch==b)
-    libsize.drop <- isOutlier(sce$total_counts[cur.batch], nmads=3, type="lower", log=TRUE) 
-    feature.drop <- isOutlier(sce$total_features[cur.batch], nmads=3, type="lower", log=TRUE) 
-    mito.drop <- isOutlier(sce$pct_counts_Mt[cur.batch], nmads=3, type="higher")
-    spike.drop <- isOutlier(sce$pct_counts_ERCC[cur.batch], nmads=3, type="higher")
-    discard <- cur.batch[(libsize.drop | feature.drop | spike.drop | mito.drop)]
-    cat("Current batch is %s:\n", b)
-    print(data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop), ByMito=sum(mito.drop), 
-        ySpike=sum(spike.drop), Remaining.in.batch=(length(cur.batch)-length(discard))))
-    discards[[b]] <- discard
-}      
-```
-
-We remove these cells from our `sce` object prior to further analysis.
-
-```{r, remOutliers3}
-sce <- sce[, -unlist(discards)]
-dim(sce) 
-```
-
-```{r, echo=FALSE, results='hide'}
-gc()
-```
-
-## Classification into cell cycle phase
-
-As part of the quality checks, we can also examine the distribution of cells into different cell cycle phases.
-These are stored in the `sce` object prior to further analysis.
-
-```{r filterPhase, fig.width=10, fig.height=6}
-hs.pairs <- readRDS(system.file("exdata", "human_cycle_markers.rds", package="scran"))
-assigned <- cyclone(sce, pairs=hs.pairs)
-write.table(file=file.path(resdir, "phases.tsv"), assigned, row.names=FALSE, sep="\t", quote=TRUE)
-head(assigned$scores)
-sce$phase <- assigned$phases
-table(assigned$phases)
-par(mfrow=c(1,2))
-plot(assigned$scores$G1, assigned$scores$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
-plot(assigned$scores$G1, assigned$scores$S, xlab="G1 score", ylab="S score", pch=16)
-```
-
-## Cleaning up the genes
-
-### Filtering out low-abundance genes
-
-We filter out low-abundance genes with mean counts below 1.
-Such genes have low counts and contain little information for downstream analyses.
-Their removal simplifies processing and improves power by avoiding multiple correction problems.
-
-```{r filterGenes}
-ave.counts <- rowMeans(counts(sce))
-keep <- ave.counts >= 1
-hist(log10(ave.counts), breaks=100, main="", col="grey", xlab=expression(Log[10]~"average count"))
-abline(v=log10(1), col="blue", lwd=2, lty=2)
-```
-
-The filter threshold in the plot above should cut somewhere to the left of the moderate-abundance peak.
-This indicates that genes that are being actively expressed are retained.
-Ideally, 5,000-15,000 genes should remain after filtering.
-
-```{r, keep}
-sce <- sce[keep,]
-summary(keep)
-```
-
-### Improving interpretability of the gene names
-
 To enable a user-friendly analysis, it is convenient to exchange the ENSEMBL IDs with the name of the genes. 
 For duplicated gene names, we merge them with the ENSEMBL IDs to avoid confusion.
 
@@ -305,9 +225,105 @@ new.row.names[dup.name] <-
 rownames(sce) <- new.row.names
 ```
 
+# Quality Control
+
+## Removing low-quality cells
+
+A number of QC metrics are calculated for each cell using the `calculateQCMetrics` function.
+We also specify the set of feature controls that correspond to spike-in transcripts.
+
+```{r QCMetrics}
+library(scater)
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
+colnames(colData(sce))
+```
+
+Assuming that most cells are high-quality, we remove cells with outlier values for technical metrics.
+We start with the library sizes and the number of expressed genes.
+Cells with small library sizes (below ~100,000) or few expressed genes (below ~5000) are considered to be of low quality.
+We do the same for the proportion of reads mapped to mitochondrial and spike-in transcripts.
+Cells with high values for either metric are likely to be poor-quality, as cytoplasmic/nuclear RNA has been lost.
+
+
+```{r histoSize, fig.width=10, fig.height=10}
+multiplot(cols=2,
+    plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_counts")),
+    plotPhenoData(sce, aesth=aes_string(x="sample", y="total_features")),
+    plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_ERCC")),
+    plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_Mt"))
+)
+```
+
+To filter out low-quality cells, we identify those with outlier values for any of the above metrics.
+We do this for each batch separately due to differences in sequencing depth and spike-in proportion between batches.
+
+```{r, remOutliers1}
+libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE, batch=sce$sample) 
+feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE, batch=sce$sample) 
+mito.drop <- isOutlier(sce$pct_counts_Mt, nmads=3, type="higher", batch=sce$sample)
+spike.drop <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", batch=sce$sample)
+discard <- libsize.drop | feature.drop | spike.drop | mito.drop
+data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop), ByMito=sum(mito.drop),
+           BySpike=sum(spike.drop), Remaining.in.batch=sum(!discard))
+```
+
+We remove these cells from our `sce` object prior to further analysis.
+
+```{r, remOutliers3}
+sce <- sce[, !discard]
+dim(sce) 
+```
+
+```{r, echo=FALSE, results='hide'}
+gc()
+```
+
+## Classification into cell cycle phase
+
+As part of the quality checks, we can also examine the distribution of cells into different cell cycle phases.
+
+```{r filterPhase}
+library(scran)
+hs.pairs <- readRDS(system.file("exdata", "human_cycle_markers.rds", package="scran"))
+assigned <- cyclone(sce, pairs=hs.pairs, gene.names=rowData(sce)$ensembl_gene_id)
+write.table(file=file.path(resdir, "phases.tsv"), assigned, row.names=FALSE, sep="\t", quote=TRUE)
+head(assigned$scores)
+```
+
+Visualizing the scores.
+
+```{r phaseplot, fig.width=10, fig.height=6}
+par(mfrow=c(1,2))
+plot(assigned$scores$G1, assigned$scores$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
+plot(assigned$scores$G1, assigned$scores$S, xlab="G1 score", ylab="S score", pch=16)
+```
+
+Phase assignments are stored in the `sce` object prior to further analysis.
+
+```{r}
+sce$phase <- assigned$phases
+table(assigned$phases)
+```
+
+# Examining the genes
+
+We have a look at the average abundance of the genes.
+
+```{r aveGenes}
+ave.counts <- calcAverage(sce)
+hist(log10(ave.counts), breaks=100, main="", col="grey", xlab=expression(Log[10]~"average count"))
+```
+
+We have a look at the number of cells expressing each gene.
+
+```{r numGenes}
+ncells <- nexprs(sce, byrow=TRUE)
+plot(ave.counts, ncells, xlab="Average count", ylab="Number of cells", log="x", pch=16, cex=0.5)
+```
+
 Inspecting the 50 most highly expressed genes should show constitutively expressed genes like mitochondrial transcripts, ribosomal proteins, actin and other usual suspects.
 
-```{r highEx}
+```{r highEx, fig.height=12, fig.width=6}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
@@ -317,10 +333,12 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 ## Removing scaling biases
 
 Cells are clustered together and scaling biases are removed using the deconvolution method.
+This is done using high-abundance genes to avoid problems with having too many zeroes.
 
 ```{r sumnorm}
-clusters <- quickCluster(sce)
-sce <- computeSumFactors(sce, cluster= clusters)
+keep <- ave.counts >= 1
+clusters <- quickCluster(sce, method="igraph", subset.row=keep)
+sce <- computeSumFactors(sce, cluster=clusters, subset.row=keep, min.mean=NULL)
 summary(sizeFactors(sce))
 ```
 
@@ -328,7 +346,7 @@ This correlates well with library size normalization, which is typically expecte
 
 ```{r sumnormplot}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy", ylab="Library size (millions)", 
-    xlab="Size factor", col=ifelse(sce$pheno=="naive", "black", "grey"))
+    xlab="Size factor", col=ifelse(sce$phenotype=="naive", "black", "grey"))
 ```
 
 Spike-in transcripts are normalized separately, because they aren't subject to the effects of total RNA content.
@@ -337,7 +355,7 @@ Here, the correlation is worse, which is also expected.
 ```{r spikenorm}
 sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE) 
 plot(sizeFactors(sce), sizeFactors(sce, type="ERCC"), log="xy", ylab="Spike-in size factor", 
-    xlab="Deconvolution size factor", col=ifelse(sce$pheno=="naive", "black", "grey"))
+    xlab="Deconvolution size factor", col=ifelse(sce$phenotype=="naive", "black", "grey"))
 ```
 
 Finally, the size factors are applied to compute normalized log-expression values.
