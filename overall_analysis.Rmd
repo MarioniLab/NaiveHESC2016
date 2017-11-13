@@ -80,7 +80,7 @@ for (b in levels(sce$batch)) {
     collected.var[[b]] <- dec.out
     collected.npcs[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
 
-    plot(dec.out$mean, dec.out$total, pch=16, col="grey", xlab="Mean log-expression",
+    plot(dec.out$mean, dec.out$total, pch=16, cex=0.5, col="grey", xlab="Mean log-expression",
          ylab="Variance of log-expression", ylim=c(0, 10), xlim=c(0, 15), main=paste("Batch", b))
     points(var.fit$mean, var.fit$var, pch=16, col="red")
     curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
@@ -122,7 +122,7 @@ Unfortunately, the number of PCs to retain is quite different between the two ba
 unlist(collected.npcs)
 ```
 
-These differences reflect the variation in technical noise in each data set, which affects the biological resolution of the analysis.
+These differences reflect the fact that the second batch is more biologically noisy, possibly due to the manner in which it was prepared.
 We'll use the latter value given that the second batch contains a greater number of cells anyway.
 
 ```{r}
@@ -141,7 +141,7 @@ dim(reducedDim(sce, "PCA"))
 plot(pc.out)
 ```
 
-# Dimensionality reduction using correlated HVGs
+# Visualization in low-dimensional space
 
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
 
