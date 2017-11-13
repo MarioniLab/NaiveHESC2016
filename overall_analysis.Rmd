@@ -1,7 +1,7 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: overall analysis"
 author: Tobias Messmer and Aaron Lun
-date: 17 December 2016
+date: 13 November 2017
 output: 
   html_document:
     toc: true
@@ -35,6 +35,7 @@ To get a first impression of the data, expression profiles of typical ESC marker
 This is done after shuffling the cell order to avoid all naive cells being plotted after primed cells.
 
 ```{r explot}
+library(scater)
 set.seed(100)
 sce <- sce[, sample(ncol(sce))]
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
@@ -69,15 +70,21 @@ We do this separately for each batch, as there is at least an order of magnitude
 ```{r trendvarfit, fig.height=6, fig.width=10}
 par(mfrow=c(1,2))
 collected.var <- list()
+collected.npcs <- list()
 for (b in levels(sce$batch)) {
     cur.sce <- sce[,sce$batch==b]
     cur.sce <- normalize(cur.sce)
+
     var.fit <- trendVar(cur.sce, method="loess", span=0.4)
-    collected.var[[b]] <- decomposeVar(cur.sce, var.fit)
-    plot(var.fit$mean, var.fit$var, pch=16, col="grey", xlab="Mean log-expression",
+    dec.out <- decomposeVar(cur.sce, var.fit)
+    collected.var[[b]] <- dec.out
+    collected.npcs[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
+
+    plot(dec.out$mean, dec.out$total, pch=16, col="grey", xlab="Mean log-expression",
          ylab="Variance of log-expression", ylim=c(0, 10), xlim=c(0, 15), main=paste("Batch", b))
-    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
-    }
+    points(var.fit$mean, var.fit$var, pch=16, col="red")
+    curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
+}
 ```
 
 The trend passes through the bulk of the spike-ins, which is reassuring.
@@ -86,19 +93,6 @@ We combine the statistics across batches (using Berger's IUT to select genes tha
 ```{r combinevar}
 var.out <- do.call(combineVar, c(collected.var, method="berger"))
 write.table(file=file.path(resdir, "var.tsv"), var.out, sep="\t", quote=FALSE, col.names = NA) 
-```
-
-We examine the distribution of variances for the endogenous genes.
-Many genes have variances above this trend, corresponding to strong heterogeneity across the population.
-
-```{r plotvar}
-par(mfrow=c(1,1))
-plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-     ylab="Variance of log-expression")
-is <- which(isSpike(sce))
-points(var.out$mean[is], var.out$total[is], col="red", pch=16)
-o <- is[order(var.out$mean[is])]
-curve(var.fit$trend(x), col='dodgerblue', lwd=2, add=TRUE)
 ```
 
 The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
@@ -118,62 +112,55 @@ plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.5,
     colour_by="phenotype", jitter="jitter") + fontsize 
 ```
 
-# Detecting highly correlated genes.
+# Dimensionality reduction based on the technical noise
 
-We identify HVGs with strong correlations to at least one other HVG.
-These genes are most likely to be driving substructure in the data, though there are also correlations due to tightly coordinated pathways (ribosomal) and mapping spillover.
-For convenience, we only take the top 1000 genes with the largest biological components.
+We examine the lower bound on the number of PCs that should be retained in each data set.
+This is based on discarding later PCs until the variance in the discarded PCs is equal to the total technical noise.
+Unfortunately, the number of PCs to retain is quite different between the two batches, which is less-than-helpful.
 
-```{r correlation}
-set.seed(100) 
-var.cor <- correlatePairs(sce, design = design, subset.row=rownames(hvg.out)[1:1000], per.gene=TRUE) 
-head(var.cor)
-sig.cor <- var.cor$FDR <= 0.05
-summary(sig.cor)
+```{r}
+unlist(collected.npcs)
 ```
 
-We save these correlated HVGs for later use. 
-As it happens, all (or almost all) of the top HVGs were detected as being correlated with at least one other HVG, so it ends up that we use all of them.
+These differences reflect the variation in technical noise in each data set, which affects the biological resolution of the analysis.
+We'll use the latter value given that the second batch contains a greater number of cells anyway.
 
-```{r chosencor}
-chosen <- var.cor$gene[sig.cor]
-length(chosen)
-saveRDS(chosen, file = file.path(resdir, "cor_hvg.rds"))
+```{r}
+chosen.npcs <- collected.npcs[[2]]
 ```
 
-```{r, echo=FALSE, results='hide'}
-rm(var.cor, sig.cor)
-gc()
+We apply PCA on the genes with positive biological components in `var.out`.
+This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
+
+```{r}
+keep <- var.out$bio > 0
+summary(keep)
+pc.out <- prcomp(t(assay(sce, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs)
+reducedDim(sce, "PCA") <- pc.out$x
+dim(reducedDim(sce, "PCA"))
+plot(pc.out)
 ```
 
 # Dimensionality reduction using correlated HVGs
 
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
-We use `norm_exprs` in which the batch effect has already been removed.
 
 ```{r tsne, fig.height=10, fig.width=10}
-tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by=rownames(hvg.out)[1],
-    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
-tsne2 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="KLF4",
-    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
-tsne3 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="batch",
-    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
-tsne4 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="phenotype",
-    perplexity=30, rand_seed=100, feature_set=chosen) + fontsize
+sce <- runTSNE(sce, use_dimred="PCA", perplexity=30, rand_seed=100)
+tsne1 <- plotTSNE(sce, colour_by=rownames(hvg.out)[1]) +  fontsize
+tsne2 <- plotTSNE(sce, colour_by="KLF4") + fontsize
+tsne3 <- plotTSNE(sce, colour_by="batch") + fontsize
+tsne4 <- plotTSNE(sce, colour_by="phenotype") + fontsize
 multiplot(tsne1, tsne3, tsne2, tsne4, cols=2)
 ```
 
 We repeat this with PCA, which is simpler but provides more stable results.
 
 ```{r pca, fig.height=10, fig.width=10}
-pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by=rownames(hvg.out)[1], 
-    feature_set = chosen) + fontsize
-pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="KLF4", 
-    feature_set = chosen) + fontsize
-pca3 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="batch", 
-    feature_set = chosen) + fontsize
-pca4 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
-    feature_set = chosen) + fontsize
+pca1 <- plotPCA(sce, colour_by=rownames(hvg.out)[1]) + fontsize
+pca2 <- plotPCA(sce, colour_by="KLF4") + fontsize
+pca3 <- plotPCA(sce, colour_by="batch") + fontsize 
+pca4 <- plotPCA(sce, colour_by="phenotype") + fontsize 
 multiplot(pca1, pca3, pca2, pca4, cols=2)
 ```
 
@@ -200,6 +187,14 @@ design_pheno <- model.matrix(~0 + ptype + batch)
 ```
 
 We run through _edgeR_'s analysis pipeline. 
+We first filter out low-abundance genes, as we did not perform any filtering on `sce` during preprocessing.
+
+```{r}
+keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+y <- y[keep,]
+summary(keep)
+```
+
 First, we normalize the samples using the TMM method.
 
 ```{r}
@@ -218,7 +213,7 @@ plotBCV(y)
 We fit a generalized linear model, with estimates of the quasi-likelihood dispersion to account for gene-specific variability.
 
 ```{r qldisp}
-fit <- glmQLFit(y, design_pheno, robust=TRUE) 
+fit <- glmQLFit(y, design_pheno, robust=TRUE)
 plotQLDisp(fit)
 ```
 
@@ -257,7 +252,7 @@ library(GO.db)
 library(org.Hs.eg.db)
 up.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC > 0]
 is.up <- rownames(sce) %in% up.genes
-entreznames <- data.frame(rowData(sce)$entrezgene)
+entreznames <- as.character(rowData(sce)$entrezgene)
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.up], universe=entreznames[has.entrez], species = "Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
