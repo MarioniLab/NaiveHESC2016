@@ -37,9 +37,9 @@ This is done after shuffling the cell order to avoid all naive cells being plott
 ```{r explot}
 library(scater)
 set.seed(100)
-sce <- sce[, sample(ncol(sce))]
+shuffled.sce <- sce[, sample(ncol(sce))]
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-plotExpression(sce, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
+plotExpression(shuffled.sce, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
     colour_by="phenotype", shape_by = "batch", show_violin = FALSE) + fontsize
 ```
 
@@ -108,7 +108,7 @@ head(hvg.out)
 The most highly variable genes across the whole population are shown to ensure that they are not driven by one or two outliers.
 
 ```{r vioplot}
-plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.5, 
+plotExpression(shuffled.sce, rownames(hvg.out)[1:10], alpha=0.5, 
     colour_by="phenotype", jitter="jitter") + fontsize 
 ```
 
@@ -131,13 +131,12 @@ chosen.npcs <- collected.npcs[[2]]
 
 We apply PCA on the genes with positive biological components in `var.out`.
 This mirrors what is done within `denoisePCA`, where only the genes with positive components are used to select the number of PCs.
-We do this with an expression matrix in which the batch effect has been regressed out. 
+We do this with the `norm_exprs` expression matrix in which the batch effect has been regressed out (see the pre-processing script for details).
 
 ```{r}
 keep <- var.out$bio > 0
 summary(keep)
-batch.adjusted <- removeBatchEffect(logcounts(sce), sce$batch)
-pc.out <- prcomp(t(batch.adjusted[keep,,drop=FALSE]), rank=chosen.npcs)
+pc.out <- prcomp(t(norm_exprs(sce)[keep,,drop=FALSE]), rank=chosen.npcs)
 reducedDim(sce, "PCA") <- pc.out$x
 dim(reducedDim(sce, "PCA"))
 ```
@@ -248,7 +247,7 @@ plotSmear(res, de.tags=rownames(DEmarkers)[is.sig], cex=0.1)
 To ensure that the top DE genes are not driven by outliers, we can examine them explicitly.
 
 ```{r viode}
-plotExpression(sce, features = rownames(DEmarkers)[1:10], col = "phenotype")
+plotExpression(shuffled.sce, features = rownames(DEmarkers)[1:10], col = "phenotype")
 ```
 
 ## Interpreting the set of DE genes
