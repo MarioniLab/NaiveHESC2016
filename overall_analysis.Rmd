@@ -130,14 +130,23 @@ chosen.npcs <- collected.npcs[[2]]
 ```
 
 We apply PCA on the genes with positive biological components in `var.out`.
-This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
+This mirrors what is done within `denoisePCA`, where only the genes with positive components are used to select the number of PCs.
+We do this with an expression matrix in which the batch effect has been regressed out. 
 
 ```{r}
 keep <- var.out$bio > 0
 summary(keep)
-pc.out <- prcomp(t(assay(sce, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs)
+batch.adjusted <- removeBatchEffect(logcounts(sce), sce$batch)
+pc.out <- prcomp(t(batch.adjusted[keep,,drop=FALSE]), rank=chosen.npcs)
 reducedDim(sce, "PCA") <- pc.out$x
 dim(reducedDim(sce, "PCA"))
+```
+
+We save the PCs to file for future use.
+We also examine the variance explained by the first few PCs.
+
+```{r}
+saveRDS(pc.out$x, file=file.path(resdir, "pcs.rds"))
 plot(pc.out)
 ```
 
