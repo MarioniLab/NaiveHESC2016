@@ -44,6 +44,7 @@ sce_naive <- normalize(sce_naive)
 We can examine the expression of the various ESC markers in more detail.
 
 ```{r naiveExpMarker}
+library(scater)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"),
     colour_by="batch") + fontsize
@@ -66,33 +67,29 @@ The trend generally fits quite well, though some deviation of the spike-ins is a
 ```{r naive.vartrend, fig.height=6, fig.width=10}
 par(mfrow=c(1,2))
 collected.var_naive <- list()
+collected.npcs_naive <- list()
 for (b in levels(sce_naive$batch)) {
     cur.sce <- sce_naive[,b==sce_naive$batch]
     cur.sce <- normalize(cur.sce)
+
     var.fit <- trendVar(cur.sce, method="loess", span=0.4)
     var.out <- decomposeVar(cur.sce, var.fit)
     collected.var_naive[[b]] <- var.out 
+    collected.npcs_naive[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
+
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-        ylab="Variance of log-expression", main=paste("Batch", b))
+        ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
     points(var.fit$mean, var.fit$var, pch=16, col="red")
     curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
 }
 ```
 
 We combine statistics across batches and save them to file.
-We also look at the distribution of the gene-wise variances.
-The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
 
 ```{r naive.varplot}
 var.out_naive <- do.call(combineVar, collected.var_naive)
 write.table(file=file.path(resdir, "var.tsv"), var.out_naive, 
     sep="\t", quote=FALSE, col.names=NA) 
-plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-expression",
-    ylab="Variance of log-expression")
-is <- which(isSpike(sce_naive))
-points(var.out_naive$mean[is], var.out_naive$total[is], col="red", pch=16)
-o <- is[order(var.out_naive$mean[is])]
-curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -113,48 +110,50 @@ plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], alpha=0.05,
     colour_by="batch", jitter="jitter") + fontsize
 ```
 
-# Detecting correlated HVGs
-
-We also assess the pairwise correlations between the genes across the naive cells.
-Again, the usual suspects dominate the top set of correlations.
-
-```{r cor.naive}
-set.seed(100)
-design_naive <- model.matrix(~0 + sce_naive$batch)
-var.cor_naive <- correlatePairs(sce_naive, design = design_naive, 
-    subset.row=rownames(hvg.out_naive), per.gene=TRUE) 
-head(var.cor_naive)
-```
-
-We focus on the genes that have significantly large correlations.
-This happens to be the majority of HVGs that were originally detected.
-
-```{r sig.naive}
-sig.cor_naive <- var.cor_naive$FDR <= 0.05
-summary(sig.cor_naive)
-chosen_naive <- var.cor_naive$gene[sig.cor_naive]
-saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_naive)
-length(chosen_naive)
-```
-
 # Performing dimensionality reduction
 
 We remove the batch effect prior to performing dimensionality reduction.
+This needs to be repeated as the batch effect for the naive-only cells may be different from the batch effect of the entire data set.
 
 ```{r}
 library(limma)
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
 ```
 
+We examine the lower bound on the number of PCs that should be retained in each data set.
+Again, the number of PCs to retain is quite different between the two batches, which is annoying.
+
+```{r}
+unlist(collected.npcs_naive)
+```
+
+We'll use the latter value given that the second batch contains a greater number of cells anyway.
+
+```{r}
+chosen.npcs_naive <- collected.npcs_naive[[2]]
+```
+
+We apply PCA on the genes with positive biological components in `var.out_naive`.
+This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
+
+```{r}
+keep <- var.out_naive$bio > 0
+summary(keep)
+pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_naive)
+reducedDim(sce_naive, "PCA") <- pc.out$x
+dim(reducedDim(sce_naive, "PCA"))
+plot(pc.out)
+```
+
+# Visualization in low-dimensional space
+
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.naive, fig.width=15, fig.height=6}
-tsne1_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1],
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
-tsne2_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="KLF4",
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
-tsne3_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="batch",
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10, rand_seed=100)
+tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) +  fontsize
+tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
+tsne3_naive <- plotTSNE(sce_naive, colour_by="batch") + fontsize
 multiplot(tsne1_naive, tsne2_naive, tsne3_naive, cols=3)
 ```
 
@@ -162,27 +161,24 @@ All plots suggest that there is a small subpopulation off the main bulk of cells
 We repeat this for PCA plots, though this is not so clear - dominated by variance along the larger population, perhaps?
 
 ```{r pca.naive, fig.width=15, fig.height=6}
-pca1_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1], 
-    feature_set = chosen_naive) + fontsize
-pca2_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="KLF4", 
-    feature_set = chosen_naive) + fontsize
-pca3_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="batch", 
-    feature_set = chosen_naive) + fontsize
+pca1_naive <- plotPCA(sce_naive, colour_by=rownames(hvg.out_naive)[1]) + fontsize
+pca2_naive <- plotPCA(sce_naive, colour_by="KLF4") + fontsize
+pca3_naive <- plotPCA(sce_naive, colour_by="batch") + fontsize 
 multiplot(pca1_naive, pca2_naive, pca3_naive, cols=3)
 ```
 
-# Clustering on Euclidean distance
+# Clustering to identify putative subpopulations
 
-We perform hierarchical clustering on the Euclidean distance, using the correlated HVGs identified previously and the batch-corrected expression values.
+We perform hierarchical clustering on the Euclidean distance in the PC space.
 
 ```{r naiveclust}
-chosen.exprs_naive <- norm_exprs(sce_naive)[chosen_naive,]
-my.dist_naive <- dist(t(chosen.exprs_naive))
-my.tree_naive <- hclust(my.dist_naive, method="ward.D2")
+pcs_naive <- reducedDim(sce_naive, "PCA")
+my.dist_naive <- dist(pcs_naive)
+my.tree_naive <- hclust(my.dist_naive)
 ```
 
 To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
-These suggest that `k=3` is the best, with cluster 3 being genuinely separated from the others.
+These suggest that `k=2` is the best, with cluster 3 being genuinely separated from the others.
 
 ```{r silhouette, fig.width=10, fig.height=10}
 library(cluster)
@@ -198,31 +194,20 @@ for (k in 2:5){
 }
 ```
 
-So, we go on to cluster the cells and to visualize the results in a heatmap.
-
-```{r heat.naive}
-my.clusters_naive <- unname(cutree(my.tree_naive, k = 3)) 
-heat.vals_naive <- chosen.exprs_naive - rowMeans(chosen.exprs_naive) 
-clust.col_naive <- rainbow(max(my.clusters_naive))
-library(gplots)
-heatmap.2(heat.vals_naive, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3, 
-    breaks = seq(-10, 10, 1), ColSideColors=clust.col_naive[my.clusters_naive], 
-    Colv=as.dendrogram(my.tree_naive), dendrogram='column')
-``` 
-
-We can have a look at the clustering result on our PCA plots from before, and on the overall PCA plot with all cells in the data set.
+So, we go on to cluster the cells, and visualize the result of clustering on our _t_-SNE plot.
 
 ```{r naive_PCA}
+my.clusters_naive <- unname(cutree(my.tree_naive, k=2))
 sce_naive$cluster <- factor(my.clusters_naive)
-plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="cluster", 
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+plotTSNE(sce_naive, use_dimred="PCA", colour_by="cluster", 
+    perplexity=10, rand_seed=100) + fontsize
 ```
 
-# Characterising cluster 3
+# Characterising cluster 2
 
 ## Checking some diagnostics
 
-Cluster 3 seems like the most interesting cluster, with a number of cells breaking away from the bulk primed population.
+Cluster 2 seems like the most interesting cluster, with a number of cells breaking away from the bulk primed population.
 We examine the expression of marker genes for this cluster.
 
 ```{r naiveexpclust}
@@ -262,8 +247,8 @@ all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==trans.cluste
 write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
     row.names=FALSE, quote=FALSE, sep="\t")
 sce$phenotype <- all.pheno
-plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
-    feature_set = readRDS("results-overall/cor_hvg.rds")) + fontsize
+reducedDim(sce, "PCA") <- readRDS("results-overall/pcs.rds")
+plotPCA(sce, colour_by="phenotype") + fontsize
 ```
 
 ## Identifying marker genes for cluster 2
@@ -282,14 +267,16 @@ head(marker.set_naive)
 
 We create a heatmap that shows differentially expressed genes relative to the chosen cluster.
 
-```{r, clust.naiv2}
+```{r clust.naiv2, fig.height=10, fig.width=6}
 top.markers_naive <- marker.set_naive$Gene[marker.set_naive$Top <= 100]
 top.exprs_naive <- norm_exprs(sce_naive)[top.markers_naive,,drop=FALSE]
 heat.vals_naive <- top.exprs_naive - rowMeans(top.exprs_naive)
-heatmap.2(heat.vals_naive, col=bluered, symbreak=TRUE, trace='none', 
-    cexRow=0.6, breaks = seq(-5,5, 1), ColSideColors=clust.col_naive[my.clusters_naive], 
-    Colv=as.dendrogram(my.tree_naive), dendrogram='column')
-legend("bottomleft", col=clust.col_naive, legend=sort(unique(my.clusters_naive)), pch=16)
+library(pheatmap)
+clust.col_naive <- topo.colors(max(my.clusters_naive))
+pheatmap(heat.vals_naive, cluster_cols=my.tree_naive, 
+    annotation_col=data.frame(Cluster=as.character(my.clusters_naive), 
+                              row.names=colnames(heat.vals_naive)),
+    annotation_colors=list(Cluster=setNames(clust.col_naive, unique(my.clusters_naive))))
 ```
 
 ## Identifying markers relative to primed/naive cells
@@ -302,14 +289,18 @@ collected <- list()
 for (mode in c("naive", "primed")) {
     current <- all.pheno %in% c("transition", mode)
     curE <- exprs(sce)[!isSpike(sce),current]
+    keep <- rowMeans(curE) > 0.1 # modest filtering to avoid distorted mean-var trend.
+    
     curB <- factor(sce$batch[current])
     curP <- factor(all.pheno[current])
     curX <- model.matrix(~0 + curP + curB)
+
     fit <- lmFit(curE, curX)
     con <- makeContrasts(contrasts=sprintf("curPtransition - curP%s", mode), levels=curX)
     fit2 <- contrasts.fit(fit, con)
     fit2 <- eBayes(fit2, robust=TRUE, trend=TRUE)
     res <- topTable(fit2, n=Inf, sort.by="p")
+
     collected[[mode]] <- res
     write.table(file=file.path(resdir, sprintf("markers_trans_vs_%s.tsv", mode)), res, 
         sep="\t", quote=FALSE, col.names = NA) 
@@ -332,12 +323,12 @@ We make a heatmap to visualize the expression of these candidates.
 use.markers <- unique(c(rownames(collected$naive)[1:50], rownames(collected$primed)[1:50]))
 o <- order(all.pheno)
 top.exprs <- norm_exprs(sce)[use.markers,o,drop=FALSE]
-re.pheno <- factor(all.pheno[o])
 clust.cols <- c("black", "grey", "red")
 heat.vals <- top.exprs - rowMeans(top.exprs)
-heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, dendrogram='row',
-    breaks = seq(-5, 5, 1), Colv=FALSE, ColSideColors=clust.cols[re.pheno])
-legend("topright", col=clust.cols, legend=levels(re.pheno), pch=16)
+pheatmap(heat.vals, cluster_cols=FALSE, 
+    annotation_col=data.frame(Phenotype=all.pheno[o], 
+                              row.names=colnames(top.exprs)),
+    annotation_colors=list(Cluster=setNames(clust.cols, unique(all.pheno))))
 ```
 
 We also have a look at the top genes that are uniquely expressed in the transition population.
@@ -457,14 +448,15 @@ Making the heatmap of expression values for these guys.
 It seems like there's changes in expression both ways, not just an increase in naive cells upon loss of imprinting.
 Apparently, this is due to loss of imprinting for the antisense locus that leads to silencing of the corresponding gene.
 
-```{r, fig.height=10, fig.width=6, dpi=150}
+```{r, fig.height=10, fig.width=6}
 o <- order(all.pheno)
 top.exprs <- norm_exprs(sce)[rowData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
-re.pheno <- factor(all.pheno[o])
 clust.cols <- c("black", "grey", "red")
 heat.vals <- top.exprs - rowMeans(top.exprs)
-heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6, dendrogram='row',
-    breaks = seq(-5, 5, 1), Colv=FALSE, ColSideColors=clust.cols[re.pheno])
+pheatmap(heat.vals, cluster_cols=FALSE, 
+    annotation_col=data.frame(Phenotype=all.pheno[o], 
+                              row.names=colnames(top.exprs)),
+    annotation_colors=list(Cluster=setNames(clust.cols, unique(all.pheno))))
 ```
 
 # Wrapping up
