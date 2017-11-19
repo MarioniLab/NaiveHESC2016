@@ -2,16 +2,16 @@ source("central.R")
 
 # Figure 1B
 sce <- readRDS("sce_all.rds")
-chosen <- readRDS(file.path("results-overall", "cor_hvg.rds"))
-library(scater)
-ugly.plot <- plotPCA(sce, exprs_values="norm_exprs", feature_set = chosen)
-plot_data <- ggplot_build(ugly.plot)
+pcs <- readRDS(file.path("results-overall", "pcs.rds"))
 
 pdf(file=file.path(figdir, "1b.pdf"), width=9, height=8, useDingbats=FALSE)
 layout(cbind(1,2), width=c(5, 1))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
-plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = ifelse(sce$phenotype=="naive", naive.col, primed.col),
-     pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5 , cex.axis=1.2)
+plot(pcs[,1], pcs[,2], col = ifelse(sce$phenotype=="naive", naive.col, primed.col),
+     pch=16, xlab = paste0('Component 1: ', round(var(pcs[,1])/sum(apply(pcs, 2, var))*100), 
+                           '%') , 
+     ylab = paste0('Component 2: ', round(var(pcs[,2])/sum(apply(pcs, 2, var))*100), 
+                   '%') , cex.lab = 1.5 , cex.axis=1.2)
 par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
 legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch=16, cex=1.5)
