@@ -52,6 +52,7 @@ and be expressed in less than 5% of cells in the other condition.
 
 ```{r}
 library(scran)
+library(scater)
 sce <- readRDS("sce_all.rds")
 naive.cells <- sce$phenotype=='naive'
 naive.prop <- nexprs(sce[,naive.cells], byrow=TRUE)/sum(naive.cells)
