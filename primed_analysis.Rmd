@@ -1,7 +1,7 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: primed-only analysis"
 author: Tobias Messmer and Aaron Lun
-date: 17 December 2016
+date: 13 November 2017
 output: 
   html_document:
     toc: true
@@ -44,6 +44,7 @@ sce_primed <- normalize(sce_primed)
 We can examine the expression of the various ESC markers in more detail.
 
 ```{r primedExpMarker}
+library(scater)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(sce_primed, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"),
     colour_by="batch") + fontsize
@@ -66,32 +67,28 @@ The trend is okay, though some deviation of the spike-ins is attributable to amp
 ```{r primed.vartrend, fig.height=6, fig.width=10}
 par(mfrow=c(1,2))
 collected.var_primed <- list()
+collected.npcs_primed <-list()
 for (b in levels(sce_primed$batch)) {
     cur.sce <- sce_primed[,b==sce_primed$batch]
     cur.sce <- normalize(cur.sce)
+    
     var.fit <- trendVar(cur.sce, method="loess", span=0.4)
     var.out <- decomposeVar(cur.sce, var.fit)
     collected.var_primed[[b]] <- var.out 
+    collected.npcs_primed[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
+    
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-        ylab="Variance of log-expression")
+        ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
     points(var.fit$mean, var.fit$var, pch=16, col="red")
     curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
 }
 ```
 
 We combine statistics across batches (requiring a gene to be HVG in both batches in order to be detected) and save them to file.
-We also look at the distribution of the gene-wise variances.
-The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
 
 ```{r primed.varplot}
 var.out_primed <- do.call(combineVar, collected.var_primed)
 write.table(file=file.path(resdir, "var.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA) 
-plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-expression",
-     ylab="Variance of log-expression")
-is <- which(isSpike(sce_primed))
-points(var.out_primed$mean[is], var.out_primed$total[is], col="red", pch=16)
-o <- is[order(var.out_primed$mean[is])]
-curve(var.fit$trend(x), col='dodgerblue', lwd=2, add=TRUE)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -111,77 +108,72 @@ plotExpression(sce_primed, rownames(hvg.out_primed)[1:10], alpha=0.05,
     colour_by="batch", jitter="jitter") + fontsize
 ```
 
-# Detecting correlated HVGs
-
-We also assess the pairwise correlations between the genes across the primed cells.
-Again, the usual suspects dominate the top set of correlations.
-
-```{r, cor.primed}
-set.seed(100) 
-design_primed <- model.matrix(~ 0 + sce_primed$batch)
-var.cor_primed <- correlatePairs(sce_primed, design = design_primed, 
-    subset.row=rownames(hvg.out_primed), per.gene=TRUE)
-head(var.cor_primed)
-```
-
-We focus on the genes that have significantly large correlations.
-This happens to be the majority of HVGs that were originally detected.
-
-```{r, sig.primed}
-sig.cor_primed <- var.cor_primed$FDR <= 0.05
-summary(sig.cor_primed)
-chosen_primed <- var.cor_primed$gene[sig.cor_primed]
-saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_primed)
-length(chosen_primed)
-```
-
-```{r, echo=FALSE, results="hide"}
-gc()
-```
-
 # Performing dimensionality reduction
 
 We remove the batch effect prior to performing dimensionality reduction.
+This needs to be repeated as the batch effect for the primed-only cells may be different from the batch effect of the entire data set.
 
 ```{r}
 library(limma)
 norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
 ```
 
+We examine the lower bound on the number of PCs that should be retained in each data set.
+Again, the number of PCs to retain is quite different between the two batches, which is annoying.
+
+```{r}
+unlist(collected.npcs_primed)
+```
+
+We'll use the latter value given that the second batch contains a greater number of cells anyway.
+
+```{r}
+chosen.npcs_primed <- collected.npcs_primed[[2]]
+```
+
+We apply PCA on the genes with positive biological components in `var.out_primed`.
+This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
+
+```{r}
+keep <- var.out_primed$bio > 0
+summary(keep)
+pc.out <- prcomp(t(assay(sce_primed, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_primed)
+reducedDim(sce_primed, "PCA") <- pc.out$x
+dim(reducedDim(sce_primed, "PCA"))
+plot(pc.out)
+```
+
+# Visualization in low-dimensional space
+
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.primed, fig.width=15, fig.height=6}
-tsne1_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by=rownames(hvg.out_primed)[1],
-    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
-tsne2_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by="KLF4",
-    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
-tsne3_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by="batch",
-    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=10, rand_seed=100)
+tsne1_primed <- plotTSNE(sce_primed, colour_by=rownames(hvg.out_primed)[1]) +  fontsize
+tsne2_primed <- plotTSNE(sce_primed, colour_by="KLF4") + fontsize
+tsne3_primed <- plotTSNE(sce_primed, colour_by="batch") + fontsize
 multiplot(tsne1_primed, tsne2_primed, tsne3_primed, cols=3)
 ```
 
 And again, for PCA plots.
 
 ```{r pca.primed, fig.width=15, fig.height=6}
-pca1_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by=rownames(hvg.out_primed)[1], 
-    feature_set = chosen_primed) + fontsize
-pca2_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by="KLF4", 
-    feature_set = chosen_primed) + fontsize
-pca3_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by="batch", 
-    feature_set = chosen_primed) + fontsize
+pca1_primed <- plotPCA(sce_primed, colour_by=rownames(hvg.out_naive)[1]) + fontsize
+pca2_primed <- plotPCA(sce_primed, colour_by="KLF4") + fontsize
+pca3_primed <- plotPCA(sce_primed, colour_by="batch") + fontsize
 multiplot(pca1_primed, pca2_primed, pca3_primed, cols=3)
 ```
 
 Both plots suggest that there is a small subpopulation off the main bulk of cells.
 
-# Clustering on Euclidean distance
+# Clustering to identify putative subpopulations
 
-We perform hierarchical clustering on the Euclidean distance, using the correlated HVGs identified previously and the batch-corrected expression values.
+We perform hierarchical clustering on the Euclidean distance in the PC space.
 
 ```{r primedclust}
-chosen.exprs_primed <- norm_exprs(sce_primed)[chosen_primed,]
-my.dist_primed <- dist(t(chosen.exprs_primed))
-my.tree_primed <- hclust(my.dist_primed, method="ward.D2")
+pcs_primed <- reducedDim(sce_primed, "PCA")
+my.dist_primed <- dist(pcs_primed)
+my.tree_primed <- hclust(my.dist_primed)
 ```
 
 To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
