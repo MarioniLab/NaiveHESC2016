@@ -1,7 +1,7 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: G1-only, naive-only analysis"
 author: Tobias Messmer and Aaron Lun
-date: 17 December 2016
+date: 13 November 2017
 output: 
   html_document:
     toc: true
