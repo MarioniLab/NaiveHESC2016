@@ -7,11 +7,11 @@ pcs <- readRDS(file.path("results-overall", "pcs.rds"))
 pdf(file=file.path(figdir, "1b.pdf"), width=9, height=8, useDingbats=FALSE)
 layout(cbind(1,2), width=c(5, 1))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
+var1 <- round(attr(pcs, "percentVar")[1]*100)
+var2 <- round(attr(pcs, "percentVar")[2]*100)
 plot(pcs[,1], pcs[,2], col = ifelse(sce$phenotype=="naive", naive.col, primed.col),
-     pch=16, xlab = paste0('Component 1: ', round(var(pcs[,1])/sum(apply(pcs, 2, var))*100), 
-                           '%') , 
-     ylab = paste0('Component 2: ', round(var(pcs[,2])/sum(apply(pcs, 2, var))*100), 
-                   '%') , cex.lab = 1.5 , cex.axis=1.2)
+     pch=16, xlab = paste0('Component 1: ', var1, '%'), ylab = paste0('Component 2: ', var2, '%') ,
+     cex.lab = 1.5 , cex.axis=1.2)
 par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
 legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch=16, cex=1.5)
