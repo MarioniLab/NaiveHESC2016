@@ -139,6 +139,7 @@ summary(keep)
 pc.out <- prcomp(t(norm_exprs(sce)[keep,,drop=FALSE]), rank=chosen.npcs)
 reducedDim(sce, "PCA") <- pc.out$x
 dim(reducedDim(sce, "PCA"))
+attr(pc.out$x, "percentVar") <- pc.out$sdev^2/sum(pc.out$sdev^2)
 ```
 
 We save the PCs to file for future use.
