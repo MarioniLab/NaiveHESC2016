@@ -255,11 +255,12 @@ naive_1 <- read.table("results-naive/var_1.tsv.gz", header=TRUE, row.names=1)
 naive_2 <- read.table("results-naive/var_2.tsv.gz", header=TRUE, row.names=1)
 primed_1 <- read.table("results-primed/var_1.tsv.gz", header=TRUE, row.names=1)
 primed_2 <- read.table("results-primed/var_2.tsv.gz", header=TRUE, row.names=1)
-stopifnot(identical(rownames(naive_1), rownames(naive_2)))
-stopifnot(identical(rownames(naive_1), rownames(primed_1)))
-stopifnot(identical(rownames(naive_1), rownames(primed_2)))
+stopifnot(identical(rownames(sce), rownames(naive_1)))
+stopifnot(identical(rownames(sce), rownames(naive_2)))
+stopifnot(identical(rownames(sce), rownames(primed_1)))
+stopifnot(identical(rownames(sce), rownames(primed_2)))
 var.tab <- cbind(naive_1$bio, naive_2$bio, primed_1$bio, primed_2$bio)
-rownames(var.tab) <- rownames(naive_1)
+rownames(var.tab) <- rowData(sce)$ensembl_gene_id
 head(var.tab)
 ```
 
@@ -272,13 +273,14 @@ design <- model.matrix(~batch + condition)
 design
 ```
 
-We filter out low-abundance genes first.
+We filter out low-abundance genes first as they have very high variability in the ratio of the variance estimates to the mean, which distorts the prior d.f. estimates.
 This requires knowledge of the actual mean, which is _not_ the same as `rowMeans(var.tab)`!
+We also filter out genes that have negative average components.
 
 ```{r}
 ab <- rowMeans(exprs(sce))
-keep <- ab > 0.1
-var.tab <- var.tab[keep,]
+keep <- ab > 1 & rowMeans(var.tab) > 0
+var.tab2 <- var.tab[keep,]
 summary(keep)
 ```
 
@@ -287,7 +289,8 @@ We see some evidence for a trend at low-abundances so we set `trend=TRUE`.
 This requires some hacking to replace the mean components with the actual abundances.
 
 ```{r, fig.width=12, fig.height=6}
-fit <- lmFit(var.tab, design)
+fit <- lmFit(var.tab2, design)
+fit$genes <- data.frame(Symbol=rowData(sce)$external_gene_name[keep])
 fit$Amean <- ab[keep]
 fit <- eBayes(fit, robust=TRUE, trend=TRUE)
 summary(fit$df.prior)
@@ -297,13 +300,12 @@ plotSA(fit, log="x")
 ```
 
 We then proceed to have a look at the differentially variable genes at a FDR of 5%.
-There is no evidence for DVG between conditions in the entire set of genes, though maybe we're just underpowered with only two replicates.
 
 ```{r}
 summary(decideTests(fit))
 all.dvg <- topTable(fit, coef=ncol(design), n=Inf, sort.by="p")
 gzout <- gzfile(file.path(resdir, "dvg.tsv.gz"), open="wb")
-write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, col.names=NA)
+write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, row.names=NA)
 close(gzout)
 head(all.dvg)
 ```
@@ -313,6 +315,40 @@ Changes in variability between conditions are mostly driven by differential expr
 
 ```{r}
 plotExpression(sce, features=rownames(all.dvg)[1:4], x="sample", colour_by="phenotype")
+```
+
+## Examining specific gene sets
+
+We throw ROAST at the gene set used to characterize each germ layer (curated by Ferdinand).
+
+```{r}
+by.lineage <- read.table("miscellaneous/commit_lineages.tsv", header=TRUE, stringsAsFactors=FALSE)
+endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
+head(endo.set)
+ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
+head(ecto.set)
+meso.set <- by.lineage$Symbol[grep("mesoderm", by.lineage$Germ_layer)]
+head(meso.set)
+```
+
+Setting up a function to identify the surviving genes.
+
+```{r}
+inPresentSet <- function(present, desired) {
+    ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=desired, column="ENSEMBL")
+    which(present %in% ensembls)    
+}
+```
+
+Checking whether there's evidence for an increase in variability in the primed condition (`Up`) in the gene sets defining each germ layer.
+
+```{r}
+endo.keep <- inPresentSet(rownames(var.tab2), endo.set)
+roast(var.tab2, index=endo.keep, design=design, coef=ncol(design)) 
+ecto.keep <- inPresentSet(rownames(var.tab2), ecto.set)
+roast(var.tab2, index=ecto.keep, design=design, coef=ncol(design)) 
+meso.keep <- inPresentSet(rownames(var.tab2), meso.set)
+roast(var.tab2, index=meso.keep, design=design, coef=ncol(design)) 
 ```
 
 # Wrapping up
