@@ -158,7 +158,7 @@ multiplot(tsne1_primed, tsne2_primed, tsne3_primed, cols=3)
 And again, for PCA plots.
 
 ```{r pca.primed, fig.width=15, fig.height=6}
-pca1_primed <- plotPCA(sce_primed, colour_by=rownames(hvg.out_naive)[1]) + fontsize
+pca1_primed <- plotPCA(sce_primed, colour_by=rownames(hvg.out_primed)[1]) + fontsize
 pca2_primed <- plotPCA(sce_primed, colour_by="KLF4") + fontsize
 pca3_primed <- plotPCA(sce_primed, colour_by="batch") + fontsize
 multiplot(pca1_primed, pca2_primed, pca3_primed, cols=3)
