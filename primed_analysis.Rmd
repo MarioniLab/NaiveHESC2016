@@ -77,6 +77,11 @@ for (b in levels(sce_primed$batch)) {
     collected.var_primed[[b]] <- var.out 
     collected.npcs_primed[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
     
+    # Saving output as a compressed GZip file.
+    gzout <- gzfile(file.path(resdir, sprintf("var_%s.tsv.gz", b)), open="wb")
+    write.table(file=gzout, var.out, sep="\t", quote=FALSE, col.names=NA)
+    close(gzout)
+    
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
         ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
     points(var.fit$mean, var.fit$var, pch=16, col="red")
@@ -88,7 +93,9 @@ We combine statistics across batches (requiring a gene to be HVG in both batches
 
 ```{r primed.varplot}
 var.out_primed <- do.call(combineVar, collected.var_primed)
-write.table(file=file.path(resdir, "var.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA) 
+gzout <- gzfile(file.path(resdir, "var_all.tsv.gz"), open="wb")
+write.table(file=gzout, var.out_primed, sep="\t", quote=FALSE, col.names=NA) 
+close(gzout)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -97,7 +104,9 @@ Genes with significantly non-zero biological components at a FDR of 5% are defin
 hvg.out_primed <- var.out_primed[which(var.out_primed$FDR <= 0.05 & var.out_primed$bio >= 0.5),]
 hvg.out_primed <- hvg.out_primed[order(hvg.out_primed$bio, decreasing=TRUE),]
 nrow(hvg.out_primed)
-write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
+gzout <- gzfile(file.path(resdir, "hvg.tsv.gz"), open="wb")
+write.table(file=gzout, hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
+close(gzout)
 head(hvg.out_primed)
 ```
 
@@ -203,13 +212,14 @@ We compare the variability of the naive and primed populations to each other.
 We first look at the number of HVGs detected in each population.
 
 ```{r}
-var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
-hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
+var.out_naive <- read.table(file.path("results-naive", "var_all.tsv.gz"))
+hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv.gz"))
 nrow(hvg.out_primed)
 nrow(hvg.out_naive)
 ```
 
 The number is slightly lower in the primed population, though that's probably due to loss of power from increases in the technical variance.
+For example, the primed population (blue) has greater variability in the spike-in counts.
 
 ```{r}
 plot(var.out_primed$mean, var.out_primed$tech, col="dodgerblue", pch=16, cex=0.5,
@@ -217,221 +227,92 @@ plot(var.out_primed$mean, var.out_primed$tech, col="dodgerblue", pch=16, cex=0.5
 points(var.out_naive$mean, var.out_naive$tech, col="orange", pch=16, cex=0.5)
 ```
 
-In any case, we look at the biological components to compare the variability of the HVGs in each condition.
-We do this for the absolute values of components and as a ratio against the technical variance.
-(This is because the size of the technical variance can affect the value of the biological component, e.g., scaling of the estimate's sampling distribution.)
+We also have a look at the biological components.
+A naive examination of the biological components of the HVGs suggests that the primed population is more variable.
 
-```{r compcomp, fig.height=7, fig.width=10}
-par(mfrow=c(1,2))
+```{r}
 boxplot(list(Primed=hvg.out_primed$bio, Naive=hvg.out_naive$bio), 
-    ylab="Biological component", ylim=c(0, 5))
-boxplot(list(Primed=hvg.out_primed$bio/hvg.out_primed$tech, 
-             Naive=hvg.out_naive$bio/hvg.out_naive$tech), 
-    ylab="Biological:technical ratio", ylim=c(0, 5))
+    ylab="Biological component", ylim=c(0, 5), col=c("dodgerblue", "orange"))
 ```
 
-We also plot the difference against the change in the mean expression to see whether DE is driving the change in variance.
-Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.
-
-```{r varcomp, fig.width=15, fig.height=6}
-dbio <- var.out_primed$bio - var.out_naive$bio
-
-# Expression values are not directly comparable between separately-normalized objects.
-# Pulling out primed-naive log-fold changes from the overall analysis instead.
-de.stats <- read.table(file.path("results-overall", "de.tsv"))
-lfc <- -de.stats[rownames(var.out_naive),"logFC"]
-
-par(mfrow=c(1,3))
-phvg <- match(rownames(hvg.out_primed), rownames(var.out_primed))
-nhvg <- match(rownames(hvg.out_naive), rownames(var.out_naive))
-both.hvg <- intersect(phvg, nhvg)
-smoothScatter(lfc[both.hvg], dbio[both.hvg], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Both HVGs")
-phvg.only <- setdiff(phvg, nhvg)
-smoothScatter(lfc[phvg.only], dbio[phvg.only], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Primed-only HVGs")
-nhvg.only <- setdiff(nhvg, phvg)
-smoothScatter(lfc[nhvg.only], dbio[nhvg.only], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Naive-only HVGs")
-```
-
-```{r, echo=FALSE, results="hide"}
-gc()
-```
-
-## Examining the genes that change in heterogeneity
-
-We perform a gene set analysis on the genes that are detected as HVGs in both conditions.
+Unfortunately, this seems to be just due to the greater imprecision of the variance estimate in primed cells.
+For example, it seems that the lowly variable genes have smaller biological components in the primed condition as well.
 
 ```{r}
-shared.genes <- rownames(var.out_primed)[both.hvg]
-is.shared <- rownames(sce_primed) %in% shared.genes
-entreznames <- as.vector(rowData(sce_primed)$entrezgene)
-has.entrez <- !is.na(entreznames)
-go <- goana(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
-topgo <- topGO(go, n=Inf, ontology = "BP") 
-topgo$FDR <- p.adjust(topgo$P.DE, method="BH")
-write.table(file=file.path(resdir, "go_shared_hvg.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
-head(topgo)
-kegg <- kegga(entreznames[has.entrez & is.shared], universe=entreznames[has.entrez], species="Hs")
-topkegg <- topKEGG(kegg, n=Inf)
-topkegg$FDR <- p.adjust(topkegg$P.DE, method="BH")
-write.table(file=file.path(resdir, "kegg_shared_hvg.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
-head(topkegg)
+lvg_naive <- order(var.out_naive$bio)[1:1000]
+lvg_primed <- order(var.out_primed$bio)[1:1000]
+boxplot(list(Primed=var.out_primed$bio[lvg_primed], 
+             Naive=var.out_naive$bio[lvg_naive]), 
+    ylab="Biological component", col=c("dodgerblue", "orange"))
 ```
 
-We also see what terms are enriched between the two sets.
-First, we set up the GO terms.
+## Testing each gene for differential variability
 
-```{r gosetup}
-library(org.Hs.eg.db)
-EG.GO <- toTable(org.Hs.egGO2ALLEGS)
-EG.GO <- EG.GO[EG.GO$Ontology=="BP",]
-all.sets <- split(EG.GO$gene_id, EG.GO$go_id)
-```
-
-We apply Fisher's exact test to see whether any terms are enriched in the primed HVGs compared to the naive HVGs.
-
-<!--
-This probably isn't the right test.
-There are the obvious complaints, of course - genes aren't independent of each other, and the marginals are not fixed.
-However, there's also the assumption that the same gene is independent between conditions, in terms of whether it is detected as a HVG.
-This is unlikely to be true, as the true variance will be positively correlated across conditions to some extent.
-Dependencies will result in conservativeness as the proportions between conditions will be more similar than expected.
-I can't think of a better test, though, that attacks the same hypothesis, i.e., the __number__ of HVGs.
-Other tests would use the relative sizes of the biological components, which will be affected by small changes at non-HVGs.
--->
-
-```{r runfisher}
-out.stats <- list()
-for (entry in names(all.sets)) {
-    curgenes <- all.sets[[entry]]
-    mat <- cbind(c(sum(entreznames[phvg] %in% curgenes, na.rm=TRUE), 
-                   sum(!entreznames[phvg] %in% curgenes, na.rm=TRUE)),
-                 c(sum(entreznames[nhvg] %in% curgenes, na.rm=TRUE),
-                   sum(!entreznames[nhvg] %in% curgenes, na.rm=TRUE)))
-    fout <- fisher.test(mat)
-    out.stats[[entry]] <- c(mat[1,]/mat[2,], mat[1,], fout$p.value)
-}
-out.stats <- data.frame(do.call(rbind, out.stats))
-colnames(out.stats) <- c("Prop.primed", "Prop.naive", "Num.primed", "Num.naive", "P")
-out.stats$FDR <- p.adjust(out.stats$P, method="BH")
-```
-
-Finally, annotating the GO terms.
-
-```{r gosummary}
-library(GO.db)
-go.names <- select(GO.db, keys = rownames(out.stats), columns = "TERM")
-go.res <- data.frame(Description=go.names$TERM, out.stats)
-go.res <- go.res[order(go.res$P),]
-write.table(file=file.path(resdir, "go_diff_hvg.tsv"), go.res, 
-    col.names=NA, sep="\t", quote=FALSE)
-head(go.res)
-```
-
-We repeat the dose with KEGG pathways.
-First, setting up the gene sets.
+We proceed to test for significant differences in the biological components, exploiting the fact that we have two batches.
 
 ```{r}
-EG.KEGG <- toTable(org.Hs.egPATH2EG)
-all.sets <- split(EG.KEGG$gene_id, EG.KEGG$path_id)
+naive_1 <- read.table("results-naive/var_1.tsv.gz", header=TRUE, row.names=1)
+naive_2 <- read.table("results-naive/var_2.tsv.gz", header=TRUE, row.names=1)
+primed_1 <- read.table("results-primed/var_1.tsv.gz", header=TRUE, row.names=1)
+primed_2 <- read.table("results-primed/var_2.tsv.gz", header=TRUE, row.names=1)
+stopifnot(identical(rownames(naive_1), rownames(naive_2)))
+stopifnot(identical(rownames(naive_1), rownames(primed_1)))
+stopifnot(identical(rownames(naive_1), rownames(primed_2)))
+var.tab <- cbind(naive_1$bio, naive_2$bio, primed_1$bio, primed_2$bio)
+rownames(var.tab) <- rownames(naive_1)
+head(var.tab)
 ```
 
-Running through the FET again.
-
-```{r, ref.label="runfisher"}
-```
-
-Adding annotation.
+We set up a design matrix with an additive model.
 
 ```{r}
-kegg.names <- getKEGGPathwayNames()
-kegg.names <- kegg.names[match(paste0("path:map", names(all.sets)), kegg.names$PathwayID),]
-kegg.res <- data.frame(Description=kegg.names$Description, out.stats)
-kegg.res <- kegg.res[order(kegg.res$P),]
-write.table(file=file.path(resdir, "kegg_diff_hvg.tsv"), kegg.res, 
-    col.names=NA, sep="\t", quote=FALSE)
-head(kegg.res)
+condition <- rep(c("naive", "primed"), each=2)
+batch <- factor(c(1,2,1,2))
+design <- model.matrix(~batch + condition)
+design
 ```
 
-## Effect of the cell cycle
+We filter out low-abundance genes first.
+This requires knowledge of the actual mean, which is _not_ the same as `rowMeans(var.tab)`!
 
-We check whether the differences in variability are caused by the cell cycle.
-
-```{r phasecheck}
-primed.col <- "#0072B2"
-naive.col <- "#e79f00"
-sce_naive <- readRDS("sce_naive.rds")
-primed.phases <- table(sce_primed$phase)
-naive.phases <- table(sce_naive$phase)
-barplot(rbind(primed.phases, naive.phases), beside = TRUE, 
-    col = c(primed.col, naive.col), ylab="Number of cells")
-legend("topright", legend = c("primed", "naive"), 
-    fill = c(primed.col, naive.col), bty="n", cex=1.5)
+```{r}
+ab <- rowMeans(exprs(sce))
+keep <- ab > 0.1
+var.tab <- var.tab[keep,]
+summary(keep)
 ```
 
-## Testing with the CV^2^
+We then apply _limma_ to fit a linear model to the biological components.
+We see some evidence for a trend at low-abundances so we set `trend=TRUE`. 
+This requires some hacking to replace the mean components with the actual abundances.
 
-We see if our results are recapitulated with the CV^2^ method.
-For simplicity, we just apply `technicalCV2` to the results of the second batch.
-
-```{r testcv2, fig.width=10, fig.height=6}
-sub.sce <- sce_naive[,sce_naive$batch=="2"]
-sub.sce <- normalize(sub.sce)
-cv2_naive <- technicalCV2(sub.sce)
-sub.sce <- sce_primed[,sce_primed$batch=="2"]
-sub.sce <- normalize(sub.sce)
-cv2_primed <- technicalCV2(sub.sce, cv2.tol=0.5)
+```{r, fig.width=12, fig.height=6}
+fit <- lmFit(var.tab, design)
+fit$Amean <- ab[keep]
+fit <- eBayes(fit, robust=TRUE, trend=TRUE)
+summary(fit$df.prior)
 par(mfrow=c(1,2))
-is <- isSpike(sce_naive)
-plot(cv2_naive$mean, cv2_naive$cv2, log="xy", xlab="Mean", ylab="CV2", 
-     main="Naive", ylim=c(0.05, 500))
-points(cv2_naive$mean[is], cv2_naive$cv2[is], col="red", pch=16)
-points(cv2_naive$mean, cv2_naive$trend, col="red", pch=16, cex=0.5)
-plot(cv2_primed$mean, cv2_primed$cv2, log="xy", xlab="Mean", ylab="CV2", 
-     main="Primed", ylim=c(0.05, 500))
-points(cv2_primed$mean[is], cv2_primed$cv2[is], col="red", pch=16)
-points(cv2_primed$mean, cv2_primed$trend, col="red", pch=16, cex=0.5)
+plotSA(fit)
+plotSA(fit, log="x")
 ```
 
-It seems like there's a systematic increase in the biological CV^2^, in both relative and absolute terms.
-This supports the previous results with the log-variance method.
+We then proceed to have a look at the differentially variable genes at a FDR of 5%.
+There is no evidence for DVG between conditions in the entire set of genes, though maybe we're just underpowered with only two replicates.
 
-```{r hvgstatscv2, fig.width=10, fig.height=6}
-par(mfrow=c(1,2))
-abs.primed <- cv2_primed$cv2-cv2_primed$trend
-abs.naive <- cv2_naive$cv2-cv2_naive$trend
-primed.hvg <- cv2_primed$FDR <= 0.05
-sum(primed.hvg, na.rm=TRUE)
-naive.hvg <- cv2_naive$FDR <= 0.05
-sum(naive.hvg, na.rm=TRUE)
-boxplot(list(Primed=abs.primed[primed.hvg], Naive=abs.naive[naive.hvg]), log='y', 
-        ylab="Residual CV2 to the trend for HVGs", col=c("dodgerblue", "orange"))
-rel.primed <- cv2_primed$cv2/cv2_primed$trend
-rel.naive <- cv2_naive$cv2/cv2_naive$trend
-boxplot(list(Primed=rel.primed[primed.hvg], Naive=rel.naive[naive.hvg]), log='y', 
-        ylab="Ratio of CV2 to the trend for HVGs", col=c("dodgerblue", "orange"))
+```{r}
+summary(decideTests(fit))
+all.dvg <- topTable(fit, coef=ncol(design), n=Inf, sort.by="p")
+gzout <- gzfile(file.path(resdir, "dvg.tsv.gz"), open="wb")
+write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+head(all.dvg)
 ```
 
-However, I suspect that this is partially driven by the liberalness of the HVG detection.
-Previous work suggests that the chi-squared test in `technicalCV2` doesn't seem to properly model the variance of the CV^2^ estimate.
-This means that an increase in the technical dispersion will result in more HVGs detected, as the extra estimation variance is not accounted for.
+We can examine the top hits in more detail.
+Changes in variability between conditions are mostly driven by differential expression, as one might expect.
 
-To handle this, I'll repeat the plots above using the top 1000 genes for each statistic.
-This avoids any effects of incorrect HVG calling within each condition.
-Fortunately, we still see a difference in both the absolute and relative differences between conditions.
-
-```{r topstatscv2, fig.width=10, fig.height=6}
-par(mfrow=c(1,2))
-top.abs.primed <- order(-abs.primed)[1:1000]
-top.abs.naive <- order(-abs.naive)[1:1000]
-boxplot(list(Primed=abs.primed[top.abs.primed], Naive=abs.naive[top.abs.naive]),
-        log='y', ylab="Top residual CV2 to the trend", col=c("dodgerblue", "orange"))
-top.rel.primed <- order(-rel.primed)[1:1000]
-top.rel.naive <- order(-rel.naive)[1:1000]
-boxplot(list(Primed=rel.primed[top.rel.primed], Naive=rel.naive[top.rel.naive]),
-        log='y', ylab="Top ratio of CV2 to the trend", col=c("dodgerblue", "orange"))
+```{r}
+plotExpression(sce, features=rownames(all.dvg)[1:4], x="sample", colour_by="phenotype")
 ```
 
 # Wrapping up

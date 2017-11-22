@@ -76,6 +76,11 @@ for (b in levels(sce_naive$batch)) {
     var.out <- decomposeVar(cur.sce, var.fit)
     collected.var_naive[[b]] <- var.out 
     collected.npcs_naive[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
+    
+    # Saving as a Gzipped file for compression.
+    gzout <- gzfile(file.path(resdir, sprintf("var_%s.tsv.gz", b)), open="wb")
+    write.table(file=gzout, var.out, sep="\t", quote=FALSE, col.names=NA)
+    close(gzout)
 
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
         ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
@@ -88,8 +93,9 @@ We combine statistics across batches and save them to file.
 
 ```{r naive.varplot}
 var.out_naive <- do.call(combineVar, collected.var_naive)
-write.table(file=file.path(resdir, "var.tsv"), var.out_naive, 
-    sep="\t", quote=FALSE, col.names=NA) 
+gzout <- gzfile(file.path(resdir, "var_all.tsv.gz"), open="wb")
+write.table(file=gzout, var.out_naive, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -98,8 +104,9 @@ Genes with significantly non-zero biological components at a FDR of 5% are defin
 hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
 hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
 nrow(hvg.out_naive)
-write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_naive, 
-    sep="\t", quote=FALSE, col.names = NA) 
+gzout <- gzfile(file.path(resdir, "hvg.tsv.gz"), open="wb")
+write.table(file=gzout, hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
+close(gzout)
 head(hvg.out_naive)
 ```
 
