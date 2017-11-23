@@ -259,11 +259,15 @@ First, we take the set of genes that were upregulated in naive over primed.
 ```{r upgo}
 library(GO.db)
 library(org.Hs.eg.db)
-up.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC > 0]
-is.up <- rownames(sce) %in% up.genes
 entreznames <- as.character(rowData(sce)$entrezgene)
 has.entrez <- !is.na(entreznames)
-go <- goana(entreznames[has.entrez & is.up], universe=entreznames[has.entrez], species = "Hs")
+in.universe <- entreznames[has.entrez & rownames(sce) %in% rownames(DEmarkers)]
+
+up.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC > 0]
+is.up <- rownames(sce) %in% up.genes
+in.up <- entreznames[has.entrez & is.up]
+
+go <- goana(in.up, universe=in.universe, species = "Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
 write.table(file=file.path(resdir, "go_up.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
@@ -272,7 +276,7 @@ head(topgo)
 We repeat the dose for KEGG analyses.
 
 ```{r upkegg}
-kegg <- kegga(entreznames[has.entrez & is.up], universe=entreznames[has.entrez], species = "Hs")
+kegg <- kegga(in.up, universe=in.universe, species = "Hs")
 topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_up.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
@@ -283,7 +287,9 @@ We now turn our attention to the downregulated genes, i.e., those expressed in p
 ```{r downgo}
 down.genes <- rownames(DEmarkers)[is.sig & DEmarkers$logFC < 0]
 is.down <- rownames(sce) %in% down.genes
-go <- goana(entreznames[has.entrez & is.down], universe=entreznames[has.entrez], species = "Hs")
+in.down <- entreznames[has.entrez & is.down]
+
+go <- goana(in.down, universe=in.universe, species = "Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
 write.table(file=file.path(resdir, "go_down.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
 head(topgo)
@@ -292,7 +298,7 @@ head(topgo)
 We repeat for KEGG analyses.
 
 ```{r downkegg}
-kegg <- kegga(entreznames[has.entrez & is.down], universe=entreznames[has.entrez], species = "Hs")
+kegg <- kegga(in.down, universe=in.universe, species = "Hs")
 topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_down.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)

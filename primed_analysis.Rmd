@@ -248,7 +248,10 @@ boxplot(list(Primed=var.out_primed$bio[lvg_primed],
 
 ## Testing each gene for differential variability
 
-We proceed to test for significant differences in the biological components, exploiting the fact that we have two batches.
+### Data loading
+
+We proceed to test for significant differences in the biological components.
+This exploits the fact that we have two batches, which allows us to model the variability in the variance estimates.
 
 ```{r}
 naive_1 <- read.table("results-naive/var_1.tsv.gz", header=TRUE, row.names=1)
@@ -259,10 +262,50 @@ stopifnot(identical(rownames(sce), rownames(naive_1)))
 stopifnot(identical(rownames(sce), rownames(naive_2)))
 stopifnot(identical(rownames(sce), rownames(primed_1)))
 stopifnot(identical(rownames(sce), rownames(primed_2)))
-var.tab <- cbind(naive_1$bio, naive_2$bio, primed_1$bio, primed_2$bio)
-rownames(var.tab) <- rowData(sce)$ensembl_gene_id
-head(var.tab)
+bio.tab <- cbind(naive_1$bio, naive_2$bio, primed_1$bio, primed_2$bio)
+rownames(bio.tab) <- rowData(sce)$ensembl_gene_id
+head(bio.tab)
 ```
+
+We filter out low-abundance genes first as they have very high variability in the ratio of the variance estimates to the mean, which distorts the prior d.f. estimates.
+This requires knowledge of the actual mean, which is _not_ the same as `rowMeans(bio.tab)`!
+We also filter out genes that have negative average components or that are spike-in transcripts.
+
+```{r}
+ab <- rowMeans(exprs(sce))
+keep <- ab > 1 & rowMeans(bio.tab) > 0 & !isSpike(sce)
+bio.tab2 <- bio.tab[keep,]
+summary(keep)
+```
+
+### Diagnostic plots
+
+We've assumed that subtraction of the trend was sufficient to account for technical noise.
+This is not entirely true as elevated technical noise can also result in scaling of the variance estimates.
+Inflation of the estimates of the biological components between samples would subsequently result in spurious DV.
+Here, there are clearly differences in the trends between samples, which could lead to scaling effects.
+
+```{r}
+plot(naive_1$mean, naive_1$tech, col="lightblue", pch=16, 
+    ylim=c(0, 10), xlab="Mean", ylab="Technical variance")
+points(naive_2$mean, naive_2$tech, col="blue", pch=16)
+points(primed_1$mean, primed_1$tech, col="salmon", pch=16)
+points(primed_2$mean, primed_2$tech, col="red", pch=16)
+```
+
+To check this, we plot the biological components against each other for samples from the same batch.
+Any scaling should manifest as a clear diagonal line with a gradient that differs from unity.
+We don't observe this, which is fortunate.
+
+```{r, fig.width=12, fig.height=6}
+par(mfrow=c(1,2))
+smoothScatter(bio.tab2[,1], bio.tab2[,3], main="Batch 1", xlab="Bio (naive)", ylab="Bio (primed)")
+abline(a=0, b=1, col="red", lwd=0.5)
+smoothScatter(bio.tab2[,2], bio.tab2[,4], main="Batch 2", xlab="Bio (naive)", ylab="Bio (primed)")
+abline(a=0, b=1, col="red", lwd=0.5)
+```
+
+### Hypothesis testing for differential variability
 
 We set up a design matrix with an additive model.
 
@@ -273,23 +316,12 @@ design <- model.matrix(~batch + condition)
 design
 ```
 
-We filter out low-abundance genes first as they have very high variability in the ratio of the variance estimates to the mean, which distorts the prior d.f. estimates.
-This requires knowledge of the actual mean, which is _not_ the same as `rowMeans(var.tab)`!
-We also filter out genes that have negative average components.
-
-```{r}
-ab <- rowMeans(exprs(sce))
-keep <- ab > 1 & rowMeans(var.tab) > 0
-var.tab2 <- var.tab[keep,]
-summary(keep)
-```
-
 We then apply _limma_ to fit a linear model to the biological components.
 We see some evidence for a trend at low-abundances so we set `trend=TRUE`. 
 This requires some hacking to replace the mean components with the actual abundances.
 
 ```{r, fig.width=12, fig.height=6}
-fit <- lmFit(var.tab2, design)
+fit <- lmFit(bio.tab2, design)
 fit$genes <- data.frame(Symbol=rowData(sce)$external_gene_name[keep])
 fit$Amean <- ab[keep]
 fit <- eBayes(fit, robust=TRUE, trend=TRUE)
@@ -305,7 +337,7 @@ We then proceed to have a look at the differentially variable genes at a FDR of 
 summary(decideTests(fit))
 all.dvg <- topTable(fit, coef=ncol(design), n=Inf, sort.by="p")
 gzout <- gzfile(file.path(resdir, "dvg.tsv.gz"), open="wb")
-write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, row.names=NA)
+write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, col.names=NA)
 close(gzout)
 head(all.dvg)
 ```
@@ -314,7 +346,8 @@ We can examine the top hits in more detail.
 Changes in variability between conditions are mostly driven by differential expression, as one might expect.
 
 ```{r}
-plotExpression(sce, features=rownames(all.dvg)[1:4], x="sample", colour_by="phenotype")
+matching <- rownames(sce)[rowData(sce)$ensembl_gene_id %in% rownames(all.dvg)[1:4]]
+plotExpression(sce, features=matching, x="sample", colour_by="phenotype")
 ```
 
 ## Examining specific gene sets
@@ -334,6 +367,7 @@ head(meso.set)
 Setting up a function to identify the surviving genes.
 
 ```{r}
+library(org.Hs.eg.db)
 inPresentSet <- function(present, desired) {
     ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=desired, column="ENSEMBL")
     which(present %in% ensembls)    
@@ -343,12 +377,53 @@ inPresentSet <- function(present, desired) {
 Checking whether there's evidence for an increase in variability in the primed condition (`Up`) in the gene sets defining each germ layer.
 
 ```{r}
-endo.keep <- inPresentSet(rownames(var.tab2), endo.set)
-roast(var.tab2, index=endo.keep, design=design, coef=ncol(design)) 
-ecto.keep <- inPresentSet(rownames(var.tab2), ecto.set)
-roast(var.tab2, index=ecto.keep, design=design, coef=ncol(design)) 
-meso.keep <- inPresentSet(rownames(var.tab2), meso.set)
-roast(var.tab2, index=meso.keep, design=design, coef=ncol(design)) 
+endo.keep <- inPresentSet(rownames(bio.tab2), endo.set)
+roast(bio.tab2, index=endo.keep, design=design, coef=ncol(design)) 
+ecto.keep <- inPresentSet(rownames(bio.tab2), ecto.set)
+roast(bio.tab2, index=ecto.keep, design=design, coef=ncol(design)) 
+meso.keep <- inPresentSet(rownames(bio.tab2), meso.set)
+roast(bio.tab2, index=meso.keep, design=design, coef=ncol(design)) 
+```
+
+## Characterizing the function of the DVGs
+
+We have a look at the genes that are more variable in primed cells.
+
+```{r}
+entreznames <- as.character(rowData(sce)$entrezgene)
+has.entrez <- !is.na(entreznames)
+all.tested <- rownames(all.dvg)
+in.universe <- entreznames[rowData(sce)$ensembl_gene_id %in% all.tested & has.entrez]
+
+dvg.in.primed <- rownames(all.dvg)[all.dvg$adj.P.Val <= 0.05 & all.dvg$logFC > 0]
+in.primed <- entreznames[rowData(sce)$ensembl_gene_id %in% dvg.in.primed & has.entrez]
+
+go <- goana(in.primed, universe=in.universe, species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_dvg_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+
+kegg <- kegga(in.primed, universe=in.universe, species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_dvg_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+Repeating the dose for DVGs that go in the other direction.
+
+```{r}
+dvg.in.naive <- rownames(all.dvg)[all.dvg$adj.P.Val <= 0.05 & all.dvg$logFC < 0]
+in.naive <- entreznames[rowData(sce)$ensembl_gene_id %in% dvg.in.naive & has.entrez]
+
+go <- goana(in.naive, universe=in.universe, species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_dvg_naive.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+
+kegg <- kegga(in.naive, universe=in.universe, species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_dvg_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
 ```
 
 # Wrapping up
