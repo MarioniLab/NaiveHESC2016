@@ -428,88 +428,91 @@ write.table(file=file.path(resdir, "kegg_dvg_naive.tsv"), topkegg, sep="\t", quo
 head(topkegg)
 ```
 
-### Chosen marker sets
+# Assessing correlations between genes
 
-Checking for increased variability and correlations within each gene set.
+Checking for coorrelations between Ferdinand's hand-curated markers and various epigenetic modifiers/readers of interest.
+First we load in the data.
 
 ```{r}
 chosen_markers <- read.table("miscellaneous/ferd_marker_set.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
-chosen_markers <- chosen_markers[chosen_markers[,1] %in% rownames(sce),]
-#chosen_markers[,1] <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=chosen_markers[,1], column="ENSEMBL")
+head(chosen_markers)
+chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, chosen_markers[,1])
+length(chosen_markers)
 
-endo.set <- chosen_markers$V1[grep("endoderm", chosen_markers$V2)]
-endo <- inPresentSet(rownames(var.tab2), endo.set)
-roast(var.tab2, index=endo, design=design, coef=ncol(design))
-endo.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = endo.set)
-endo.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = endo.set)
-
-ecto.set <- chosen_markers$V1[grep("ectoderm", chosen_markers$V2)]
-ecto <- inPresentSet(rownames(var.tab2), ecto.set)
-roast(var.tab2, index=ecto, design=design, coef=ncol(design)) 
-ecto.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = ecto.set)
-ecto.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = ecto.set)
-
-meso.set <- chosen_markers$V1[grep("mesoderm", chosen_markers$V2)]
-meso <- inPresentSet(rownames(var.tab2), meso.set)
-roast(var.tab2, index=meso, design=design, coef=ncol(design)) 
-meso.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = meso.set)
-meso.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = meso.set)
-
-trop.set <- chosen_markers$V1[grep("trophectoderm", chosen_markers$V2)]
-trop <- inPresentSet(rownames(var.tab2), trop.set)
-roast(var.tab2, index=trop, design=design, coef=ncol(design)) 
-trop.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = trop.set)
-trop.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = trop.set)
-
-core.set <- chosen_markers$V1[grep("core_pluripotency", chosen_markers$V2)]
-core <- inPresentSet(rownames(var.tab2), core.set)
-roast(var.tab2, index=core, design=design, coef=ncol(design)) 
-core.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = core.set)
-core.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = core.set)
-
-naive.set <- chosen_markers$V1[grep("naive_pluripotency", chosen_markers$V2)]
-naive <- inPresentSet(rownames(var.tab2), naive.set)
-roast(var.tab2, index=naive, design=design, coef=ncol(design)) 
-naive.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = naive.set)
-naive.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = naive.set)
-
-form.set <- chosen_markers$V1[grep("formative_pluripotency", chosen_markers$V2)]
-form <- inPresentSet(rownames(var.tab2), form.set)
-roast(var.tab2, index=form, design=design, coef=ncol(design)) 
-form.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = form.set)
-form.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = form.set)
-
-primed.set <- chosen_markers$V1[grep("primed_pluripotency", chosen_markers$V2)]
-primed <- inPresentSet(rownames(var.tab2), primed.set)
-roast(var.tab2, index=primed, design=design, coef=ncol(design)) 
-primed.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = primed.set)
-primed.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = primed.set)
-
-germ.set <- chosen_markers$V1[grep("germline", chosen_markers$V2)]
-germ <- inPresentSet(rownames(var.tab2), germ.set)
-roast(var.tab2, index=germ, design=design, coef=ncol(design)) 
-germ.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = germ.set)
-germ.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = germ.set)
-
-```
-
-
-### Epigenetic markers
-
-```{r}
 epi_modifier <- read.table("miscellaneous/epigen_modifiers.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
-epi_modifier <- epi_modifier[epi_modifier[,1] %in% rownames(sce),]
-mod.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = epi_modifier)
-mod.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = epi_modifier)
-#epi_modifier <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=epi_modifier, column="ENSEMBL")
+head(epi_modifier)
+epi_modifier <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_modifier[,1])
+length(epi_modifier)
 
 epi_reader <- read.table("miscellaneous/epigen_readers.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
-epi_reader <- epi_reader[epi_reader[,1] %in% rownames(sce),]
-read.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = epi_reader)
-read.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = epi_reader)
-#epi_reader <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=epi_reader, column="ENSEMBL")
+head(epi_reader)
+epi_reader <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_reader[,1])
+length(epi_reader)
 ```
 
+Now checking for correlations between the markers and epigenetic modifiers.
+We block on the batch of origin and we also compute a null distribution to avoid redundant work.
+
+```{r}
+set.seed(10000)
+design <- model.matrix(~sce_primed$batch)
+null.dist <- correlateNull(iters=1e6, design=design)
+vs.mod <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
+    pairings=list(chosen_markers, epi_modifier))
+head(vs.mod)
+```
+
+We save the results, and have a look at the number of pairs at a FDR of 5%.
+We also check that there aren't pairs that fail to obtain significance due to the number of iterations in `correlateNull`.
+
+```{r}
+gzout <- gzfile(file.path(resdir, "corr_marker_modifier.tsv.gz"), open="wb")
+write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+table(Sig=vs.mod$FDR<=0.05, Limited=vs.mod$limited)
+```
+
+We can visualize a few of them to check that the results are sensible.
+We colour by total features to check whether there is some bias with respect to the total number of expressed features.
+
+```{r}
+collected <- list()
+for (i in 1:4) {
+    collected[[i]] <- plotExpression(sce_primed, x=vs.mod$gene1[i], 
+        features=vs.mod$gene2[i], exprs_values="norm_exprs",
+        colour_by="total_features")
+}
+do.call(multiplot, c(collected, cols=2))
+```
+
+We repeat this process to check for correlations between markers and epigenetic readers.
+
+```{r}
+vs.read <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
+    pairings=list(chosen_markers, epi_reader))
+head(vs.read)
+```
+
+We save the results, and have a look at the number of pairs at a FDR of 5%.
+
+```{r}
+gzout <- gzfile(file.path(resdir, "corr_marker_reader.tsv.gz"), open="wb")
+write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+table(Sig=vs.read$FDR<=0.05, Limited=vs.read$limited)
+```
+
+Again, we visualize a few of them to check that the results are sensible.
+
+```{r}
+collected <- list()
+for (i in 1:4) {
+    collected[[i]] <- plotExpression(sce_primed, x=vs.read$gene1[i], 
+        features=vs.read$gene2[i], exprs_values="norm_exprs",
+        colour_by="total_features")
+}
+do.call(multiplot, c(collected, cols=2))
+```
 
 # Wrapping up
 
