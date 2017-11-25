@@ -319,6 +319,8 @@ plotExpression(sce, features=rownames(all.dvg)[1:4], x="sample", colour_by="phen
 
 ## Examining specific gene sets
 
+### Germ layers
+
 We throw ROAST at the gene set used to characterize each germ layer (curated by Ferdinand).
 
 ```{r}
@@ -350,6 +352,89 @@ roast(var.tab2, index=ecto.keep, design=design, coef=ncol(design))
 meso.keep <- inPresentSet(rownames(var.tab2), meso.set)
 roast(var.tab2, index=meso.keep, design=design, coef=ncol(design)) 
 ```
+
+### Chosen marker sets
+
+Checking for increased variability and correlations within each gene set.
+
+```{r}
+chosen_markers <- read.table("miscellaneous/ferd_marker_set.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
+chosen_markers <- chosen_markers[chosen_markers[,1] %in% rownames(sce),]
+#chosen_markers[,1] <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=chosen_markers[,1], column="ENSEMBL")
+
+endo.set <- chosen_markers$V1[grep("endoderm", chosen_markers$V2)]
+endo <- inPresentSet(rownames(var.tab2), endo.set)
+roast(var.tab2, index=endo, design=design, coef=ncol(design))
+endo.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = endo.set)
+endo.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = endo.set)
+
+ecto.set <- chosen_markers$V1[grep("ectoderm", chosen_markers$V2)]
+ecto <- inPresentSet(rownames(var.tab2), ecto.set)
+roast(var.tab2, index=ecto, design=design, coef=ncol(design)) 
+ecto.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = ecto.set)
+ecto.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = ecto.set)
+
+meso.set <- chosen_markers$V1[grep("mesoderm", chosen_markers$V2)]
+meso <- inPresentSet(rownames(var.tab2), meso.set)
+roast(var.tab2, index=meso, design=design, coef=ncol(design)) 
+meso.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = meso.set)
+meso.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = meso.set)
+
+trop.set <- chosen_markers$V1[grep("trophectoderm", chosen_markers$V2)]
+trop <- inPresentSet(rownames(var.tab2), trop.set)
+roast(var.tab2, index=trop, design=design, coef=ncol(design)) 
+trop.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = trop.set)
+trop.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = trop.set)
+
+core.set <- chosen_markers$V1[grep("core_pluripotency", chosen_markers$V2)]
+core <- inPresentSet(rownames(var.tab2), core.set)
+roast(var.tab2, index=core, design=design, coef=ncol(design)) 
+core.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = core.set)
+core.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = core.set)
+
+naive.set <- chosen_markers$V1[grep("naive_pluripotency", chosen_markers$V2)]
+naive <- inPresentSet(rownames(var.tab2), naive.set)
+roast(var.tab2, index=naive, design=design, coef=ncol(design)) 
+naive.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = naive.set)
+naive.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = naive.set)
+
+form.set <- chosen_markers$V1[grep("formative_pluripotency", chosen_markers$V2)]
+form <- inPresentSet(rownames(var.tab2), form.set)
+roast(var.tab2, index=form, design=design, coef=ncol(design)) 
+form.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = form.set)
+form.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = form.set)
+
+primed.set <- chosen_markers$V1[grep("primed_pluripotency", chosen_markers$V2)]
+primed <- inPresentSet(rownames(var.tab2), primed.set)
+roast(var.tab2, index=primed, design=design, coef=ncol(design)) 
+primed.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = primed.set)
+primed.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = primed.set)
+
+germ.set <- chosen_markers$V1[grep("germline", chosen_markers$V2)]
+germ <- inPresentSet(rownames(var.tab2), germ.set)
+roast(var.tab2, index=germ, design=design, coef=ncol(design)) 
+germ.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = germ.set)
+germ.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = germ.set)
+
+```
+
+
+### Epigenetic markers
+
+```{r}
+epi_modifier <- read.table("miscellaneous/epigen_modifiers.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
+epi_modifier <- epi_modifier[epi_modifier[,1] %in% rownames(sce),]
+mod.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = epi_modifier)
+mod.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = epi_modifier)
+#epi_modifier <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=epi_modifier, column="ENSEMBL")
+
+epi_reader <- read.table("miscellaneous/epigen_readers.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
+epi_reader <- epi_reader[epi_reader[,1] %in% rownames(sce),]
+read.pairs1 <- correlatePairs(sce_primed[,sce_primed$batch ==1], subset.row = epi_reader)
+read.pairs2 <- correlatePairs(sce_primed[,sce_primed$batch ==2], subset.row = epi_reader)
+#epi_reader <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=epi_reader, column="ENSEMBL")
+```
+
 
 # Wrapping up
 
