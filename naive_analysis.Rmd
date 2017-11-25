@@ -362,7 +362,7 @@ First, gene ontology terms:
 ```{r naivego}
 unique.genes <- rownames(unique.marker)[1:200]
 is.unique <- rownames(sce) %in% unique.genes
-entreznames <- as.vector(rowData(sce)$entrezgene)
+entreznames <- as.character(rowData(sce)$entrezgene)
 has.entrez <- !is.na(entreznames)
 go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
 topgo <- topGO(go, n=Inf, ontology = "BP") 
