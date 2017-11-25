@@ -434,17 +434,17 @@ Checking for coorrelations between Ferdinand's hand-curated markers and various 
 First we load in the data.
 
 ```{r}
-chosen_markers <- read.table("miscellaneous/ferd_marker_set.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
+chosen_markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE)
 head(chosen_markers)
 chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, chosen_markers[,1])
 length(chosen_markers)
 
-epi_modifier <- read.table("miscellaneous/epigen_modifiers.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
+epi_modifier <- read.csv("miscellaneous/epigen_modifiers.csv", stringsAsFactors = FALSE)
 head(epi_modifier)
 epi_modifier <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_modifier[,1])
 length(epi_modifier)
 
-epi_reader <- read.table("miscellaneous/epigen_readers.csv", header=TRUE, sep=';', stringsAsFactors = FALSE)
+epi_reader <- read.csv("miscellaneous/epigen_readers.csv", stringsAsFactors = FALSE)
 head(epi_reader)
 epi_reader <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_reader[,1])
 length(epi_reader)
