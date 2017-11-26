@@ -1,0 +1,224 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: differential variability" 
+author: Tobias Messmer and Aaron Lun
+date: 13 November 2017
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-dvg/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-dvg/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+```
+
+# Setting up the data
+
+We load in the counts for each cell.
+We identify the transition cells in the naive population to prune them out.
+This ensures that we're estimating the dispersion for reasonably homogeneous populations.
+
+```{r}
+library(scran)
+sce <- readRDS("sce_all.rds")
+true.groups <- read.table("results-naive/groups.tsv", header=TRUE, stringsAsFactors=FALSE)
+sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
+```
+
+We need to recalculate the average counts for the remaining cells.
+(This also accounts for size factors for each class of features that wasn't considered in the existing `AveCounts`.)
+
+```{r}
+library(scater)
+rowData(sce)$AveCount <- calcAverage(sce)
+summary(rowData(sce)$AveCount)
+```
+
+We also set up an output directory.
+
+```{r}
+resdir <- "results-dvg"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Estimating the dispersions
+
+We estimate the dispersion for each sample.
+This gives us biological components after we take the residual from the technical trend.
+
+```{r, fig.height=10, fig.width=10}
+source("testing/varfun.R")
+bio.mat <- weight.mat <- matrix(0, nrow(sce), nlevels(sce$sample))
+colnames(bio.mat) <- colnames(weight.mat) <- levels(sce$sample)
+
+par(mfrow=c(2,2))
+for (s in levels(sce$sample)) {
+    chosen <- sce$sample==s 
+    design <- matrix(1, sum(chosen), 1)
+    current <- getBioDisp(counts(sce)[,chosen,drop=FALSE], design, 
+        is.spike=isSpike(sce, "ERCC"), sf.cell=sizeFactors(sce)[chosen],
+        sf.spike=sizeFactors(sce, "ERCC")[chosen], plot=TRUE, niters=0)
+    bio.mat[,s] <- current$bio
+    weight.mat[,s] <- nrow(design) - ncol(design)
+}
+```
+
+We set this up as a `EList` with weight components.
+We use the Ensembl Gene IDs for naming to make it  easier later on to match to pre-defined gene sets.
+
+```{r}
+vals <- new("EList", list(E=bio.mat, weights=weight.mat))
+rownames(vals) <- rowData(sce)$ensembl_gene_id
+```
+
+We filter out genes with negative average components or low abundances.
+
+```{r}
+keep <- rowMeans(bio.mat) > 0 & rowData(sce)$AveCount > 5
+vals <- vals[keep,]
+summary(keep)
+``` 
+
+We have a preview of the component matrix.
+
+```{r}
+head(bio.mat)
+```
+
+# Testing for differential variability
+
+We set up a design matrix with an additive model.
+
+```{r}
+condition <- rep(c("naive", "primed"), 2)
+batch <- factor(c(1,1,2,2))
+design <- model.matrix(~batch + condition)
+design
+```
+
+We apply _limma_ to fit a linear model to the biological components.
+We see some evidence for a trend at low-abundances so we set `trend=TRUE`. 
+This requires some hacking to replace the mean components with the actual abundances.
+
+```{r, fig.width=12, fig.height=6}
+fit <- lmFit(vals, design)
+fit$genes <- data.frame(Symbol=rowData(sce)$external_gene_name[keep])
+fit$Amean <- log2(rowData(sce)$AveCount[keep])
+fit <- eBayes(fit, robust=TRUE, trend=TRUE)
+summary(fit$df.prior)
+par(mfrow=c(1,2))
+plotSA(fit)
+plotSA(fit, log="x")
+```
+
+We proceed to have a look at the differentially variable genes at a FDR of 5%.
+
+```{r}
+summary(decideTests(fit))
+all.dvg <- topTable(fit, coef=ncol(design), n=Inf, sort.by="p")
+gzout <- gzfile(file.path(resdir, "dvg.tsv.gz"), open="wb")
+write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+head(all.dvg)
+```
+
+We can examine the top hits in more detail.
+Changes in variability between conditions are mostly driven by differential expression, as one might expect.
+
+```{r}
+matching <- rownames(sce)[rowData(sce)$ensembl_gene_id %in% rownames(all.dvg)[1:4]]
+plotExpression(sce, features=matching, x="sample", colour_by="phenotype")
+```
+
+## Examining specific gene sets
+
+### Germ layers
+
+We throw ROAST at the gene set used to characterize each germ layer (curated by Ferdinand).
+
+```{r}
+by.lineage <- read.table("miscellaneous/commit_lineages.tsv", header=TRUE, stringsAsFactors=FALSE)
+endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
+head(endo.set)
+ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
+head(ecto.set)
+meso.set <- by.lineage$Symbol[grep("mesoderm", by.lineage$Germ_layer)]
+head(meso.set)
+```
+
+Setting up a function to identify the surviving genes.
+
+```{r}
+library(org.Hs.eg.db)
+inPresentSet <- function(present, desired) {
+    ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=desired, column="ENSEMBL")
+    which(present %in% ensembls)    
+}
+```
+
+Checking whether there's evidence for an increase in variability in the primed condition (`Up`) in the gene sets defining each germ layer.
+
+```{r}
+endo.keep <- inPresentSet(rownames(vals), endo.set)
+roast(vals, index=endo.keep, design=design, coef=ncol(design)) 
+ecto.keep <- inPresentSet(rownames(vals), ecto.set)
+roast(vals, index=ecto.keep, design=design, coef=ncol(design)) 
+meso.keep <- inPresentSet(rownames(vals), meso.set)
+roast(vals, index=meso.keep, design=design, coef=ncol(design)) 
+```
+
+### Characterizing the function of the DVGs
+
+We have a look at the genes that are more variable in primed cells.
+
+```{r}
+entreznames <- as.character(rowData(sce)$entrezgene)
+has.entrez <- !is.na(entreznames)
+all.tested <- rownames(all.dvg)
+in.universe <- entreznames[rowData(sce)$ensembl_gene_id %in% all.tested & has.entrez]
+
+dvg.in.primed <- rownames(all.dvg)[all.dvg$adj.P.Val <= 0.05 & all.dvg$logFC > 0]
+in.primed <- entreznames[rowData(sce)$ensembl_gene_id %in% dvg.in.primed & has.entrez]
+
+go <- goana(in.primed, universe=in.universe, species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_dvg_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+
+kegg <- kegga(in.primed, universe=in.universe, species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_dvg_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+Repeating the dose for DVGs that go in the other direction.
+
+```{r}
+dvg.in.naive <- rownames(all.dvg)[all.dvg$adj.P.Val <= 0.05 & all.dvg$logFC < 0]
+in.naive <- entreznames[rowData(sce)$ensembl_gene_id %in% dvg.in.naive & has.entrez]
+
+go <- goana(in.naive, universe=in.universe, species="Hs")
+topgo <- topGO(go, n=Inf, ontology = "BP") 
+write.table(file=file.path(resdir, "go_dvg_naive.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
+head(topgo)
+
+kegg <- kegga(in.naive, universe=in.universe, species="Hs")
+topkegg <- topKEGG(kegg, n=Inf)
+write.table(file=file.path(resdir, "kegg_dvg_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
+head(topkegg)
+```
+
+# Wrapping up
+
+```{r}
+sessionInfo()
+```

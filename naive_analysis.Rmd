@@ -77,11 +77,6 @@ for (b in levels(sce_naive$batch)) {
     collected.var_naive[[b]] <- var.out 
     collected.npcs_naive[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
     
-    # Saving as a Gzipped file for compression.
-    gzout <- gzfile(file.path(resdir, sprintf("var_%s.tsv.gz", b)), open="wb")
-    write.table(file=gzout, var.out, sep="\t", quote=FALSE, col.names=NA)
-    close(gzout)
-
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
         ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
     points(var.fit$mean, var.fit$var, pch=16, col="red")
