@@ -25,6 +25,20 @@ GENERATE_COUNTS <- function(ncells=200, disp.mult=1, mean.mult=1, scale=1) {
 source("varfun.R")
 library(limma)
 
+VARFUN <- function(counts, is.spike, plot=FALSE) {
+    bio.mat <- mean.mat <- weight.mat <- matrix(0, sum(!is.spike), length(counts))
+    for (x in seq_along(counts)) { 
+        current <- counts[[x]]
+        design <- matrix(1, ncol(current), 1)
+        output <- getBioDisp(current, is.spike=is.spike, design=design, plot=plot, BPPARAM=MulticoreParam(3), niters=0)
+
+        bio.mat[,x] <- output$bio[!is.spike]
+        mean.mat[,x] <- output$mean[!is.spike]
+        weight.mat[,x] <- ncol(current) - 1L # residual d.f.
+    }
+    return(list(bio=bio.mat, mean=mean.mat, weights=weight.mat))
+}
+
 TESTFUN <- function(bio.mat, mean.mat, weight.mat, design, coef=ncol(design)) {
     keep <- rowSums(is.na(bio.mat))==0L
     fit <- lmFit(bio.mat[keep,], design=design, weights=weight.mat[keep,])
