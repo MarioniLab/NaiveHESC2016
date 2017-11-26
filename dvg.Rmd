@@ -21,26 +21,19 @@ library(BiocParallel)
 register(SerialParam())
 ```
 
-# Setting up the data
+# Overview
 
-We load in the counts for each cell.
+The idea here is to test for whether there are any changes in variability between the naive and primed populations.
+This will allow us to determine if the primed population is getting noisier, e.g., in preparation for differentiation into the three germ layers.
+First, we load in the counts for each cell.
 We identify the transition cells in the naive population to prune them out.
-This ensures that we're estimating the dispersion for reasonably homogeneous populations.
+This ensures that we're estimating the dispersion for homogeneous populations.
 
 ```{r}
 library(scran)
 sce <- readRDS("sce_all.rds")
 true.groups <- read.table("results-naive/groups.tsv", header=TRUE, stringsAsFactors=FALSE)
 sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
-```
-
-We need to recalculate the average counts for the remaining cells.
-(This also accounts for size factors for each class of features that wasn't considered in the existing `AveCounts`.)
-
-```{r}
-library(scater)
-rowData(sce)$AveCount <- calcAverage(sce)
-summary(rowData(sce)$AveCount)
 ```
 
 We also set up an output directory.
@@ -50,10 +43,13 @@ resdir <- "results-dvg"
 dir.create(resdir, showWarning=FALSE)
 ```
 
-# Estimating the dispersions
+# Using the NB dispersions
 
-We estimate the dispersion for each sample.
-This gives us biological components after we take the residual from the technical trend.
+## Estimating the dispersions
+
+We can use the NB dispersion as a measure of the variability of expression for each gene in each sample.
+We use _edgeR_ to estimate the dispersion for each sample.
+This gives us biological components after we take the residual from the technical trend (fitted based on spike-in counts).
 
 ```{r, fig.height=10, fig.width=10}
 source("testing/varfun.R")
@@ -76,6 +72,7 @@ We set this up as a `EList` with weight components.
 We use the Ensembl Gene IDs for naming to make it  easier later on to match to pre-defined gene sets.
 
 ```{r}
+library(limma)
 vals <- new("EList", list(E=bio.mat, weights=weight.mat))
 rownames(vals) <- rowData(sce)$ensembl_gene_id
 ```
@@ -83,7 +80,9 @@ rownames(vals) <- rowData(sce)$ensembl_gene_id
 We filter out genes with negative average components or low abundances.
 
 ```{r}
-keep <- rowMeans(bio.mat) > 0 & rowData(sce)$AveCount > 5
+library(scater)
+ab <- calcAverage(sce)
+keep <- rowMeans(bio.mat) > 0 & ab > 5
 vals <- vals[keep,]
 summary(keep)
 ``` 
@@ -94,7 +93,7 @@ We have a preview of the component matrix.
 head(bio.mat)
 ```
 
-# Testing for differential variability
+## Testing for differential variability
 
 We set up a design matrix with an additive model.
 
@@ -125,7 +124,7 @@ We proceed to have a look at the differentially variable genes at a FDR of 5%.
 ```{r}
 summary(decideTests(fit))
 all.dvg <- topTable(fit, coef=ncol(design), n=Inf, sort.by="p")
-gzout <- gzfile(file.path(resdir, "dvg.tsv.gz"), open="wb")
+gzout <- gzfile(file.path(resdir, "dvg_nbdisp.tsv.gz"), open="wb")
 write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, col.names=NA)
 close(gzout)
 head(all.dvg)
@@ -139,9 +138,7 @@ matching <- rownames(sce)[rowData(sce)$ensembl_gene_id %in% rownames(all.dvg)[1:
 plotExpression(sce, features=matching, x="sample", colour_by="phenotype")
 ```
 
-## Examining specific gene sets
-
-### Germ layers
+## Examining DV in germ layer markers
 
 We throw ROAST at the gene set used to characterize each germ layer (curated by Ferdinand).
 
@@ -176,7 +173,122 @@ meso.keep <- inPresentSet(rownames(vals), meso.set)
 roast(vals, index=meso.keep, design=design, coef=ncol(design)) 
 ```
 
-### Characterizing the function of the DVGs
+```{r, echo=FALSE, results="hide"}
+gc()
+```
+
+# Using the variance of log-expression
+
+## Estimating the biological components
+
+We cycle through each sample, fit a curve and extract the biological components as well as the mean expression for each gene.
+Calculating the variance of the log-expression values has the advantage in that it does not need to be interpreted with respect to the mean.
+In contrast, the dispersion only makes sense as a measure of variance when considered with the mean.
+
+```{r}
+collected.bio <- collected.tech <- collected.mean <- collected.weight <- list()
+for (s in levels(sce$sample)) {
+    cur.sce <- sce[,s==sce$sample]
+    cur.sce <- normalize(cur.sce)
+
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit)
+    collected.bio[[s]] <- var.out$bio
+    collected.mean[[s]] <- var.out$mean
+    collected.tech[[s]] <- var.out$tech
+    collected.weight[[s]] <- rep(nrow(var.fit$design) - ncol(var.fit$design), nrow(var.out))
+}
+bio.mat <- do.call(cbind, collected.bio)
+mean.mat <- do.call(cbind, collected.mean)
+weight.mat <- do.call(cbind, collected.weight)
+vals <- new("EList", list(E=bio.mat, weights=weight.mat))
+rownames(vals) <- rowData(sce)$ensembl_gene_id
+vals
+```
+
+We filter out genes that have negative average biological components or low abundances.
+
+```{r}
+weighted.ab <- rowSums(mean.mat * weight.mat)/rowSums(weight.mat)
+weighted.bio <- rowSums(bio.mat * weight.mat)/rowSums(weight.mat)
+keep <- weighted.ab > 1 & weighted.bio > 0
+vals <- vals[keep,]
+summary(keep)
+```
+
+## Diagnostic plots
+
+We've assumed that subtraction of the trend was sufficient to account for technical noise.
+This is not entirely true as elevated technical noise can also result in scaling of the variance estimates.
+Inflation of the estimates of the biological components between samples would subsequently result in spurious DV.
+Here, there are clearly differences in the trends between samples, which could lead to scaling effects.
+
+```{r}
+plot(collected.mean[[1]], collected.tech[[1]], col="lightblue", pch=16, 
+    ylim=c(0, 9), xlab="Mean", ylab="Technical variance")
+points(collected.mean[[2]], collected.tech[[2]], col="blue", pch=16)
+points(collected.mean[[3]], collected.tech[[3]], col="salmon", pch=16)
+points(collected.mean[[4]], collected.tech[[4]], col="red", pch=16)
+```
+
+To check this, we plot the biological components against each other for samples from the same batch.
+Any scaling should manifest as a clear diagonal line with a gradient that differs from unity.
+We don't observe this, which is fortunate.
+
+```{r, fig.width=12, fig.height=6}
+par(mfrow=c(1,2))
+smoothScatter(vals$E[,1], vals$E[,3], main="Batch 1", xlab="Bio (naive)", ylab="Bio (primed)")
+abline(a=0, b=1, col="red", lwd=0.5)
+smoothScatter(vals$E[,2], vals$E[,4], main="Batch 2", xlab="Bio (naive)", ylab="Bio (primed)")
+abline(a=0, b=1, col="red", lwd=0.5)
+```
+
+## Hypothesis testing for differential variability
+
+We re-use the design matrix from before, and we apply _limma_ to fit a linear model to the biological components.
+Again, some hacking is required to get the trend with respect to abundance.
+
+```{r, fig.width=12, fig.height=6}
+fit <- lmFit(vals, design)
+fit$genes <- data.frame(Symbol=rowData(sce)$external_gene_name[keep])
+fit$Amean <- weighted.ab[keep]
+fit <- eBayes(fit, robust=TRUE, trend=TRUE)
+summary(fit$df.prior)
+par(mfrow=c(1,2))
+plotSA(fit)
+plotSA(fit, log="x")
+```
+
+We look at the differentially variable genes at a FDR of 5%.
+
+```{r}
+summary(decideTests(fit))
+all.dvg <- topTable(fit, coef=ncol(design), n=Inf, sort.by="p")
+gzout <- gzfile(file.path(resdir, "dvg_logvar.tsv.gz"), open="wb")
+write.table(file=gzout, all.dvg, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+head(all.dvg)
+```
+
+And we can examine the top hits in more detail.
+
+```{r}
+matching <- rownames(sce)[rowData(sce)$ensembl_gene_id %in% rownames(all.dvg)[1:4]]
+plotExpression(sce, features=matching, x="sample", colour_by="phenotype")
+```
+
+## Examining specific gene sets
+
+We throw ROAST at the germ layer-specific gene sets.
+
+```{r}
+endo.keep <- inPresentSet(rownames(vals), endo.set)
+roast(vals, index=endo.keep, design=design, coef=ncol(design)) 
+ecto.keep <- inPresentSet(rownames(vals), ecto.set)
+roast(vals, index=ecto.keep, design=design, coef=ncol(design)) 
+meso.keep <- inPresentSet(rownames(vals), meso.set)
+roast(vals, index=meso.keep, design=design, coef=ncol(design)) 
+```
 
 We have a look at the genes that are more variable in primed cells.
 
