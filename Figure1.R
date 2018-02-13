@@ -51,9 +51,8 @@ text(x[m], y[m], labels = primed.genes, col=primed.col, pos=pos, offset=0.5)
 dev.off()
 
 # Figure S1b
-pdf(file=file.path(figdir, "s1b.pdf"), useDingbats=FALSE)
+pdf(file=file.path(figdir, "s1b.pdf"),width = 10, height = 10, useDingbats=FALSE)
 markers <- c("KLF17", "DNMT3L", "DPPA5", "DPPA3", "KLF4", "THY1", "DUSP6")
-par(las=1, mar = c(2.1, 4.5, 0.1, 0.5), mfrow=c(1,1))
 ugly.plot <- plotExpression(sce, features = markers, col = "phenotype")
 plot_data <- ggplot_build(ugly.plot)
 plot_data$data[[1]]$colour[plot_data$data[[1]]$colour == '#729ECE'] <- naive.col
@@ -64,3 +63,4 @@ plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = plot_data$data[[1]]$col
 axis(1, at=seq_along(markers), labels = levels(plot_data$plot$data$Feature), cex.axis = 1.5)
 legend("topright", legend=c("naive", "primed"), col=c(naive.col, primed.col, main.col), pch=16, cex=1.5, yjust=0, xjust=1)
 dev.off()
+
