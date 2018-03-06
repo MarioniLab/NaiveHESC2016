@@ -132,7 +132,7 @@ imprinted <- c("ENSG00000140443", # IGF1R
                "ENSG00000198300", # PEG3
                "ENSG00000214548") # MEG3
 
-heat.imprint.vals <- exprs(sce)[match(imprinted, fData(sce)$ensembl_gene_id),]
+heat.imprint.vals <- exprs(sce)[match(imprinted, rowData(sce)$ensembl_gene_id),]
 heat.imprint.vals <- heat.imprint.vals - rowMeans(heat.imprint.vals)
 
 pdf(file=file.path(figdir, "s2b.pdf"), width = 10, height = 5)
