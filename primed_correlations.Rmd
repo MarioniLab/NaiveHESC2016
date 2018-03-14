@@ -1,0 +1,218 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: primed-only correlations"
+author: Tobias Messmer and Aaron Lun
+date: 13 March 2018
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-primed/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-primed/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+```
+
+# Selecting only the primed subpopulations
+
+We select only the primed cells and attempt to identify subpopulations within the primed condition.
+This is more sensitive than doing so on the entire data set, where the naive/primed differences dominate.
+
+```{r primedin}
+library(scran)
+sce_primed <- readRDS("sce_primed.rds")
+dim(sce_primed)
+
+resdir <- "results-primed"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Assessing correlations between genes
+
+Checking for correlations between Ferdinand's hand-curated markers and various epigenetic modifiers/readers of interest.
+First we load in the data.
+
+```{r}
+library(org.Hs.eg.db)
+inPresentSet <- function(present, desired) {
+    ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=desired, column="ENSEMBL")
+    which(present %in% ensembls)    
+}
+
+markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE)
+head(markers)
+chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, markers[,1])
+length(chosen_markers)
+
+epi_modifier <- read.csv("miscellaneous/epigen_modifiers.csv", stringsAsFactors = FALSE)
+head(epi_modifier)
+epi_modifier <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_modifier[,1])
+length(epi_modifier)
+
+epi_reader <- read.csv("miscellaneous/epigen_readers.csv", stringsAsFactors = FALSE)
+head(epi_reader)
+epi_reader <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_reader[,1])
+length(epi_reader)
+```
+
+Now checking for correlations between the markers and epigenetic modifiers.
+We block on the batch of origin and we also compute a null distribution to avoid redundant work.
+
+```{r}
+set.seed(10000)
+design <- model.matrix(~sce_primed$batch)
+null.dist <- correlateNull(iters=1e6, design=design)
+vs.mod <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
+    pairings=list(chosen_markers, epi_modifier))
+head(vs.mod)
+```
+
+We save the results, and have a look at the number of pairs at a FDR of 5%.
+We also check that there aren't pairs that fail to obtain significance due to the number of iterations in `correlateNull`.
+
+```{r}
+gzout <- gzfile(file.path(resdir, "corr_marker_modifier.tsv.gz"), open="wb")
+write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+table(Sig=vs.mod$FDR<=0.05, Limited=vs.mod$limited)
+```
+
+We can visualize a few of them to check that the results are sensible.
+We colour by total features to check whether there is some bias with respect to the total number of expressed features.
+
+```{r}
+library(scater)
+collected <- list()
+for (i in 1:4) {
+    collected[[i]] <- plotExpression(sce_primed, x=vs.mod$gene1[i], 
+        features=vs.mod$gene2[i], exprs_values="norm_exprs",
+        colour_by="total_features")
+}
+do.call(multiplot, c(collected, cols=2))
+```
+
+We can check whether the genes that are most correlated are in a specific germline.
+```{r}
+a <- vs.mod$gene1[vs.mod$FDR<=0.05]
+b <- vs.mod$gene2[vs.mod$FDR<=0.05]
+table(c(markers[markers[,1] %in% c(a,b),2]))
+```
+
+We repeat this process to check for correlations between markers and epigenetic readers.
+
+```{r}
+vs.read <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
+    pairings=list(chosen_markers, epi_reader))
+head(vs.read)
+```
+
+We save the results, and have a look at the number of pairs at a FDR of 5%.
+
+```{r}
+gzout <- gzfile(file.path(resdir, "corr_marker_reader.tsv.gz"), open="wb")
+write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
+table(Sig=vs.read$FDR<=0.05, Limited=vs.read$limited)
+```
+
+Again, we visualize a few of them to check that the results are sensible.
+
+```{r}
+collected <- list()
+for (i in 1:4) {
+    collected[[i]] <- plotExpression(sce_primed, x=vs.read$gene1[i], 
+        features=vs.read$gene2[i], exprs_values="norm_exprs",
+        colour_by="total_features")
+}
+do.call(multiplot, c(collected, cols=2))
+```
+
+We can check whether the genes that are most correlated are in a specific germline.
+```{r}
+a <- vs.read$gene1[vs.read$FDR<=0.05]
+b <- vs.read$gene2[vs.read$FDR<=0.05]
+table(c(markers[markers[,1] %in% c(a,b),2]))
+```
+
+# Correlations between specific chosen markers and epigenetic modifiers
+
+First, we separate the markers into the specific type and assess the correlations of epigenetic modifiers to these markers, respectively. The correlation of for each subset of markers will be saved as a table and we store the statistics of the correlations in a separate object.
+
+
+```{r}
+ii <- 1
+primed_mod <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
+
+for (marker.type in unique(markers[,2])){
+  print(marker.type)
+  current.markers <- markers[markers[,2] == marker.type,]
+  chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
+  set.seed(10000)
+  design <- model.matrix(~sce_primed$batch)
+  null.dist <- correlateNull(iters=1e6, design=design)
+  vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
+    pairings=list(chosen_markers, epi_modifier))
+  print(head(vs.mod))
+  sig.count <- sum(vs.mod$FDR <= 0.05)
+
+  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
+  write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
+  close(gzout)
+  primed_mod[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
+  ii <- ii+1
+}
+```
+
+With this object, we can now have a look at the number of total correlations and significant correlations for each marker type:
+
+```{r}
+print(primed_mod)
+```
+
+Finally, we can do the same for epigeentic readers.
+
+```{r}
+ii <- 1
+primed_read <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
+
+for (marker.type in unique(markers[,2])){
+  print(marker.type)
+  current.markers <- markers[markers[,2] == marker.type,]
+  chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
+  set.seed(10000)
+  design <- model.matrix(~sce_primed$batch)
+  null.dist <- correlateNull(iters=1e6, design=design)
+  vs.read <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
+    pairings=list(chosen_markers, epi_reader))
+  print(head(vs.read))
+  sig.count <- sum(vs.read$FDR <= 0.05)
+
+  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_read.tsv.gz")), open="wb")
+  write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
+  close(gzout)
+  primed_read[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
+  ii <- ii+1
+}
+```
+
+This again will give us the number of significant and total correlations.
+
+```{r}
+print(primed_read)
+```
+
+# Wrapping up
+
+Reporting the session information.
+
+```{r}
+sessionInfo()
+```
