@@ -22,10 +22,10 @@ library(scater)
 sce_all <- readRDS("sce_all.rds")
 library(org.Hs.eg.db)
 cell.anno <- select(org.Hs.eg.db, keys="GO:0007049", keytype="GOALL", columns="ENTREZID")
-in.cell.cycle <- fData(sce_all)$entrezgene %in% cell.anno$ENTREZID
+in.cell.cycle <- rowData(sce_all)$entrezgene %in% cell.anno$ENTREZID
 
-var.naive <- read.table(file.path("results-naive", "var.tsv"), header=TRUE)
-var.primed <- read.table(file.path("results-primed", "var.tsv"), header=TRUE)
+var.naive <- read.table(file.path("results-naive", "var_all.tsv"), header=TRUE)
+var.primed <- read.table(file.path("results-primed", "var_all.tsv"), header=TRUE)
 
 cycle.naive <- var.naive[in.cell.cycle & rownames(var.naive) %in% rownames(hvg.naive),]
 cycle.primed <- var.primed[in.cell.cycle & rownames(var.primed) %in% rownames(hvg.primed),]
@@ -74,7 +74,7 @@ dev.off()
 # Figure 3C
 
 splice.anno <- select(org.Hs.eg.db, keys="03040", keytype="PATH", columns="ENTREZID")
-in.splice <- fData(sce_all)$entrezgene %in% splice.anno$ENTREZID
+in.splice <- rowData(sce_all)$entrezgene %in% splice.anno$ENTREZID
 splice.naive <- var.naive[in.splice & rownames(var.naive) %in% rownames(hvg.naive),]
 splice.primed <- var.primed[in.splice & rownames(var.primed) %in% rownames(hvg.primed),]
 
@@ -115,7 +115,7 @@ primed.genenum <- sum(var.primed$mean > 0)
 pdf(file=file.path(figdir, "s3a.pdf"), width=8, height=5)
 par(mar=c(5.1, 5.1, 4.1, 1.1), mfrow=c(1,3))
 gcounts <- c(Primed=primed.genenum, Naive=naive.genenum)
-out <- barplot(gcounts/1e3, col = c(primed.col, naive.col), ylim=c(0, 16), width=0.5,
+out <- barplot(gcounts/1e3, col = c(primed.col, naive.col), ylim=c(0, 42), width=0.5,
         ylab=expression("Number of expressed genes ("*10^3*")"), cex.axis=1.2, cex.names=1.4, cex.lab=1.4)
 text(out, gcounts/1e3, gcounts, pos=3, cex=1.2)
 
