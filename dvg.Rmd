@@ -52,7 +52,7 @@ We use _edgeR_ to estimate the dispersion for each sample.
 This gives us biological components after we take the residual from the technical trend (fitted based on spike-in counts).
 
 ```{r, fig.height=10, fig.width=10}
-source("testing/varfun.R")
+source("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/testing/varfun.R")
 bio.mat <- weight.mat <- matrix(0, nrow(sce), nlevels(sce$sample))
 colnames(bio.mat) <- colnames(weight.mat) <- levels(sce$sample)
 
@@ -327,6 +327,100 @@ kegg <- kegga(in.naive, universe=in.universe, species="Hs")
 topkegg <- topKEGG(kegg, n=Inf)
 write.table(file=file.path(resdir, "kegg_dvg_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
 head(topkegg)
+```
+
+# Differential expression of specific markers
+
+The idea of this section is to assess whether DE genes between the naive and primed subpopulation include markers for specific germ layers.
+For this, we import the DE genes and the marker lists.
+
+```{r}
+DEgenes <- read.table(file=file.path('results-overall','de.tsv'))
+
+markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE)
+chosen_markers <- inPresentSet(rowData(sce)$ensembl_gene_id, markers[,1])
+
+#germlayers
+endo_markers <- inPresentSet(rowData(sce)$ensembl_gene_id, endo.set)
+ecto_markers <- inPresentSet(rowData(sce)$ensembl_gene_id, ecto.set)
+meso_markers <- inPresentSet(rowData(sce)$ensembl_gene_id, meso.set)
+```
+
+First we focus on the genes that are differentially expressed between naive and primed. We check whether they are in the list of DE genes and if yes, whether they are signifcantly different.
+
+@Aaron&Ferdinand:
+Could we test for cell cycle related genes here as well? 
+
+```{r}
+print('endoderm')
+length(endo_markers)
+sum(rownames(DEgenes) %in% rownames(sce)[endo_markers])
+DE_endo <- DEgenes[which(rownames(DEgenes) %in% rownames(sce)[endo_markers]),]
+primed_up_endo <- DE_endo[DE_endo$FDR <= 0.05 & DE_endo$logFC > 1,]
+primed_down_endo <- DE_endo[DE_endo$FDR <= 0.05 & DE_endo$logFC < 1,]
+data.frame(primed_up = dim(primed_up_endo)[1], primed_down = dim(primed_down_endo)[1], not_significant = sum(DE_endo$FDR > 0.05), row.names = 'gene count')
+
+print('ectoderm')
+length(ecto_markers)
+sum(rownames(DEgenes) %in% rownames(sce)[ecto_markers])
+DE_ecto <- DEgenes[which(rownames(DEgenes) %in% rownames(sce)[ecto_markers]),]
+primed_up_ecto <- DE_ecto[DE_ecto$FDR <= 0.05 & DE_ecto$logFC > 1,]
+primed_down_ecto <- DE_ecto[DE_ecto$FDR <= 0.05 & DE_ecto$logFC < 1,]
+data.frame(primed_up = dim(primed_up_ecto)[1], primed_down = dim(primed_down_ecto)[1], not_significant = sum(DE_ecto$FDR > 0.05), row.names = 'gene count')
+
+print('mesoderm')
+length(meso_markers)
+sum(rownames(DEgenes) %in% rownames(sce)[meso_markers])
+DE_meso <- DEgenes[which(rownames(DEgenes) %in% rownames(sce)[meso_markers]),]
+primed_up_meso <- DE_meso[DE_meso$FDR <= 0.05 & DE_meso$logFC > 1,]
+primed_down_meso <- DE_endo[DE_meso$FDR <= 0.05 & DE_meso$logFC < 1,]
+data.frame(primed_up = dim(primed_up_meso)[1], primed_down = dim(primed_down_meso)[1], not_significant = sum(DE_meso$FDR > 0.05) , row.names = 'gene count')
+```
+
+
+We can do the same for the naive and primed subset, respectively by using the highly variable genes in each subpopulation.
+
+```{r}
+#naive 
+naive.hvg <- read.table(file=file.path('results-naive','hvg.tsv'), header=TRUE, stringsAsFactors=FALSE)
+
+print('naive hvg vs endoderm')
+length(endo_markers)
+sum(rownames(naive.hvg) %in% rownames(sce)[endo_markers])
+naive.hvg_endo <- naive.hvg[which(rownames(naive.hvg) %in% rownames(sce)[endo_markers]),]
+
+
+print('naive hvg vs ectoderm')
+length(ecto_markers)
+sum(rownames(naive.hvg) %in% rownames(sce)[ecto_markers])
+naive.hvg_ecto <- naive.hvg[which(rownames(naive.hvg) %in% rownames(sce)[ecto_markers]),]
+
+
+print('naive hvg vs mesoderm')
+length(meso_markers)
+sum(rownames(naive.hvg) %in% rownames(sce)[meso_markers])
+naive.hvg_meso <- naive.hvg[which(rownames(naive.hvg) %in% rownames(sce)[meso_markers]),]
+
+
+#primed
+primed.hvg <- read.table(file=file.path('results-primed','hvg.tsv'), header=TRUE, stringsAsFactors=FALSE)
+
+print('primed hvg vs endoderm')
+length(endo_markers)
+sum(rownames(primed.hvg) %in% rownames(sce)[endo_markers])
+primed.hvg_endo <- primed.hvg[which(rownames(primed.hvg) %in% rownames(sce)[endo_markers]),]
+
+
+print('primed hvg vs ectoderm')
+length(ecto_markers)
+sum(rownames(primed.hvg) %in% rownames(sce)[ecto_markers])
+primed.hvg_ecto <- primed.hvg[which(rownames(primed.hvg) %in% rownames(sce)[ecto_markers]),]
+
+
+print('primed hvg vs mesoderm')
+length(meso_markers)
+sum(rownames(naive.hvg) %in% rownames(sce)[meso_markers])
+primed.hvg_meso <- primed.hvg[which(rownames(naive.hvg) %in% rownames(sce)[meso_markers]),]
 ```
 
 # Wrapping up
