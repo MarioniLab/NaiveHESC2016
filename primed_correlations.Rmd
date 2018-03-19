@@ -47,21 +47,76 @@ inPresentSet <- function(present, desired) {
     which(present %in% ensembls)    
 }
 
-markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE)
+markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
 head(markers)
 chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, markers[,1])
 length(chosen_markers)
 
-epi_modifier <- read.csv("miscellaneous/epigen_modifiers.csv", stringsAsFactors = FALSE)
+epi_modifier <- read.csv("miscellaneous/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_modifier)
 epi_modifier <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_modifier[,1])
 length(epi_modifier)
 
-epi_reader <- read.csv("miscellaneous/epigen_readers.csv", stringsAsFactors = FALSE)
+epi_reader <- read.csv("miscellaneous/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_reader)
 epi_reader <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, epi_reader[,1])
 length(epi_reader)
 ```
+
+## Checking the structure of the subpopulation
+
+First, we perform PCA of the naive subpopulation using all genes to exclude that there are subclusters of cells.
+
+```{r primed.pca.corr}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
+
+plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1") + fontsize
+plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by='CDK1',
+    perplexity=5, rand_seed=100) + fontsize
+```
+
+Then we repeat the same using only the subset of chosen genes of interest. 
+
+```{r primed.pca.single.corr, fig.width=20, fig.height=12}
+for (marker.type in unique(markers[,2])){
+  marker.set <- which(rownames(sce_primed) %in% markers[markers[,2]==marker.type,1])
+  name.pca <- paste("pca_", marker.type, sep = "")
+  assign(name.pca, plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = markers[markers[,2]==marker.type,1][1], 
+    feature_set = marker.set) + fontsize)
+    name.tsne <- paste("tsne_", marker.type, sep = "")
+    assign(name.tsne, plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by='CDK1',
+    perplexity=5, rand_seed=100) + fontsize)
+}
+  
+multiplot(pca_endoderm, pca_ectoderm, pca_mesoderm, tsne_endoderm, tsne_ectoderm, tsne_mesoderm,  cols=2)
+multiplot(pca_core_pluripotency, pca_naive_pluripotency, pca_primed_pluripotency, pca_formative_pluripotency, 
+         tsne_core_pluripotency, tsne_naive_pluripotency, tsne_primed_pluripotency, tsne_formative_pluripotency,cols=2)
+multiplot(pca_germline, pca_trophectoderm, tsne_germline, tsne_trophectoderm, cols=2)
+```
+
+Alternatively, we can calculate all pc's new for every plot but I'm not sure if that's right.
+```{r primed.pca.single.corr2, fig.width=20, fig.height=12}
+pc.out <- prcomp(t(assay(sce_primed, "norm_exprs")))
+attr(pc.out$x, "percentVar") <- pc.out$sdev^2/sum(pc.out$sdev^2)
+reducedDim(sce_primed, "PCA") <- pc.out$x
+dim(reducedDim(sce_primed, "PCA"))
+
+for (marker.type in unique(markers[,2])){
+  marker <- which(rownames(sce_primed) %in% markers[markers[,2]==marker.type,1])
+  pc.out <- prcomp(t(assay(sce_primed, "norm_exprs")[marker,,drop=FALSE]))
+  attr(pc.out$x, "percentVar") <- pc.out$sdev^2/sum(pc.out$sdev^2)
+  reducedDim(sce_primed, "PCA") <- pc.out$x
+  nam <- paste("pca_", marker.type, sep = "")
+  assign(nam, plotPCA(sce_primed, main = marker.type, colour_by = markers[markers[,2]==marker.type,1][1]) + fontsize)
+}
+
+multiplot(pca_endoderm, pca_ectoderm, pca_mesoderm, cols=3)
+multiplot(pca_core_pluripotency, pca_naive_pluripotency, pca_primed_pluripotency, pca_formative_pluripotency, cols=4)
+multiplot(pca_germline, pca_trophectoderm, cols=2)
+```
+
+
+## Correlations between all chosen markers and epigenetic markers
 
 Now checking for correlations between the markers and epigenetic modifiers.
 We block on the batch of origin and we also compute a null distribution to avoid redundant work.
