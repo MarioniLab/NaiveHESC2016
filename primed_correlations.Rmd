@@ -79,7 +79,7 @@ Then we repeat the same using only the subset of chosen genes of interest.
 
 ```{r primed.pca.single.corr, fig.width=20, fig.height=12}
 for (marker.type in unique(markers[,2])){
-  marker.set <- which(rownames(sce_primed) %in% markers[markers[,2]==marker.type,1])
+  marker.set <- rownames(sce_naive[rownames(sce_primed) %in% markers[markers[,2]==marker.type,1],])
   name.pca <- paste("pca_", marker.type, sep = "")
   assign(name.pca, plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = markers[markers[,2]==marker.type,1][1], 
     feature_set = marker.set) + fontsize)
