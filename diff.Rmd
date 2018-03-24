@@ -1,0 +1,143 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: differential variability" 
+author: Tobias Messmer and Aaron Lun
+date: 13 November 2017
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-dif/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-diff/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+```
+
+# Data preparation
+
+The idea here is to test for whether there are any changes in gene expression of germlayer specific markers within the naive and the primed population, respectively.
+This will allow us to determine whether the primed cells prepare for differentiation into the three germ layers.
+First, we load the counts of our cells and the germ layer markers.
+We identify the transition cells in the naive population to prune them out.
+This ensures that we're identifying effects of homogeneous populations.
+
+```{r}
+library(scran)
+sce <- readRDS("~/Desktop/analysis/sce_all.rds")
+true.groups <- read.table("~/Desktop/analysis/results-naive/groups.tsv", header=TRUE, stringsAsFactors=FALSE)
+sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
+sce_naive <- sce[,sce$phenotype == "naive"]
+sce_primed <- sce[,sce$phenotype == "primed"]
+```
+
+We also set up an output directory.
+
+```{r}
+resdir <- "results-diff"
+dir.create(resdir, showWarning=FALSE)
+```
+
+```{r}
+by.lineage <- read.table("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/miscellaneous/commit_lineages.tsv", header=TRUE, stringsAsFactors=FALSE)
+endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
+head(endo.set)
+ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
+head(ecto.set)
+meso.set <- by.lineage$Symbol[grep("mesoderm", by.lineage$Germ_layer)]
+head(meso.set)
+lin.markers <- by.lineage$Symbol
+```
+
+Setting up a function to identify the surviving genes.
+
+```{r}
+library(org.Hs.eg.db)
+inPresentSet <- function(present, desired) {
+    ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=desired, column="ENSEMBL")
+    which(present %in% ensembls)    
+}
+lin.markers <- inPresentSet(rowData(sce)$ensembl_gene_id, lin.markers)
+lin.markers <- rownames(sce)[lin.markers]
+```
+
+```{r}
+#naive.hvg <- read.table(file=file.path('results-naive','hvg.tsv'), header=TRUE, stringsAsFactors=FALSE)
+#primed.hvg <- read.table(file=file.path('results-primed','hvg.tsv'), header=TRUE, stringsAsFactors=FALSE)
+```
+
+First, we can have a first glimpse on the the naive and primed populations to check whether they form any clusters and color the PCA/tSNE according to their expression of cell-cycle related genes. If cell-cycle related genes colour different parts of the PCA/tSNE, this is an indication that cell-cycle is the great driver for heterogeneity in the populations.
+
+```{r}
+library(ggplot2)
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
+
+library(scater)
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1", rerun=T) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=T,
+    perplexity=5, rand_seed=100) + fontsize
+
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1", rerun=T) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=T,
+    perplexity=5, rand_seed=100) + fontsize
+
+multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
+```
+
+# Naive population clustering
+
+We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering. 
+To ensure that 
+
+```{r}
+library(limma)
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+
+multiplot(pca_naive, tsne_naive)
+norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch)
+
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+
+multiplot(pca_naive, tsne_naive)
+```
+
+In the PCA - using only the lineage markers - it appears as if two distinct populations form. As this may indicate early lineage commitment, it is interesting to take a closer look into these two populations. For this, we first have to separate them using 
+```{r}
+library(cluster)
+library(limma)
+#pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]))
+#reducedDim(sce_naive, "PCA") <- pc.out$x
+#dim(reducedDim(sce_naive, "PCA"))
+#pcs <- reducedDim(sce_naive, "PCA")
+#my.dist <- dist(pcs)
+#my.tree <- hclust(my.dist)
+```
+
+# Primed subpopulation
+
+```{r}
+library(limma)
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+
+multiplot(pca_primed, tsne_primed)
+
+norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch)
+
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+
+multiplot(pca_primed, tsne_primed)
+```
+
+
+
