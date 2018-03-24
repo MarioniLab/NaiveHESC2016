@@ -328,6 +328,10 @@ We can now visualize these 4 lists with a heatmap.
 
 ```{r}
 library(pheatmap)
-
+epi_mat <- cbind(naive_mod_stat$sig.corrs, naive_read_stat$sig.corrs, 
+               primed_mod_stat$sig.corrs, primed_read_stat$sig.corrs)
+rownames(epi_mat) <- naive_mod_stat$marker
+colnames(epi_mat) <- c('naive mod', 'naive read', 'primed mod', 'primed read')
+pheatmap(epi_mat, cluster_row = F, cluster_cols = F)
 ```
 
