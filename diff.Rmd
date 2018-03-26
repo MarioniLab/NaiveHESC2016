@@ -80,12 +80,12 @@ library(ggplot2)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
 
 library(scater)
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1", rerun=T) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=T,
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=TRUE,
     perplexity=5, rand_seed=100) + fontsize
 
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1", rerun=T) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=T,
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=TRUE,
     perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
@@ -98,19 +98,35 @@ We remove batch effects to ensure that they don't distord the clustering.
 
 ```{r}
 library(limma)
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_naive, tsne_naive)
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch)
 
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_naive, tsne_naive)
 ```
 
 There are no distinct clusters visible and the first principal component is separating the cells with <5% variance, thus we assume that cells are still in a uncommited stage.
+We can further colour the plots for specific markers of mesoderm, endoderm and ectoderm to see whether the clustering is in fact independent of the lineage.
+
+```{r}
+#mesoderm
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'T', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+multiplot(pca_naive, tsne_naive)
+#ectoderm
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'FGF5', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+multiplot(pca_naive, tsne_naive)
+#endoderm
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA6", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+multiplot(pca_naive, tsne_naive)
+```
 
 
 # Primed subpopulation
@@ -119,25 +135,36 @@ We now repeat the same analysis for the primed population. Again, it is necessar
 
 ```{r}
 library(limma)
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_primed, tsne_primed)
 
 norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch)
 
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=T) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'batch', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "batch", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_primed, tsne_primed)
 ```
 
-We can also colour the plots again for cell-cycle expression, which shows that even when separating by lineage markers, cell cycle still seems to be the main influence in variability. 
+We can also colour the plots again for cell-cycle expression and for key lineage markers.
 
 ```{r}
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=T) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, rerun=T, perplexity=5, rand_seed=100) + fontsize
-
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+multiplot(pca_primed, tsne_primed)
+#mesoderm
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'T', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+multiplot(pca_primed, tsne_primed)
+#ectoderm
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'FGF5', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+multiplot(pca_primed, tsne_primed)
+#endoderm
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "GATA6", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 ```
 
@@ -178,8 +205,8 @@ for (marker.type in unique(markers[,2])){
   all.tsne[[marker.type]] <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by='batch', feature_set = marker.set, perplexity=5, rand_seed=100, rerun=TRUE, check_duplicates = FALSE) + fontsize
 }
   
-do.call(multiplot, c(all.pca, list(cols=2)))
-do.call(multiplot, c(all.tsne, list(cols=2)))
+#do.call(multiplot, c(all.pca, list(cols=2)))
+#do.call(multiplot, c(all.tsne, list(cols=2)))
 ```
 
 We now do the same thing for the primed population. 
@@ -195,8 +222,8 @@ for (marker.type in unique(markers[,2])){
   all.tsne[[marker.type]] <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= 'batch', feature_set = marker.set, perplexity=5, rand_seed=100, rerun=TRUE, check_duplicates = FALSE) + fontsize
 }
   
-do.call(multiplot, c(all.pca, list(cols=2)))
-do.call(multiplot, c(all.tsne, list(cols=2)))
+#do.call(multiplot, c(all.pca, list(cols=2)))
+#do.call(multiplot, c(all.tsne, list(cols=2)))
 ```
 
 
@@ -213,7 +240,7 @@ We begin with the naive population.
 ```{r}
 ii <- 1
 naive_mod_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_mod <- list(unique(markers[,2]))
+naive_mod <- data.frame()
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -224,13 +251,15 @@ for (marker.type in unique(markers[,2])){
   vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, 
     pairings=list(chosen_markers, epi_modifier))
   sig.count <- sum(vs.mod$FDR <= 0.05)
+  vs.mod$type <- marker.type
+
 
   gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
   write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   naive_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  naive_mod[[marker.type]] <- vs.mod
+  naive_mod <- rbind(naive_mod, vs.read)#
   
   ii <- ii+1
 }
@@ -242,7 +271,7 @@ Next, we can do the same for epigeentic readers.
 ```{r}
 ii <- 1
 naive_read_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_read <- list(unique(markers[,2]))
+naive_read <- data.frame()
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -253,13 +282,15 @@ for (marker.type in unique(markers[,2])){
   vs.read <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, 
     pairings=list(chosen_markers, epi_reader))
   sig.count <- sum(vs.read$FDR <= 0.05)
+  vs.read$type <- marker.type
+
 
   gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_read.tsv.gz")), open="wb")
   write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   naive_read_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
-  naive_read[[marker.type]] <- vs.read
+  naive_read <- rbind(naive_read, vs.read)#
   
   ii <- ii+1
 }
@@ -271,7 +302,7 @@ Now we can repeat the same two steps with the primed population.
 ```{r}
 ii <- 1
 primed_mod_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_mod <- list(unique(markers[,2]))
+primed_mod <- data.frame()
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -282,13 +313,15 @@ for (marker.type in unique(markers[,2])){
   vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
     pairings=list(chosen_markers, epi_modifier))
   sig.count <- sum(vs.mod$FDR <= 0.05)
+  vs.mod$type <- marker.type #
+
 
   gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
   write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   primed_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  primed_mod[[marker.type]] <- vs.mod
+  primed_mod <- rbind(primed_mod, vs.mod)#
   
   ii <- ii+1
 }
@@ -300,7 +333,7 @@ Finally, we also repeat it for epigeentic readers in the primed population.
 ```{r}
 ii <- 1
 primed_read_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_read <- list(unique(markers[,2]))
+primed_read <- data.frame()
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -308,30 +341,63 @@ for (marker.type in unique(markers[,2])){
   set.seed(10000)
   design <- model.matrix(~sce_primed$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
-  vs.read <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
+  vs.read <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
     pairings=list(chosen_markers, epi_reader))
   sig.count <- sum(vs.read$FDR <= 0.05)
+  vs.read$type <- marker.type
 
   gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_read.tsv.gz")), open="wb")
   write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   primed_read_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
-  primed_read[[marker.type]] <- vs.read
+  primed_read <- rbind(primed_read, vs.read)
   
-  ii <- ii+1
+ii <- ii+1
 }
 print(primed_read_stat)
+dim(primed_read)
 ```
 
-We can now visualize these 4 lists with a heatmap.
+We can now visualize the statistics in a heatmap.
 
 ```{r}
 library(pheatmap)
 epi_mat <- cbind(naive_mod_stat$sig.corrs, naive_read_stat$sig.corrs, 
                primed_mod_stat$sig.corrs, primed_read_stat$sig.corrs)
-rownames(epi_mat) <- naive_mod_stat$marker
-colnames(epi_mat) <- c('naive mod', 'naive read', 'primed mod', 'primed read')
-pheatmap(epi_mat, cluster_row = F, cluster_cols = F)
+rownames(epi_mat) <- gsub('_',' ', naive_mod_stat$marker)
+colnames(epi_mat) <- c('modifiers in naive', 'readers in naive', 'modifiers in primed', 'readers in primed')
+pheatmap(epi_mat, cluster_row = F, cluster_cols = F, color = colorRampPalette(c("#0072B2","yellow" ,"#e79f00"))(50), display_numbers = epi_mat, fontsize = 20, fontsize_row = 15, fontsize_col = 15, gaps_col = 2)
 ```
 
+However, it is clearer to make a heatmap of the correlations themselves of the lineage markers.
+
+```{r}
+
+lineage.names <- unique(c(primed_read$gene1[primed_read$gene1 %in% lin.markers], 
+                          primed_read$gene2[primed_read$gene2 %in% lin.markers]))
+epi.read.names <- unique(c(primed_read$gene1[primed_read$gene1 %in% rownames(sce[epi_reader,])], 
+                           primed_read$gene2[primed_read$gene2 %in% rownames(sce[epi_reader,])]))
+
+heatmat <- matrix(nrow=length(lineage.names), ncol = length(epi.read.names))
+rownames(heatmat) <- lineage.names
+colnames(heatmat) <- epi.read.names
+
+for (lin in lineage.names){
+    for (epi in epi.read.names){
+      if (any(primed_read$gene1 == lin & primed_read$gene2 == epi)){
+        heatmat[lin, epi] <- primed_read$rho[which(primed_read$gene1 == lin & primed_read$gene2 == epi)]
+      }
+      else if (any(primed_read$gene2 == lin & primed_read$gene1 == epi)){
+        heatmat[lin, epi] <- primed_read$rho[which(primed_read$gene1 == lin & primed_read$gene2 == epi)]
+      }
+  else {heatmat[lin, epi] <- NA}
+}}
+
+```
+
+
+```{r}
+gc()
+sessionInfo()
+```
