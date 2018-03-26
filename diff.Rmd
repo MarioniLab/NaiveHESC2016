@@ -245,6 +245,7 @@ naive_mod <- list(unique(markers[,2]))
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
   chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
+
   set.seed(10000)
   design <- model.matrix(~sce_naive$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
@@ -317,7 +318,7 @@ for (marker.type in unique(markers[,2])){
   close(gzout)
   
   primed_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  primed_mod [[marker.type]] <- vs.mod
+  primed_mod[[marker.type]] <- vs.mod
   
   ii <- ii+1
 }
@@ -365,24 +366,25 @@ pheatmap(epi_mat, cluster_row = F, cluster_cols = F, color = colorRampPalette(c(
 ```
 
 However, it is clearer to make a heatmap of the correlations themselves of the lineage markers.
+For this, we first have to loop through all the lists, extracting the correlating genes and putting them into a matrix that uses respective lineage markers as row and epigenetic readers/writers as columns. 
 
 ```{r}
-all.heats <- list(unique(markers[,2]))
-  
+all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
-  current_list <-primed_read[[marker.type]] 
+  current_list <- naive_mod[[marker.type]] 
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
-  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% lin.markers], 
-                          current_list$gene2[current_list$gene2 %in% lin.markers]))
-  epi.read.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
-                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_modifier,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_modifier,])]))
 
-  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.read.names))
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
   rownames(current_mat) <- lineage.names
-  colnames(current_mat) <- epi.read.names
+  colnames(current_mat) <- epi.names
 
   for (lin in lineage.names){
-    for (epi in epi.read.names){
+    for (epi in epi.names){
       if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
         current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
       }
@@ -392,9 +394,118 @@ for (marker.type in unique(markers[,2])){
   else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
     }}
   
-  all.heats[[marker.type]] <- current_mat
+  all.heats <- rbind(all.heats, current_mat)
+  
 }
+naive.mod.heat <- all.heats
+```
 
+Of course, we have to repeat this for naive/readers primed/mod and primed/readers.
+
+```{r}
+all.heats <- data.frame()
+for (marker.type in unique(markers[,2])){
+  current_list <-naive_read[[marker.type]] 
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
+
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
+  
+  all.heats <- rbind(all.heats, current_mat)
+  
+}
+naive.read.heat <- all.heats
+```
+
+
+```{r}
+all.heats <- data.frame()
+for (marker.type in unique(markers[,2])){
+  current_list <-primed_mod[[marker.type]] 
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_modifier,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_modifier,])]))
+
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
+  
+  all.heats <- rbind(all.heats, current_mat)
+  
+}
+primed.mod.heat <- all.heats
+```
+
+```{r}
+all.heats <- data.frame()
+for (marker.type in unique(markers[,2])){
+  current_list <-primed_read[[marker.type]] 
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
+
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
+  
+  all.heats <- rbind(all.heats, current_mat)
+  
+}
+primed.read.heat <- all.heats
+```
+
+Finally, this allows us to create the heatmaps.
+
+```{r}
+pheatmap(naive.read.heat)
+pheatmap(naive.mod.heat)
+pheatmap(primed.mod.heat)
+pheatmap(primed.read.heat)
 ```
 
 
