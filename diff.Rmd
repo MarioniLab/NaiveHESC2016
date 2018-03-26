@@ -240,7 +240,7 @@ We begin with the naive population.
 ```{r}
 ii <- 1
 naive_mod_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_mod <- data.frame()
+naive_mod <- list(unique(markers[,2]))
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -251,15 +251,13 @@ for (marker.type in unique(markers[,2])){
   vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, 
     pairings=list(chosen_markers, epi_modifier))
   sig.count <- sum(vs.mod$FDR <= 0.05)
-  vs.mod$type <- marker.type
-
 
   gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
   write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   naive_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  naive_mod <- rbind(naive_mod, vs.read)#
+  naive_mod[[marker.type]] <- vs.mod
   
   ii <- ii+1
 }
@@ -271,7 +269,7 @@ Next, we can do the same for epigeentic readers.
 ```{r}
 ii <- 1
 naive_read_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_read <- data.frame()
+naive_read <- list(unique(markers[,2]))
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -290,7 +288,7 @@ for (marker.type in unique(markers[,2])){
   close(gzout)
   
   naive_read_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
-  naive_read <- rbind(naive_read, vs.read)#
+  naive_read[[marker.type]] <- vs.read
   
   ii <- ii+1
 }
@@ -302,7 +300,7 @@ Now we can repeat the same two steps with the primed population.
 ```{r}
 ii <- 1
 primed_mod_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_mod <- data.frame()
+primed_mod <- list(unique(markers[,2]))
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -313,15 +311,13 @@ for (marker.type in unique(markers[,2])){
   vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
     pairings=list(chosen_markers, epi_modifier))
   sig.count <- sum(vs.mod$FDR <= 0.05)
-  vs.mod$type <- marker.type #
-
 
   gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
   write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   primed_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  primed_mod <- rbind(primed_mod, vs.mod)#
+  primed_mod [[marker.type]] <- vs.mod
   
   ii <- ii+1
 }
@@ -333,7 +329,7 @@ Finally, we also repeat it for epigeentic readers in the primed population.
 ```{r}
 ii <- 1
 primed_read_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_read <- data.frame()
+primed_read <- list(unique(markers[,2]))
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -344,19 +340,17 @@ for (marker.type in unique(markers[,2])){
   vs.read <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
     pairings=list(chosen_markers, epi_reader))
   sig.count <- sum(vs.read$FDR <= 0.05)
-  vs.read$type <- marker.type
 
   gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_read.tsv.gz")), open="wb")
   write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
   primed_read_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
-  primed_read <- rbind(primed_read, vs.read)
+  primed_read[[marker.type]] <- vs.read
   
 ii <- ii+1
 }
 print(primed_read_stat)
-dim(primed_read)
 ```
 
 We can now visualize the statistics in a heatmap.
@@ -373,26 +367,33 @@ pheatmap(epi_mat, cluster_row = F, cluster_cols = F, color = colorRampPalette(c(
 However, it is clearer to make a heatmap of the correlations themselves of the lineage markers.
 
 ```{r}
+all.heats <- list(unique(markers[,2]))
+  
+for (marker.type in unique(markers[,2])){
+  current_list <-primed_read[[marker.type]] 
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% lin.markers], 
+                          current_list$gene2[current_list$gene2 %in% lin.markers]))
+  epi.read.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
 
-lineage.names <- unique(c(primed_read$gene1[primed_read$gene1 %in% lin.markers], 
-                          primed_read$gene2[primed_read$gene2 %in% lin.markers]))
-epi.read.names <- unique(c(primed_read$gene1[primed_read$gene1 %in% rownames(sce[epi_reader,])], 
-                           primed_read$gene2[primed_read$gene2 %in% rownames(sce[epi_reader,])]))
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.read.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.read.names
 
-heatmat <- matrix(nrow=length(lineage.names), ncol = length(epi.read.names))
-rownames(heatmat) <- lineage.names
-colnames(heatmat) <- epi.read.names
-
-for (lin in lineage.names){
+  for (lin in lineage.names){
     for (epi in epi.read.names){
-      if (any(primed_read$gene1 == lin & primed_read$gene2 == epi)){
-        heatmat[lin, epi] <- primed_read$rho[which(primed_read$gene1 == lin & primed_read$gene2 == epi)]
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
       }
-      else if (any(primed_read$gene2 == lin & primed_read$gene1 == epi)){
-        heatmat[lin, epi] <- primed_read$rho[which(primed_read$gene1 == lin & primed_read$gene2 == epi)]
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
       }
-  else {heatmat[lin, epi] <- NA}
-}}
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
+  
+  all.heats[[marker.type]] <- current_mat
+}
 
 ```
 
