@@ -108,11 +108,11 @@ naive.mod.heat[which(naive.mod.heat< (-0.5), arr.ind = TRUE)] <- -0.5
 naive.read.heat[which(naive.read.heat>0.5, arr.ind = TRUE)] <- 0.5
 naive.read.heat[which(naive.read.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
 
-pdf(file.path(figdir, "3c1.pdf"), width=5, height = 5)
-pheatmap(naive.mod.heat, breaks=seq(-0.5, 0.5, length.out=101))
+pdf(file.path(figdir, "3c1.pdf"), width=5, height = 5, onefile=FALSE)
+p <- pheatmap(naive.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE)
 dev.off()
-pdf(file.path(figdir, "3c2.pdf"), width=5, height = 5)
-pheatmap(naive.read.heat, breaks=seq(-0.5, 0.5, length.out=101))
+pdf(file.path(figdir, "3c2.pdf"), width=5, height = 5, onefile=FALSE)
+pheatmap(naive.read.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE)
 dev.off()
 
 
@@ -126,11 +126,11 @@ primed.mod.heat[which(primed.mod.heat< (-0.5), arr.ind = TRUE)] <- -0.5
 primed.read.heat[which(primed.read.heat>0.5, arr.ind = TRUE)] <- 0.5
 primed.read.heat[which(primed.read.heat< (-0.5), arr.ind = TRUE)] <- -0.5
 
-pdf(file.path(figdir, "3d1.pdf"), width=5, height = 5)
-pheatmap(primed.mod.heat, breaks=seq(-0.5, 0.5, length.out=101) )
+pdf(file.path(figdir, "3d1.pdf"), width=5, height = 5, onefile=FALSE)
+pheatmap(primed.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE)
 dev.off()
-pdf(file.path(figdir, "3d2.pdf"), width=5, height = 5)
-pheatmap(primed.read.heat, breaks=seq(-0.5, 0.5, length.out=101) )
+pdf(file.path(figdir, "3d2.pdf"), width=5, height = 5, onefile=FALSE)
+pheatmap(primed.read.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE )
 dev.off()
 
 ### Supplements
