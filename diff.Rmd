@@ -71,6 +71,9 @@ lin.markers <- rownames(sce)[lin.markers]
 First, we first remove the batch effect in each population separately to ensure that they don't distord the clustering. 
 
 ```{r}
+library(limma)
+library(scater)
+
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch)
 norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch)
 ```
@@ -81,7 +84,6 @@ We can now have a first glimpse on the the naive and primed populations to check
 library(ggplot2)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
 
-library(scater)
 pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
 tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=TRUE,
     perplexity=5, rand_seed=100) + fontsize
@@ -101,7 +103,6 @@ saveRDS(pca_primed, file = 'primed_plot.Rds')
 We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering.
 
 ```{r}
-library(limma)
 pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
 tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 
@@ -114,20 +115,20 @@ We can further colour the plots for specific markers of mesoderm, endoderm and e
 
 ```{r}
 #mesoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'T', feature_set = lin.markers, rerun=TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers, rerun=TRUE) + fontsize
 tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne1.Rds')
 
 #ectoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'FGF5', feature_set = lin.markers, rerun=TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers, rerun=TRUE) + fontsize
 tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne2.Rds')
 
 #endoderm
 pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA6", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne3.Rds')
 ```
@@ -152,13 +153,13 @@ tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1"
 multiplot(pca_primed, tsne_primed)
 
 #mesoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'T', feature_set = lin.markers, rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers, rerun=TRUE) + fontsize
 tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne1.Rds')
 
 #ectoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'FGF5', feature_set = lin.markers, rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers, rerun=TRUE) + fontsize
 tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne2.Rds')
@@ -374,7 +375,7 @@ For this, we first have to loop through all the lists, extracting the correlatin
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <- naive_mod[[marker.type]]
-  current_list <- current_list[1:300,]
+  current_list <- current_list[1:205,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
@@ -413,7 +414,7 @@ Of course, we have to repeat this for naive/readers primed/mod and primed/reader
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <-naive_read[[marker.type]] 
-  current_list <- current_list[1:500,]
+  current_list <- current_list[1:413,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
@@ -452,7 +453,7 @@ naive.read.heat <- all.heats
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <-primed_mod[[marker.type]] 
-  current_list <- current_list[1:300,]
+  current_list <- current_list[1:225,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
@@ -490,7 +491,7 @@ primed.mod.heat <- all.heats
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <-primed_read[[marker.type]] 
-  current_list <- current_list[1:700,]
+  current_list <- current_list[1:584,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
