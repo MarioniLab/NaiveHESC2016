@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH -o count.out
 #SBATCH -e count.err
-#SBATCH -n 1
-#SBATCH --mem 16000
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16000
 
 echo '
 anno.files <- file.path("../../genomes/annotation/", c("hg38.gtf", "ERCC92.gtf"))
