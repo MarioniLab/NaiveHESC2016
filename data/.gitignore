@@ -1,0 +1,13 @@
+*.err
+*.out
+*.tsv
+*.Rout
+*/logs
+*/bam
+*/fastq
+real-2677_20161024/count_me.R
+real-2678_20161024/count_me.R
+real-2739_20161024/count_me.R
+real-2740_20161024/count_me.R
+real-2780_20161024/count_me.R
+real-2781_20161024/count_me.R

@@ -1,7 +1,7 @@
 all.out <- list()
 all.out[["MAGE-TAB Version"]] <- "1.1"
 all.out[["Investigation Title"]] <- "Single-cell RNA-seq of naive and primed human embryonic stem cells"
-all.out[["Experiment Description"]] <- "This study aims to profile the transcriptomes of single naive and primed human embryonic stem cells. Cells from the H9 line were cultured to select for naive or primed phenotypes, and a sequencing library was generated from each single cell using the Smart-seq2 method. This was performed across multiple experimental batches (i.e., independent cultures) and high-throughput sequencing runs. Transcriptional profiles for all cells were obtained from the sequencing data and used to explore substructure and heterogeneity in the population for each phenotype."
+all.out[["Experiment Description"]] <- "This study aims to profile the transcriptomes of single naive and primed human embryonic stem cells. Cells from the H9 line were cultured to select for naive or primed phenotypes, and a sequencing library was generated from each single cell using the Smart-seq2 method. This was repeated for multiple experimental batches, i.e., independent cultures. Batch 1 consists of sequencing runs 2383 and 2384; batch 2 consists of runs 2678, 2679, 2739 and 2740; and batch 3 consists of runs 2780 and 2781. Transcriptional profiles for all cells were obtained from the sequencing data and used to explore substructure and heterogeneity in the population for each phenotype."
 
 all.out[["Experimental Design"]] <- c("cell type comparison design")
 all.out[["Experimental Design Term Source REF"]] <- c("EFO") 
@@ -52,17 +52,17 @@ all.out[["Protocol Term Accession Number"]] <- c("EFO_0005518",
                                                  "EFO_0004917",
                                                  "EFO_0005520")
 
-all.out[["Protocol Description"]] <- c("HeLa cells were obtained from American Type Culture Collection. To generate clones expressing dCas9-KRAB, HeLa cells were transduced with lentivirus containing the pHR-SFFV-dCAS9-BFP-KRAB vector along with polybrene (5 ug/ml, Sigma), incubated for 72 hours with medium replacement after 24 hours, and sorted for the BFP-expressing cells using a BD FACSAria III cell sorter.",
-                                       "HeLa cells were maintained in Dulbecco's modified Eagle's medium (Sigma Aldrich, D6429) supplemented with 10% fetal bovine serum (Thermo Fisher Scientific) and cultured at 37 degrees Celsius with with 5% CO2.",
-                                       "RNA (1 ug) was extracted with the RNeasy Kit (QIAGEN) and treated with DNase I following the manufacturer's instructions. RNA quality was assessed using a Total RNA Nano chip with a 2100 Bioanalyzer instrument (Agilent).",
-                                       "RNA-seq libraries were prepared from HeLA cells using TruSeq Stranded Total RNA Kit with Ribo-Zero Gold (Illumina, RS-122-2303). Library quality was assessed using a DNA1000 chip with a 2100 Bioanalyzer instrument (Agilent).",
-                                       "Indexed libraries were PCR amplified and sequenced on multiple lanes of an Illumina Hiseq 2500 instrument to obtain 125 bp paired-end reads.",
-                                       "Reads were aligned to the hg38 build of the human genome using subread v1.5.0 in paired-end RNA-seq mode with unique mapping. The number of read pairs mapped to the exonic regions of each gene was then counted for each library, using the featureCounts function in Rsubread v1.22.3 with Ensembl GRCh38 version 83. Only alignments with mapping quality scores above 10 were considered during counting.",
-                                       "The QuantiTect Reverse Transcription Kit (QIAGEN) was used for cDNA synthesis including an additional step to eliminate genomic DNA contamination.")
-all.out[["Protocol Hardware"]] <- c("BD FACSAria III cell sorter",
-                                    "", 
-                                    "2100 Bioanalyzer",
-                                    "2100 Bioanalyzer",
+all.out[["Protocol Description"]] <- c("Human H9-NK2 ESCs were kindly provided by Austin Smith." ,
+                                       "Naive hESCs were grown in 6-well dishes on mouse embryonic fibroblasts in N2B27 supplemented with human LIF, 1 uM Chiron, 1 uM PD03 and 2 uM Go6983. One passage before sorting, cells were plated on 6-well plates coated with Matrigel (growth-factor reduced). Primed hESCs were grown in 6-well dishes coated with Vitronectin in E8 media.",
+                                       "hESCs were dissociated with Accutase and sorted with a BD Aria Cell sorter, gating for cell size and granularity. Single-cells were sorted in 2uL of Lysis Buffer (0.2% v/v Triton X-100 (Sigma-Aldrich, cat. no. T9284) with 2U/ul RNase Inhibitor (Clontech, cat. no. 2313A)) in 96 well plates, spun down and immediately frozen at -80 degrees Celsius.",
+                                       "The cDNA libraries for sequencing were prepared using Nextera XT DNA Sample Preparation Kit (Illumina, cat. no. FC-131-1096), according to the protocol supplied by Fluidigm (PN 100-5950 B1). Libraries from 96 single cells were pooled and purified using AMPure XP beads (Beckman Coulter).",
+                                       "Pooled samples were sequenced on an Illumina HiSeq 2500 instrument, using paired-end 100-bp reads.",
+                                       "Reads were aligned to the hg38 build of the human genome (with additional ERCC sequences) using subread v1.6.1. in paired-end RNA-seq mode with unique mapping. The number of read pairs mapped to the exonic regions of each gene was then counted for each library, using the featureCounts function in Rsubread v1.28.1 with Ensembl GRCh38 version 91. Only alignments with mapping quality scores above 10 were considered during counting.",
+                                        "A cDNA library was prepared from each sorted single cell following the SmartSeq2 protocol. Briefly, oligo-dT primer, dNTPs (ThermoFisher, cat. no. 10319879) and ERCC RNA Spike-In Mix (1:25,000,000 final dilution, Ambion, cat. no. 4456740) were added to the single-cell lysates, and reverse transcription and PCR were performed.")
+all.out[["Protocol Hardware"]] <- c("",
+                                    "",
+                                    "BD FACSAria cell sorter", 
+                                    "",
                                     "Illumina Hiseq 2500",
                                     "",
                                     "")

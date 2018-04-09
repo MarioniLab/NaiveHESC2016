@@ -1,11 +1,16 @@
- # Files of interest.
 
-bam.files <- list.files(path="./bam", full.names=TRUE, pattern = '.bam$')
+anno.files <- file.path("../../genomes/annotation/", c("hg38.gtf", "ERCC92.gtf"))
+bam.files <- list.files("bam", full=TRUE, pattern="bam$")
+stat.file <- "all_qual.tsv"
+ispet <- TRUE
+# NOT STRAND-SPECIFIC.
 
-anno.files <- c("/lustre/jmlab/resources/annotation/processed/hg38.gtf", "/lustre/jmlab/resources/annotation/original/ERCC92.gtf")
+# Files of interest.
+bam.files
+anno.files
 
 if (!exists("ispet")) { 
-    ispet <- TRUE 
+    ispet <- FALSE
 } 
 if (!exists("strandspec")) {
     strandspec <- 0
@@ -38,7 +43,7 @@ out <- do.call(featureCounts, c(list(files=bam.files, annot.ext="temp.gtf", isGT
 
 # Saving counts to file, with gene names.
 colnames(out$counts) <- sub("\\.bam$", "", basename(bam.files))
-final <- data.frame(GeneID=rownames(out$counts), Length=out$annotation$Length, out$counts)
+final <- data.frame(GeneID=rownames(out$counts), Length=out$annotation$Length, out$counts, check.names=FALSE)
 write.table(file="genic_counts.tsv", final, col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
 
 # Augmenting the stats.

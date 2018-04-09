@@ -1,5 +1,4 @@
 *.html
-*.md
 *.rds
 .DS_Store
 objects
