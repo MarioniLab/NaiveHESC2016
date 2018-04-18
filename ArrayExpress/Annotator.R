@@ -55,7 +55,15 @@ output[["Characteristics[organism]"]] <- "Homo sapiens"
 output[["Characteristics[cell line]"]] <- "H9"
 output[["Characteristics[phenotype]"]] <- collected$Phenotype
 output[["Material Type"]] <- "cell"
-output[[paste0(rep(c("Protocol REF", "Performer"), 6), collapse="\t")]] <- paste0(c("Obtaining H9 cells", "Ferdinand von Meyenn",
+
+output[["Comment[spike in]"]] <- "ERCC"
+output[["Comment[spike in dilution]"]] <- "1:25,000,000"
+output[["Comment[spike sequence file]"]] <- "spikes.fa"
+output[["Comment[spike concentration file]"]] <- "spikes.txt"
+output[["Comment[experiment batch]"]] <- collected$Batch
+output[["Comment[sequencing run]"]] <- collected$Run
+
+output[[paste0(rep(c("Protocol REF", "Performer"), 5), collapse="\t")]] <- paste0(c("Obtaining H9 cells", "Ferdinand von Meyenn",
                                                                                     "Culturing H9 cells", "Ferdinand von Meyenn",
                                                                                     "Reverse transcription", "Ferdinand von Meyenn",
                                                                                     "Extracting RNA", "Ferdinand von Meyenn",
@@ -64,21 +72,22 @@ output[[paste0(rep(c("Protocol REF", "Performer"), 6), collapse="\t")]] <- paste
 output[["Extract Name"]] <- collected$Sample
 output[["Comment[LIBRARY_LAYOUT]"]] <- "PAIRED"
 output[["Comment[LIBRARY_SELECTION]"]] <- "Oligo-dT"
-output[["Comment[LIBRARY_SOURCE]"]] <- "TRANSCRIPTOMIC"
+output[["Comment[LIBRARY_SOURCE]"]] <- "TRANSCRIPTOMIC SINGLE CELL"
 output[["Comment[LIBRARY_STRAND]"]] <- "not applicable"
 output[["Comment[LIBRARY_STRATEGY]"]] <- "RNA-seq"
 output[["Comment[NOMINAL_LENGTH]"]] <- 295
 output[["Comment[NOMINAL_SDEV]"]] <- 25
 output[["Comment[ORIENTATION]"]] <- "5'-3'-3'-5'"
 output[["Protocol REF\tPerformer"]] <- "Sequencing libraries\tFerdinand von Meyenn"
+
 output[["Assay Name"]] <- collected$Sample
 output[["Technology Type"]] <- "sequencing assay"
-output[["Comment[experiment batch]"]] <- collected$Batch
-output[["Comment[sequencing run]"]] <- collected$Run
 output[["Array Data File"]] <- collected$File
 output[["Protocol REF"]] <- "Assigning reads to genes"
 output[["Derived Array Data File"]] <- paste0("genic_counts_", collected$Run, ".tsv")
 output[["Comment[MD5]"]] <- collected$MD5
+
+output[["Factor Value[phenotype]"]] <- collected$Phenotype
 
 output$check.names <- FALSE
 sdrf <- do.call(data.frame, output)
