@@ -105,16 +105,22 @@ naive.mod.heat <- readRDS('naive.mod.Rds')
 
 naive.mod.heat[which(naive.mod.heat>0.5, arr.ind = TRUE)] <- 0.5
 naive.mod.heat[which(naive.mod.heat< (-0.5), arr.ind = TRUE)] <- -0.5
+selection <- tail(order(apply(naive.mod.heat^2,1, mean, na.rm = TRUE)), n=50)
+naive.mod.heat <- naive.mod.heat[selection,]
+
 naive.read.heat[which(naive.read.heat>0.5, arr.ind = TRUE)] <- 0.5
 naive.read.heat[which(naive.read.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
+selection <- tail(order(apply(naive.read.heat^2,1, mean, na.rm = TRUE)), n=50)
+naive.read.heat <- naive.read.heat[selection,]
 
 pdf(file.path(figdir, "3c1.pdf"), width=5, height = 5, onefile=FALSE)
-p <- pheatmap(naive.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE)
+pheatmap(naive.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
+         treeheight_row = 0, treeheight_col = 0)
 dev.off()
 pdf(file.path(figdir, "3c2.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(naive.read.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE)
+pheatmap(naive.read.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
+         treeheight_row = 0, treeheight_col = 0)
 dev.off()
-
 
 # Figure 3D
 
@@ -123,14 +129,21 @@ primed.read.heat <- readRDS('primed.read.Rds')
 
 primed.mod.heat[which(primed.mod.heat>0.5, arr.ind = TRUE)] <- 0.5
 primed.mod.heat[which(primed.mod.heat< (-0.5), arr.ind = TRUE)] <- -0.5
+selection <- tail(order(apply(primed.mod.heat^2,1, mean, na.rm = TRUE)), n=50)
+primed.mod.heat <- primed.mod.heat[selection,]
+
 primed.read.heat[which(primed.read.heat>0.5, arr.ind = TRUE)] <- 0.5
 primed.read.heat[which(primed.read.heat< (-0.5), arr.ind = TRUE)] <- -0.5
+selection <- tail(order(apply(primed.read.heat^2,1, mean, na.rm = TRUE)), n=50)
+primed.read.heat <- primed.read.heat[selection,]
 
 pdf(file.path(figdir, "3d1.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(primed.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE)
+pheatmap(primed.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
+         treeheight_row = 0, treeheight_col = 0)
 dev.off()
 pdf(file.path(figdir, "3d2.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(primed.read.heat, breaks=seq(-0.5, 0.5, length.out=101), show_rownames = FALSE )
+pheatmap(primed.read.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
+         treeheight_row = 0, treeheight_col = 0)
 dev.off()
 
 ### Supplements
