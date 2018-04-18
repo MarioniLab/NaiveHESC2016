@@ -42,7 +42,6 @@ all.out[["Protocol Term Source REF"]] <- c("EFO",
                                            "EFO",
                                            "EFO",
                                            "EFO",
-                                           "EFO",
                                            "EFO")
 all.out[["Protocol Term Accession Number"]] <- c("EFO_0005518",
                                                  "EFO_0003789",
@@ -78,8 +77,8 @@ all.out[["Term Source Name"]] <- "EFO"
 all.out[["Term Source File"]] <- "http://www.ebi.ac.uk/efo/"
 all.out[["Term Source Version"]] <- ""
 all.out[["SDRF File"]] <- "sdrf.tsv"
-all.out[["Public Release Date"]] <- "2017-05-31"
-all.out[["Comment[AEExperimentType]"]] <- "RNA-seq of coding RNA"
+all.out[["Public Release Date"]] <- "2018-10-31"
+all.out[["Comment[AEExperimentType]"]] <- "RNA-seq of coding RNA from single cells"
 all.out[["Comment[AdditionalFile:fa]"]] <- "spikes.fa"
 all.out[["Comment[AdditionalFile:txt]"]] <- "spikes.txt"
 
