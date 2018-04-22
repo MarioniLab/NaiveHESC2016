@@ -1,0 +1,58 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: data preprocessing"
+author: Tobias Messmer and Aaron Lun
+date: 09 April 2018
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-preprocess/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-preprocess/")
+options(bitmapType="cairo", width=100)
+```
+
+# Examining mapping and counting statistics
+
+We have a look at the mapping statistics for the libraries in each batch.
+This includes the proportion of reads that were mapped, and the proportion that were counted into genes.
+The former should generally be at least 70-80% while the latter should be at least 50-60%.
+
+```{r statcheck}
+overall.maps <- list()
+overall.counts <- list()
+total.maps <- list()
+for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){  
+    cur.file <- list.files("counts", pattern=paste0("my_qual_", sample), full=TRUE)
+    qual.data <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
+    total <- rowSums(qual.data)
+    reads.mapped <- total - qual.data$Unassigned_Unmapped - qual.data$Unassigned_MappingQuality
+    reads.assigned <- qual.data$Assigned
+    cat(sprintf("Mapping percentages for batch %s:\n", sample))
+    print(summary(reads.mapped/total*100))
+    cat(sprintf("Counting percentages for batch %s:\n", sample))
+    print(summary(reads.assigned/total*100))
+    cat("\n")
+    overall.maps[[sample]] <- c(mean(reads.mapped/total*100), length(reads.mapped))
+    overall.counts[[sample]] <- c(mean(reads.assigned/total*100), length(reads.mapped))
+    total.maps[[sample]] <- mean(total)
+}
+```
+
+```{r stats}
+overall.stats <- data.frame(Maps.Means = unlist(overall.maps)[seq(1, 12, 2)], Counts.Means = unlist(overall.counts)[seq(1, 12, 2)], Length = unlist(overall.maps)[seq(2, 12, 2)], Total = unlist(total.maps), row.names = c("2383", "2384", "2677", "2678", "2739", "2740"))
+overall.stats
+#Maps
+sum(overall.stats[,1]*overall.stats[,3])/sum(overall.stats[,3])
+#Counts
+sum(overall.stats[,2]*overall.stats[,3])/sum(overall.stats[,3])
+#Total
+sum(overall.stats[,4]*overall.stats[,3])/sum(overall.stats[,3])
+```
