@@ -80,10 +80,27 @@ all.out[["Term Source Version"]] <- ""
 all.out[["SDRF File"]] <- "sdrf.tsv"
 all.out[["Public Release Date"]] <- "2017-05-31"
 all.out[["Comment[AEExperimentType]"]] <- "RNA-seq of coding RNA"
+all.out[["Comment[AdditionalFile:fa]"]] <- "spikes.fa"
+all.out[["Comment[AdditionalFile:txt]"]] <- "spikes.txt"
 
 unlink("idf.tsv")
 for (x in names(all.out)) {
     write(file="idf.tsv", paste0(c(x, all.out[[x]]), collapse="\t"), append=TRUE)
 }
+
+##########################################################################3
+# Computing the spike-in quantity per well.
+
+# ERCC data taken from https://www.thermofisher.com/order/catalog/product/4456740,
+# under the link "ERCC Controls Analysis: ERCC RNA Spike-In Control Mixes (English)".
+ercc.dil <- 25e6
+ercc.data <- read.table("cms_095046.txt", header=TRUE, check.names=FALSE, sep="\t", stringsAsFactors=FALSE)
+ercc.id <- ercc.data[,"ERCC ID"]
+ercc.quant <- ercc.data[,"concentration in Mix 1 (attomoles/ul)"] / ercc.dil
+
+spike.dir <- "spike-data"
+dir.create(spike.dir, showWarnings=FALSE)
+write.table(file=file.path(spike.dir, "spikes.txt"), sep="\t", quote=FALSE, row.names=FALSE,
+    data.frame(Name=ercc.id, "Attomole/well"=ercc.quant, check.names=FALSE))
 
 
