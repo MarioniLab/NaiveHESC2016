@@ -14,7 +14,7 @@ plot(pcs[,1], pcs[,2], col = ifelse(sce$phenotype=="naive", naive.col, primed.co
      cex.lab = 1.5 , cex.axis=1.2)
 par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
-legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch=16, cex=1.5)
+legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch=16, cex=1.5, bty='n')
 dev.off()
 
 # Figure 1C
@@ -49,6 +49,22 @@ points(x[m], y[m], col=primed.col, pch=16, cex=1.2)
 pos <- c(4,3)
 text(x[m], y[m], labels = primed.genes, col=primed.col, pos=pos, offset=0.5)
 dev.off()
+
+# Figure S1a
+
+ugly1 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_counts"))
+ugly2 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_features"))
+ugly3 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_ERCC"))
+ugly4 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_Mt"))
+
+pdf(file=file.path(figdir, "s1a.pdf"),width = 10, height = 10, useDingbats=FALSE)
+multiplot(ugly1 + geom_boxplot(width=0.1) + theme_classic() + ylab('Total Counts [log10]') + xlab(''),
+ugly2 + geom_boxplot(width=0.1) + theme_classic() + ylab('Total Features [log10]') + xlab('Batch'),
+ugly3 + geom_boxplot(width=0.1) + theme_classic() + ylab('PCT Counts ERCC') + xlab(''),
+ugly4 + geom_boxplot(width=0.1) + theme_classic() + ylab('PCT Counts Mt') + xlab('Batch'),
+cols=2)
+dev.off()
+
 
 # Figure S1b
 pdf(file=file.path(figdir, "s1b.pdf"),width = 10, height = 10, useDingbats=FALSE)
