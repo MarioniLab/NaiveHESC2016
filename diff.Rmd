@@ -31,8 +31,8 @@ This ensures that we're identifying effects of homogeneous populations.
 
 ```{r}
 library(scran)
-sce <- readRDS("~/Desktop/analysis/sce_all.rds")
-true.groups <- read.table("~/Desktop/analysis/results-naive/groups.tsv", header=TRUE, stringsAsFactors=FALSE)
+sce <- readRDS("sce_all.rds")
+true.groups <- read.table(file.path("results-naive", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
 sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
 sce_naive <- sce[,sce$phenotype == "naive"]
 sce_primed <- sce[,sce$phenotype == "primed"]
@@ -46,7 +46,7 @@ dir.create(resdir, showWarning=FALSE)
 ```
 
 ```{r}
-by.lineage <- read.table("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/miscellaneous/commit_lineages.tsv", header=TRUE, stringsAsFactors=FALSE)
+by.lineage <- read.table(file.path("data/marker", "commit_lineages.tsv"), header=TRUE, stringsAsFactors=FALSE)
 endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
 head(endo.set)
 ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
@@ -66,6 +66,12 @@ inPresentSet <- function(present, desired) {
 }
 lin.markers <- inPresentSet(rowData(sce)$ensembl_gene_id, lin.markers)
 lin.markers <- rownames(sce)[lin.markers]
+
+
+#Export the table of the used markers
+whole.list <- by.lineage[which(by.lineage$Symbol %in% lin.markers),]
+whole.list <- whole.list[(!duplicated(whole.list$Symbol)),]
+write.table(file=file.path(resdir, "linmarkers.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
 ```
 
 First, we first remove the batch effect in each population separately to ensure that they don't distord the clustering. 
@@ -177,20 +183,28 @@ Next, we want to check for correlations between Ferdinand's hand-curated markers
 First we load in the new data.
 
 ```{r}
-markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
+markers <- read.csv("data/marker/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
 head(markers)
 chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, markers[,1])
 markers <-  markers[markers$V1 %in% rownames(sce)[chosen_markers],]
+colnames(markers) <- c('Symbol','Function')
 
-epi_modifier <- read.csv("miscellaneous/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
+epi_modifier <- read.csv("data/marker/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_modifier)
 epi_modifier <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_modifier[,1])
 length(epi_modifier)
 
-epi_reader <- read.csv("miscellaneous/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
+epi_reader <- read.csv("data/marker/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_reader)
 epi_reader <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_reader[,1])
 length(epi_reader)
+
+#Export the complete list
+all_reader <- data.frame(Symbol = rownames(sce[epi_reader,]), Function = 'epi_reader')
+all_modifier <- data.frame(Symbol = rownames(sce[epi_modifier,]), Function = 'epi_modifier')
+whole.list <- rbind(markers, all_reader, all_modifier)
+whole.list <- whole.list[(!duplicated(whole.list$Symbol)),]
+write.table(file=file.path(resdir, "epimarker.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
 ```
 
 We can now check again whether the populations cluster if we use only markers for core_pluripotency, naive_pluripotency, primed_pluripotency, formative_pluripotency, mesoderm, ectoderm, trophectoderm or endoderm.
@@ -375,7 +389,7 @@ For this, we first have to loop through all the lists, extracting the correlatin
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <- naive_mod[[marker.type]]
-  current_list <- current_list[1:205,]
+  current_list <- current_list[1:206,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
@@ -414,7 +428,7 @@ Of course, we have to repeat this for naive/readers primed/mod and primed/reader
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <-naive_read[[marker.type]] 
-  current_list <- current_list[1:413,]
+  current_list <- current_list[1:362,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
@@ -453,7 +467,7 @@ naive.read.heat <- all.heats
 all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
   current_list <-primed_mod[[marker.type]] 
-  current_list <- current_list[1:225,]
+  current_list <- current_list[1:243,]
   current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
   lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
@@ -484,7 +498,7 @@ for (marker.type in unique(markers[,2])){
   all.heats <- rbind(all.heats, current_mat)
   
 }
-primed.mod.heat <- all.heats
+primed.mod.heat <- all.heats[,1:25]
 ```
 
 ```{r}
@@ -525,7 +539,7 @@ for (marker.type in unique(markers[,2])){
 primed.read.heat <- all.heats
 ```
 
-Finally, this allows us to create the heatmaps.
+Finally, this allows us to create the heatmaps and saving the objects.
 
 ```{r}
 pheatmap(naive.read.heat)
@@ -539,7 +553,152 @@ saveRDS(primed.mod.heat,'primed.mod.Rds')
 saveRDS(primed.read.heat,'primed.read.Rds')
 ```
 
-Saving the objects and printing session information.
+
+
+```{r}
+ii <- 1
+naive_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
+naive_epi <- list(unique(markers[,2]))
+
+for (marker.type in unique(markers[,2])){
+  current.markers <- markers[markers[,2] == marker.type,]
+  chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
+
+  set.seed(10000)
+  design <- model.matrix(~sce_naive$batch)
+  null.dist <- correlateNull(iters=1e6, design=design)
+  vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, 
+    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
+  sig.count <- sum(vs.mod$FDR <= 0.05)
+
+  gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
+  write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
+  close(gzout)
+  
+  naive_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
+  naive_epi[[marker.type]] <- vs.mod
+  
+  ii <- ii+1
+}
+print(naive_epi_stat)
+```
+
+```{r}
+all.heats <- data.frame()
+for (marker.type in unique(markers[,2])){
+  current_list <-naive_epi[[marker.type]] 
+  current_list <- current_list[1:506,]
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
+
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
+  
+  if (!any(dim(all.heats)==0)){
+  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
+  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
+  }
+  
+  all.heats <- rbind(all.heats, current_mat)
+  
+}
+naive_epi.heat <- all.heats[,1:25]
+```
+
+```{r}
+ii <- 1
+primed_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
+primed_epi <- list(unique(markers[,2]))
+
+for (marker.type in unique(markers[,2])){
+  current.markers <- markers[markers[,2] == marker.type,]
+  chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
+
+  set.seed(10000)
+  design <- model.matrix(~sce_primed$batch)
+  null.dist <- correlateNull(iters=1e6, design=design)
+  vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
+    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
+  sig.count <- sum(vs.mod$FDR <= 0.05)
+
+  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
+  write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
+  close(gzout)
+  
+  primed_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
+  primed_epi[[marker.type]] <- vs.mod
+  
+  ii <- ii+1
+}
+print(primed_epi_stat)
+```
+
+```{r}
+all.heats <- data.frame()
+for (marker.type in unique(markers[,2])){
+  current_list <-primed_epi[[marker.type]] 
+  current_list <- current_list[1:784,]
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
+
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
+  
+  if (!any(dim(all.heats)==0)){
+  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
+  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
+  }
+  
+  all.heats <- rbind(all.heats, current_mat)
+  
+}
+primed_epi.heat <- all.heats
+```
+
+Plot and save objects
+
+```{r}
+pheatmap(naive_epi.heat)
+pheatmap(primed_epi.heat)
+
+saveRDS(naive_epi.heat, 'naive.epi.Rds')
+saveRDS(primed_epi.heat, 'primed.epi.Rds')
+```
+
+
+Printing session information.
 
 ```{r}
 gc()
