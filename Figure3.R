@@ -104,8 +104,6 @@ naive.epi.heat <- readRDS('naive.epi.Rds')
 
 naive.epi.heat[which(naive.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
 naive.epi.heat[which(naive.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5
-selection <- tail(order(apply(naive.epi.heat^2,1, mean, na.rm = TRUE)), n=25)
-naive.epi.heat <- naive.epi.heat[selection,]
 
 pdf(file.path(figdir, "3c.pdf"), width=5, height = 5, onefile=FALSE)
 pheatmap(naive.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
@@ -119,8 +117,6 @@ primed.epi.heat <- readRDS('primed.epi.Rds')
 
 primed.epi.heat[which(primed.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
 primed.epi.heat[which(primed.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
-selection <- tail(order(apply(primed.epi.heat^2,1, mean, na.rm = TRUE)), n=25)
-primed.epi.heat <- primed.epi.heat[selection,]
 
 pdf(file.path(figdir, "3d.pdf"), width=5, height = 5, onefile=FALSE)
 pheatmap(primed.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
