@@ -114,6 +114,14 @@ plotExpression(shuffled.sce, rownames(hvg.out)[1:10], alpha=0.5,
 
 # Dimensionality reduction based on the technical noise
 
+We remove the batch effect prior to performing dimensionality reduction.
+This needs to be repeated as the batch effect for the naive-only cells may be different from the batch effect of the entire data set.
+
+```{r}
+library(limma)
+norm_exprs(sce) <- removeBatchEffect(exprs(sce), batch=sce$batch) 
+```
+
 We examine the lower bound on the number of PCs that should be retained in each data set.
 This is based on discarding later PCs until the variance in the discarded PCs is equal to the total technical noise.
 Unfortunately, the number of PCs to retain is quite different between the two batches, which is less-than-helpful.
