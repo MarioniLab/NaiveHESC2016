@@ -74,7 +74,7 @@ grid.draw(legend)
 par(mar = c(5.1, 4.1, 4.1, 6.1), las = 1)
 plot_data <- ggplot_build(tsne2)
 plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, main = 'primed', col = plot_data$data[[2]]$fill, 
-     pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5 , cex=1.5)
+     pch=16, xlab = plot_data$plot$labels$x , ylab ='', cex.lab = 1.5 , cex=1.5)
 tmp <- ggplot_gtable(plot_data) 
 leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
 legend <- tmp$grobs[[leg]] 
@@ -85,7 +85,7 @@ grid.draw(legend)
 par(mar = c(5.1, 4.1, 4.1, 6.1), las = 1)
 plot_data <- ggplot_build(tsne3)
 plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = plot_data$data[[2]]$fill, 
-     pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5 , cex=1.5)
+     pch=16, xlab = plot_data$plot$labels$x , ylab ='', cex.lab = 1.5 , cex=1.5)
 tmp <- ggplot_gtable(plot_data) 
 leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
 legend <- tmp$grobs[[leg]] 
@@ -95,56 +95,34 @@ grid.draw(legend)
 
 dev.off()
 
+# 3C
 
-# Figure 3C
 library(pheatmap)
 library(gridExtra)
 
-naive.read.heat <- readRDS('naive.read.Rds')
-naive.mod.heat <- readRDS('naive.mod.Rds')
+naive.epi.heat <- readRDS('naive.epi.Rds')
 
-naive.mod.heat[which(naive.mod.heat>0.5, arr.ind = TRUE)] <- 0.5
-naive.mod.heat[which(naive.mod.heat< (-0.5), arr.ind = TRUE)] <- -0.5
-selection <- tail(order(apply(naive.mod.heat^2,1, mean, na.rm = TRUE)), n=50)
-naive.mod.heat <- naive.mod.heat[selection,]
+naive.epi.heat[which(naive.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
+naive.epi.heat[which(naive.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5
 
-naive.read.heat[which(naive.read.heat>0.5, arr.ind = TRUE)] <- 0.5
-naive.read.heat[which(naive.read.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
-selection <- tail(order(apply(naive.read.heat^2,1, mean, na.rm = TRUE)), n=50)
-naive.read.heat <- naive.read.heat[selection,]
-
-pdf(file.path(figdir, "3c1.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(naive.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0)
-dev.off()
-pdf(file.path(figdir, "3c2.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(naive.read.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
+pdf(file.path(figdir, "3c.pdf"), width=5, height = 5, onefile=FALSE)
+pheatmap(naive.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
          treeheight_row = 0, treeheight_col = 0)
 dev.off()
 
-# Figure 3D
 
-primed.mod.heat <- readRDS('primed.mod.Rds')
-primed.read.heat <- readRDS('primed.read.Rds')
+# 3D
 
-primed.mod.heat[which(primed.mod.heat>0.5, arr.ind = TRUE)] <- 0.5
-primed.mod.heat[which(primed.mod.heat< (-0.5), arr.ind = TRUE)] <- -0.5
-selection <- tail(order(apply(primed.mod.heat^2,1, mean, na.rm = TRUE)), n=50)
-primed.mod.heat <- primed.mod.heat[selection,]
+primed.epi.heat <- readRDS('primed.epi.Rds')
 
-primed.read.heat[which(primed.read.heat>0.5, arr.ind = TRUE)] <- 0.5
-primed.read.heat[which(primed.read.heat< (-0.5), arr.ind = TRUE)] <- -0.5
-selection <- tail(order(apply(primed.read.heat^2,1, mean, na.rm = TRUE)), n=50)
-primed.read.heat <- primed.read.heat[selection,]
+primed.epi.heat[which(primed.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
+primed.epi.heat[which(primed.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
 
-pdf(file.path(figdir, "3d1.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(primed.mod.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
+pdf(file.path(figdir, "3d.pdf"), width=5, height = 5, onefile=FALSE)
+pheatmap(primed.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
          treeheight_row = 0, treeheight_col = 0)
 dev.off()
-pdf(file.path(figdir, "3d2.pdf"), width=5, height = 5, onefile=FALSE)
-pheatmap(primed.read.heat, breaks=seq(-0.5, 0.5, length.out=101), color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0)
-dev.off()
+
 
 ### Supplements
 
@@ -153,7 +131,7 @@ dev.off()
 naive.plot <- readRDS("naive_plot.Rds")
 primed.plot <- readRDS("primed_plot.rds")
 
-pdf(file=file.path(figdir, "s3b.pdf"), width=10, useDingbats=FALSE)
+pdf(file=file.path(figdir, "s3a.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
 plot_data <- ggplot_build(naive.plot)
 plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, main = 'naive', col = plot_data$data[[2]]$fill, 

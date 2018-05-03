@@ -103,23 +103,24 @@ dev.off()
 
 ###############################
 # Figure S2A
-chosen <- readRDS(file.path("results-overall", "cor_hvg.rds"))
-ugly.plot <- plotPCA(sce, exprs_values="norm_exprs", feature_set = chosen)
-plot_data <- ggplot_build(ugly.plot)
+pcs <- readRDS(file.path("results-overall", "pcs.rds"))
 
 all.colors <- character(ncol(sce))
 all.colors[pops$Type=="naive"] <- naive.col
 all.colors[pops$Type=="transition"] <- trans.col
 all.colors[pops$Type=="primed"] <- primed.col
 
-pdf(file=file.path(figdir, "s2a.pdf"), width=8, height=6, useDingbats=FALSE)
-layout(cbind(1,2), width=c(5, 1.5))
+pdf(file=file.path(figdir, "s2a.pdf"), width=9, height=8, useDingbats=FALSE)
+layout(cbind(1,2), width=c(5, 1))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
-plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = all.colors,
-     pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5)
+var1 <- round(attr(pcs, "percentVar")[1]*100)
+var2 <- round(attr(pcs, "percentVar")[2]*100)
+plot(pcs[,1], pcs[,2], col = all.colors,
+     pch=16, xlab = paste0('Component 1: ', var1, '%'), ylab = paste0('Component 2: ', var2, '%') ,
+     cex.lab = 1.5 , cex.axis=1.2)
 par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
-legend("topleft", legend=c("Naive", "Transition", "Primed"), col=c(naive.col, trans.col, primed.col), pch=16, cex=1.5)
+legend("topleft", legend=c("Naive","Transition", "Primed"), col=c(naive.col, trans.col, primed.col), pch=16, cex=1.4, bty='n')
 dev.off()
 
 ###############################

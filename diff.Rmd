@@ -31,8 +31,8 @@ This ensures that we're identifying effects of homogeneous populations.
 
 ```{r}
 library(scran)
-sce <- readRDS("~/Desktop/analysis/sce_all.rds")
-true.groups <- read.table("~/Desktop/analysis/results-naive/groups.tsv", header=TRUE, stringsAsFactors=FALSE)
+sce <- readRDS("sce_all.rds")
+true.groups <- read.table(file.path("results-naive", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
 sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
 sce_naive <- sce[,sce$phenotype == "naive"]
 sce_primed <- sce[,sce$phenotype == "primed"]
@@ -46,7 +46,7 @@ dir.create(resdir, showWarning=FALSE)
 ```
 
 ```{r}
-by.lineage <- read.table("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/miscellaneous/commit_lineages.tsv", header=TRUE, stringsAsFactors=FALSE)
+by.lineage <- read.table(file.path("data/marker", "commit_lineages.tsv"), header=TRUE, stringsAsFactors=FALSE)
 endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
 head(endo.set)
 ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
@@ -66,16 +66,73 @@ inPresentSet <- function(present, desired) {
 }
 lin.markers <- inPresentSet(rowData(sce)$ensembl_gene_id, lin.markers)
 lin.markers <- rownames(sce)[lin.markers]
+
+
+#Export the table of the used markers
+whole.list <- by.lineage[which(by.lineage$Symbol %in% lin.markers),]
+whole.list <- whole.list[(!duplicated(whole.list$Symbol)),]
+write.table(file=file.path(resdir, "linmarkers.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
 ```
 
-First, we first remove the batch effect in each population separately to ensure that they don't distord the clustering. 
+Because we removed the transition cells from the naive subpopulation, we have to calculate the PCs freshly.
+It is important not to forget to remove the batch effect to ensure that they don't distord the clustering. 
+
 
 ```{r}
 library(limma)
 library(scater)
 
-norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch)
-norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch)
+par(mfrow=c(1,2))
+collected.var_naive <- list()
+collected.npcs_naive <- list()
+for (b in levels(sce_naive$batch)) {
+    cur.sce <- sce_naive[,b==sce_naive$batch]
+    cur.sce <- normalize(cur.sce)
+
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit)
+    collected.var_naive[[b]] <- var.out 
+    collected.npcs_naive[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
+}
+
+var.out_naive <- do.call(combineVar, collected.var_naive)
+
+norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
+unlist(collected.npcs_naive)
+
+chosen.npcs_naive <- collected.npcs_naive[[2]]
+
+keep <- var.out_naive$bio > 0
+pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_naive)
+reducedDim(sce_naive, "PCA") <- pc.out$x
+```
+
+Now we repeat the same for the primed population.
+
+```{r primed.vartrend, fig.height=6, fig.width=10}
+par(mfrow=c(1,2))
+collected.var_primed <- list()
+collected.npcs_primed <-list()
+for (b in levels(sce_primed$batch)) {
+    cur.sce <- sce_primed[,b==sce_primed$batch]
+    cur.sce <- normalize(cur.sce)
+    
+    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
+    var.out <- decomposeVar(cur.sce, var.fit)
+    collected.var_primed[[b]] <- var.out 
+    collected.npcs_primed[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
+}
+
+var.out_primed <- do.call(combineVar, collected.var_primed)
+
+norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
+unlist(collected.npcs_primed)
+
+chosen.npcs_primed <- collected.npcs_primed[[2]]
+
+keep <- var.out_primed$bio > 0
+pc.out <- prcomp(t(assay(sce_primed, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_primed)
+reducedDim(sce_primed, "PCA") <- pc.out$x
 ```
 
 We can now have a first glimpse on the the naive and primed populations to check whether they form any clusters and color the PCA/tSNE according to their expression of cell-cycle related genes. If cell-cycle related genes colour different parts of the PCA/tSNE, this is an indication that cell-cycle is the great driver for heterogeneity in the populations.
@@ -83,19 +140,22 @@ We can now have a first glimpse on the the naive and primed populations to check
 ```{r}
 library(ggplot2)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10, rand_seed=100)
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=10, rand_seed=100)
 
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=TRUE,
+
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1") + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",
     perplexity=5, rand_seed=100) + fontsize
 
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1",  rerun=TRUE,
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1") + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1",
     perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
 
-saveRDS(pca_naive, file = 'naive_plot.Rds')
-saveRDS(pca_primed, file = 'primed_plot.Rds')
+saveRDS(tsne_naive, file = 'naive_plot.Rds')
+saveRDS(tsne_primed, file = 'primed_plot.Rds')
 ```
 
 # Naive population clustering
@@ -103,8 +163,8 @@ saveRDS(pca_primed, file = 'primed_plot.Rds')
 We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering.
 
 ```{r}
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_naive, tsne_naive)
 
@@ -115,20 +175,20 @@ We can further colour the plots for specific markers of mesoderm, endoderm and e
 
 ```{r}
 #mesoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne1.Rds')
 
 #ectoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne2.Rds')
 
 #endoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne3.Rds')
 ```
@@ -139,8 +199,8 @@ saveRDS(tsne_naive, file = 'naive_tsne3.Rds')
 We now repeat the same analysis for the primed population. Again, it is necessary to remove the batch effects, which becomes obvious in the direct comparison to before removal.
 
 ```{r}
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_primed, tsne_primed)
 ```
@@ -148,25 +208,25 @@ multiplot(pca_primed, tsne_primed)
 We can also colour the plots again for cell-cycle expression and for key lineage markers.
 
 ```{r}
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 
 #mesoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne1.Rds')
 
 #ectoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne2.Rds')
 
 #endoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, rerun=TRUE, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne3.Rds')
 ```
@@ -177,20 +237,28 @@ Next, we want to check for correlations between Ferdinand's hand-curated markers
 First we load in the new data.
 
 ```{r}
-markers <- read.csv("miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
+markers <- read.csv("data/marker/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
 head(markers)
 chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, markers[,1])
 markers <-  markers[markers$V1 %in% rownames(sce)[chosen_markers],]
+colnames(markers) <- c('Symbol','Function')
 
-epi_modifier <- read.csv("miscellaneous/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
+epi_modifier <- read.csv("data/marker/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_modifier)
 epi_modifier <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_modifier[,1])
 length(epi_modifier)
 
-epi_reader <- read.csv("miscellaneous/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
+epi_reader <- read.csv("data/marker/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_reader)
 epi_reader <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_reader[,1])
 length(epi_reader)
+
+#Export the complete list
+all_reader <- data.frame(Symbol = rownames(sce[epi_reader,]), Function = 'epi_reader')
+all_modifier <- data.frame(Symbol = rownames(sce[epi_modifier,]), Function = 'epi_modifier')
+whole.list <- rbind(markers, all_reader, all_modifier)
+whole.list <- whole.list[(!duplicated(whole.list$Symbol)),]
+write.table(file=file.path(resdir, "epimarker.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
 ```
 
 We can now check again whether the populations cluster if we use only markers for core_pluripotency, naive_pluripotency, primed_pluripotency, formative_pluripotency, mesoderm, ectoderm, trophectoderm or endoderm.
@@ -203,9 +271,9 @@ all.tsne <- list(unique(markers[,2]))
 for (marker.type in unique(markers[,2])){
   marker.set <- rownames(sce_naive[rownames(sce_naive) %in% markers[markers[,2]==marker.type,1],])
   
-  all.pca[[marker.type]] <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = markers[markers[,2]==marker.type,1][1], feature_set = marker.set, rerun=TRUE) + fontsize
+  all.pca[[marker.type]] <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = markers[markers[,2]==marker.type,1][1], feature_set = marker.set) + fontsize
   
-  all.tsne[[marker.type]] <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by='batch', feature_set = marker.set, perplexity=5, rand_seed=100, rerun=TRUE, check_duplicates = FALSE) + fontsize
+  all.tsne[[marker.type]] <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by='batch', feature_set = marker.set, perplexity=5, rand_seed=100, check_duplicates = FALSE) + fontsize
 }
   
 #do.call(multiplot, c(all.pca, list(cols=2)))
@@ -220,9 +288,9 @@ all.tsne <- list(unique(markers[,2]))
 for (marker.type in unique(markers[,2])){
   marker.set <- rownames(sce_primed[rownames(sce_primed) %in% markers[markers[,2]==marker.type,1],])
   
-  all.pca[[marker.type]] <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = markers[markers[,2]==marker.type,1][1], feature_set = marker.set, rerun=TRUE) + fontsize
+  all.pca[[marker.type]] <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = markers[markers[,2]==marker.type,1][1], feature_set = marker.set) + fontsize
   
-  all.tsne[[marker.type]] <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= 'batch', feature_set = marker.set, perplexity=5, rand_seed=100, rerun=TRUE, check_duplicates = FALSE) + fontsize
+  all.tsne[[marker.type]] <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= 'batch', feature_set = marker.set, perplexity=5, rand_seed=100, check_duplicates = FALSE) + fontsize
 }
   
 #do.call(multiplot, c(all.pca, list(cols=2)))
@@ -242,8 +310,8 @@ We begin with the naive population.
 
 ```{r}
 ii <- 1
-naive_mod_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_mod <- list(unique(markers[,2]))
+naive_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
+naive_epi <- list(unique(markers[,2]))
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
@@ -253,293 +321,144 @@ for (marker.type in unique(markers[,2])){
   design <- model.matrix(~sce_naive$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
   vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, 
-    pairings=list(chosen_markers, epi_modifier))
+    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
   sig.count <- sum(vs.mod$FDR <= 0.05)
 
-  gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
+  gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_epi.tsv.gz")), open="wb")
   write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
-  naive_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  naive_mod[[marker.type]] <- vs.mod
+  naive_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
+  naive_epi[[marker.type]] <- vs.mod
   
   ii <- ii+1
 }
-print(naive_mod_stat)
+print(naive_epi_stat)
 ```
 
-Next, we can do the same for epigeentic readers.
+We then merge the correlations for all the markers into one dataframe with the epigenetic markers as rows and the chosen markers as columns.
+The cells contain the correlations between each respective gene pair.
 
 ```{r}
-ii <- 1
-naive_read_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_read <- list(unique(markers[,2]))
-
+all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
-  current.markers <- markers[markers[,2] == marker.type,]
-  chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
-  set.seed(10000)
-  design <- model.matrix(~sce_naive$batch)
-  null.dist <- correlateNull(iters=1e6, design=design)
-  vs.read <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, 
-    pairings=list(chosen_markers, epi_reader))
-  sig.count <- sum(vs.read$FDR <= 0.05)
-  vs.read$type <- marker.type
-
-
-  gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_read.tsv.gz")), open="wb")
-  write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
-  close(gzout)
+  current_list <-naive_epi[[marker.type]] 
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
   
-  naive_read_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
-  naive_read[[marker.type]] <- vs.read
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[c(epi_modifier, epi_reader),])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[c(epi_modifier, epi_reader),])]))
+
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
   
-  ii <- ii+1
+  if (!any(dim(all.heats)==0)){
+  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
+  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
+  }
+  
+  all.heats <- rbind(all.heats, current_mat)
+  
 }
-print(naive_read_stat)
+selection_rows <- tail(order(apply(abs(all.heats),1, mean, na.rm = TRUE)), n=25)
+selection_columns <- tail(order(apply(abs(all.heats),2, mean, na.rm = TRUE)), n=25)
+naive.epi.heat <- all.heats[selection_rows,selection_columns]
 ```
 
 Now we can repeat the same two steps with the primed population.
 
 ```{r}
 ii <- 1
-primed_mod_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_mod <- list(unique(markers[,2]))
+primed_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
+primed_epi <- list(unique(markers[,2]))
 
 for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
   chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
+
   set.seed(10000)
   design <- model.matrix(~sce_primed$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
   vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
-    pairings=list(chosen_markers, epi_modifier))
+    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
   sig.count <- sum(vs.mod$FDR <= 0.05)
 
-  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_mod.tsv.gz")), open="wb")
+  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_epi.tsv.gz")), open="wb")
   write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
   close(gzout)
   
-  primed_mod_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  primed_mod[[marker.type]] <- vs.mod
+  primed_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
+  primed_epi[[marker.type]] <- vs.mod
   
   ii <- ii+1
 }
-print(primed_mod_stat)
+print(primed_epi_stat)
 ```
-
-Finally, we also repeat it for epigeentic readers in the primed population.
 
 ```{r}
-ii <- 1
-primed_read_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_read <- list(unique(markers[,2]))
-
+all.heats <- data.frame()
 for (marker.type in unique(markers[,2])){
-  current.markers <- markers[markers[,2] == marker.type,]
-  chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
-  set.seed(10000)
-  design <- model.matrix(~sce_primed$batch)
-  null.dist <- correlateNull(iters=1e6, design=design)
-  vs.read <- correlatePairs(sce_primed, design=design, null.dist=null.dist, 
-    pairings=list(chosen_markers, epi_reader))
-  sig.count <- sum(vs.read$FDR <= 0.05)
+  current_list <- primed_epi[[marker.type]] 
+  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
+  
+  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
+                          current_list$gene2[current_list$gene2 %in% current.markers]))
+  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[c(epi_modifier, epi_reader),])], 
+                           current_list$gene2[current_list$gene2 %in% rownames(sce[c(epi_modifier, epi_reader),])]))
 
-  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_read.tsv.gz")), open="wb")
-  write.table(file=gzout, vs.read, sep="\t", quote=FALSE, col.names=NA)
-  close(gzout)
+  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
+  rownames(current_mat) <- lineage.names
+  colnames(current_mat) <- epi.names
+
+  for (lin in lineage.names){
+    for (epi in epi.names){
+      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
+      }
+      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
+        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
+      }
+  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
+    }}
   
-  primed_read_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.read)[1], sig.count)
-  primed_read[[marker.type]] <- vs.read
+  if (!any(dim(all.heats)==0)){
+  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
+  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
+  }
   
-ii <- ii+1
+  all.heats <- rbind(all.heats, current_mat)
+  
 }
-print(primed_read_stat)
+selection_rows <- tail(order(apply(abs(all.heats),1, mean, na.rm = TRUE)), n=25)
+selection_columns <- tail(order(apply(abs(all.heats),2, mean, na.rm = TRUE)), n=25)
+primed.epi.heat <- all.heats[selection_rows,selection_columns]
 ```
-
-We can now visualize the statistics in a heatmap.
 
 ```{r}
 library(pheatmap)
-epi_mat <- cbind(naive_mod_stat$sig.corrs, naive_read_stat$sig.corrs, 
-               primed_mod_stat$sig.corrs, primed_read_stat$sig.corrs)
-rownames(epi_mat) <- gsub('_',' ', naive_mod_stat$marker)
-colnames(epi_mat) <- c('modifiers in naive', 'readers in naive', 'modifiers in primed', 'readers in primed')
-pheatmap(epi_mat, cluster_row = F, cluster_cols = F, color = colorRampPalette(c("#0072B2","yellow" ,"#e79f00"))(50), display_numbers = epi_mat, fontsize = 20, fontsize_row = 15, fontsize_col = 15, gaps_col = 2)
+pheatmap(naive.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
+         treeheight_row = 0, treeheight_col = 0)
+pheatmap(primed.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
+         treeheight_row = 0, treeheight_col = 0)
+
+saveRDS(naive.epi.heat, 'naive.epi.Rds')
+saveRDS(primed.epi.heat, 'primed.epi.Rds')
 ```
 
-However, it is clearer to make a heatmap of the correlations themselves of the lineage markers.
-For this, we first have to loop through all the lists, extracting the correlating genes and putting them into a matrix that uses respective lineage markers as row and epigenetic readers/writers as columns. 
-
-```{r}
-all.heats <- data.frame()
-for (marker.type in unique(markers[,2])){
-  current_list <- naive_mod[[marker.type]]
-  current_list <- current_list[1:205,]
-  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
-  
-  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
-                          current_list$gene2[current_list$gene2 %in% current.markers]))
-  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_modifier,])], 
-                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_modifier,])]))
-
-  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
-  rownames(current_mat) <- lineage.names
-  colnames(current_mat) <- epi.names
-
-  for (lin in lineage.names){
-    for (epi in epi.names){
-      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
-      }
-      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
-      }
-  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
-    }}
-  
-  if (!any(dim(all.heats)==0)){
-  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
-  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
-  }
-  all.heats <- rbind(all.heats, current_mat)
-  
-}
-naive.mod.heat <- all.heats
-```
-
-Of course, we have to repeat this for naive/readers primed/mod and primed/readers.
-
-```{r}
-all.heats <- data.frame()
-for (marker.type in unique(markers[,2])){
-  current_list <-naive_read[[marker.type]] 
-  current_list <- current_list[1:413,]
-  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
-  
-  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
-                          current_list$gene2[current_list$gene2 %in% current.markers]))
-  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
-                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
-
-  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
-  rownames(current_mat) <- lineage.names
-  colnames(current_mat) <- epi.names
-
-  for (lin in lineage.names){
-    for (epi in epi.names){
-      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
-      }
-      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
-      }
-  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
-    }}
-  
-  if (!any(dim(all.heats)==0)){
-  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
-  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
-  }
-  
-  all.heats <- rbind(all.heats, current_mat)
-  
-}
-naive.read.heat <- all.heats
-```
-
-
-```{r}
-all.heats <- data.frame()
-for (marker.type in unique(markers[,2])){
-  current_list <-primed_mod[[marker.type]] 
-  current_list <- current_list[1:225,]
-  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
-  
-  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
-                          current_list$gene2[current_list$gene2 %in% current.markers]))
-  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_modifier,])], 
-                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_modifier,])]))
-
-  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
-  rownames(current_mat) <- lineage.names
-  colnames(current_mat) <- epi.names
-
-  for (lin in lineage.names){
-    for (epi in epi.names){
-      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
-      }
-      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
-      }
-  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
-    }}
-  
-  if (!any(dim(all.heats)==0)){
-  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
-  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
-  }
-  
-  all.heats <- rbind(all.heats, current_mat)
-  
-}
-primed.mod.heat <- all.heats
-```
-
-```{r}
-all.heats <- data.frame()
-for (marker.type in unique(markers[,2])){
-  current_list <-primed_read[[marker.type]] 
-  current_list <- current_list[1:584,]
-  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
-  
-  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
-                          current_list$gene2[current_list$gene2 %in% current.markers]))
-  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[epi_reader,])], 
-                           current_list$gene2[current_list$gene2 %in% rownames(sce[epi_reader,])]))
-
-  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
-  rownames(current_mat) <- lineage.names
-  colnames(current_mat) <- epi.names
-
-  for (lin in lineage.names){
-    for (epi in epi.names){
-      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
-      }
-      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
-      }
-  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
-    }}
-  
-  if (!any(dim(all.heats)==0)){
-  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
-  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
-  }
-  
-  all.heats <- rbind(all.heats, current_mat)
-  
-}
-primed.read.heat <- all.heats
-```
-
-Finally, this allows us to create the heatmaps.
-
-```{r}
-pheatmap(naive.read.heat)
-pheatmap(naive.mod.heat)
-pheatmap(primed.mod.heat)
-pheatmap(primed.read.heat)
-
-saveRDS(naive.read.heat, 'naive.read.Rds')
-saveRDS(naive.mod.heat, 'naive.mod.Rds')
-saveRDS(primed.mod.heat,'primed.mod.Rds')
-saveRDS(primed.read.heat,'primed.read.Rds')
-```
-
-Saving the objects and printing session information.
+Printing session information.
 
 ```{r}
 gc()
