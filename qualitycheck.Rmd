@@ -54,5 +54,8 @@ sum(overall.stats[,1]*overall.stats[,3])/sum(overall.stats[,3])
 #Counts
 sum(overall.stats[,2]*overall.stats[,3])/sum(overall.stats[,3])
 #Total
-sum(overall.stats[,4]*overall.stats[,3])/sum(overall.stats[,3])
+sum(overall.stats[c(1,2),4]*overall.stats[,3])/sum(overall.stats[,3])
+sum(overall.stats[c(1,2),4]*overall.stats[c(1,2),3])/sum(overall.stats[c(1,2),3])
+sum(overall.stats[c(3,4,5,6),4]*overall.stats[c(3,4,5,6),3])/sum(overall.stats[c(3,4,5,6),3])
+
 ```
