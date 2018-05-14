@@ -24,8 +24,8 @@ is.down <- de.res$logFC < 0 & de.res$FDR <= 0.05
 x <- de.res$logCPM
 y <- de.res$logFC
 main.col <- "grey50"
-naive.genes <- c("KLF4", "KLF17", "DPPA3", "DNMT3L", "DPPA5")
-primed.genes <- c("DUSP6", "THY1")
+naive.genes <- c("KLF4", "KLF17", "DPPA3", "DNMT3L", "DPPA5", "GATA6", 'TBX3', "IL6ST")
+primed.genes <- c("DUSP6", "THY1", "CD24", "ZIC2", "SFRP2")
 
 pdf(file=file.path(figdir, "1c.pdf"), useDingbats=FALSE)
 par(mar = c(5.1, 5.1, 4.1, 2.1), las=1)
@@ -41,17 +41,17 @@ legend(coords[2]-0.5, coords[3]+1, legend=c(sprintf("Upregulated in naive (%i)",
 
 m <- match(naive.genes, rownames(de.res))
 points(x[m], y[m], col=naive.col, pch=16, cex=1.2)
-pos <- c(4,3,4,4,4)
+pos <- c(4,3,4,4,4,2,3,3)
 text(x[m], y[m], labels = naive.genes, col=naive.col, pos=pos, offset=0.5)
 
 m <- match(primed.genes, rownames(de.res))
 points(x[m], y[m], col=primed.col, pch=16, cex=1.2)
-pos <- c(4,3)
+pos <- c(4,2,4,4,4)
 text(x[m], y[m], labels = primed.genes, col=primed.col, pos=pos, offset=0.5)
 dev.off()
 
 # Figure S1a
-
+library(scater)
 ugly1 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_counts"))
 ugly2 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_features"))
 ugly3 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_ERCC"))
@@ -67,16 +67,24 @@ dev.off()
 
 
 # Figure S1b
-pdf(file=file.path(figdir, "s1b.pdf"),width = 10, height = 10, useDingbats=FALSE)
-markers <- c("KLF17", "DNMT3L", "DPPA5", "DPPA3", "KLF4", "THY1", "DUSP6")
-ugly.plot <- plotExpression(sce, features = markers, col = "phenotype")
-plot_data <- ggplot_build(ugly.plot)
-plot_data$data[[1]]$colour[plot_data$data[[1]]$colour == '#729ECE'] <- naive.col
-plot_data$data[[1]]$colour[plot_data$data[[1]]$colour == '#FF9E4A'] <- primed.col
+pdf(file=file.path(figdir, "s1b.pdf"),width = 10, height = 12, useDingbats=FALSE)
+par(las=1, mar = c(2.1, 4.5, 0.1, 0.5), mfrow=c(2,1))
+markers <- c("KLF4", "DNMT3L", "KHDC1L", "FAM151A", "DUSP6", "FAT3", "THY1")
 
-plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = plot_data$data[[1]]$colour, 
-       ylab=bquote(~log[2]*"-expression"), pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=1.2, ylim=c(0,13), cex.axis=1.2)
-axis(1, at=seq_along(markers), labels = levels(plot_data$plot$data$Feature), cex.axis = 1.5)
-legend("topright", legend=c("naive", "primed"), col=c(naive.col, primed.col, main.col), pch=16, cex=1.5, yjust=0, xjust=1)
+for (ptype in c("naive", "primed")) {
+  object <- sce[,sce$phenotype==ptype]
+  ugly.plot <- plotExpression(object, features = markers, col = "phenotype")
+  plot_data <- ggplot_build(ugly.plot)
+  
+  pcol <- switch(ptype, naive=naive.col, primed=primed.col, transition=trans.col)      
+  plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = pcol, 
+       ylab=bquote(.(stuff)~log[2]*"-expression", list(stuff=paste0(toupper(substring(ptype, 1, 1)), substring(ptype, 2)))),
+       pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,13.3), cex.axis=1.2)
+  if (ptype == "primed"){
+    axis(1, at=seq_along(markers), labels = levels(plot_data$plot$data$Feature), cex.axis = 1.5)
+  } else {
+    axis(1, at=seq_along(markers), labels=character(length(markers)))
+  }
+}
 dev.off()
 

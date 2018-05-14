@@ -173,3 +173,37 @@ abline(h=0, col=primed.col, lwd=5)
 text(0.5, 0.5, sprintf("Primed cells (%i)", sum(pops$Type=="primed")), cex=1.5)
 dev.off()
 
+# Figure S2C
+pdf(file=file.path(figdir, "s2c.pdf"), width = 6, height = 10, useDingbats=FALSE)
+markers <- c("ABCG2", "CLDN4", "VGLL1", "GATA2", "GATA3", "ERP27")
+
+par(las=1, mar = c(2.1, 4.5, 0.1, 0.5), mfrow=c(3,1))
+for (ptype in c("naive", "transition", "primed")) {
+  object <- sce[,pops$Type==ptype]
+  ugly.plot <- plotExpression(object, features = markers, col = "phenotype")
+  plot_data <- ggplot_build(ugly.plot)
+  
+  pcol <- switch(ptype, naive=naive.col, primed=primed.col, transition=trans.col)      
+  plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = pcol, 
+       ylab=bquote(.(stuff)~log[2]*"-expression", list(stuff=paste0(toupper(substring(ptype, 1, 1)), substring(ptype, 2)))),
+       pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,11), cex.axis=1.2)
+  if (ptype == "primed"){
+    axis(1, at=seq_along(markers), labels = levels(plot_data$plot$data$Feature), cex.axis = 1.5)
+  } else {
+    axis(1, at=seq_along(markers), labels=character(length(markers)))
+  }
+}
+
+dev.off()
+
+# Figure S2D
+topgo <- read.table(file=file.path("results-naive", "go_unique_trans.tsv"), sep="\t", header = TRUE) 
+topgo <- topgo[1:10,]
+pdf(file=file.path(figdir, "s2d.pdf"), width = 6, height = 10, useDingbats=FALSE)
+plot <- barplot(topgo$P.DE, horiz = TRUE, col='white', ylab = 'GO Term', xlab='Logged P-Val')
+x<-0.5*topgo$P.DE
+text(x[8:10], plot[8:10],topgo$Term[8:10])
+text((x*2)[1:7], plot[1:7], topgo$Term[1:7], pos =4)
+dev.off()
+
+
