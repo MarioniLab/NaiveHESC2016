@@ -42,7 +42,6 @@ all.out[["Protocol Term Source REF"]] <- c("EFO",
                                            "EFO",
                                            "EFO",
                                            "EFO",
-                                           "EFO",
                                            "EFO")
 all.out[["Protocol Term Accession Number"]] <- c("EFO_0005518",
                                                  "EFO_0003789",
@@ -52,7 +51,7 @@ all.out[["Protocol Term Accession Number"]] <- c("EFO_0005518",
                                                  "EFO_0004917",
                                                  "EFO_0005520")
 
-all.out[["Protocol Description"]] <- c("Human H9-NK2 ESCs were kindly provided by Austin Smith." ,
+all.out[["Protocol Description"]] <- c("The H9 NK2 cell line was kindly provided by Austin Smith, consisting of human H9 ESCs transformed with a doxycycline-inducible Nanog-Klf2 construct (Takashima et al., 2014, Cell).",
                                        "Naive hESCs were grown in 6-well dishes on mouse embryonic fibroblasts in N2B27 supplemented with human LIF, 1 uM Chiron, 1 uM PD03 and 2 uM Go6983. One passage before sorting, cells were plated on 6-well plates coated with Matrigel (growth-factor reduced). Primed hESCs were grown in 6-well dishes coated with Vitronectin in E8 media.",
                                        "hESCs were dissociated with Accutase and sorted with a BD Aria Cell sorter, gating for cell size and granularity. Single-cells were sorted in 2uL of Lysis Buffer (0.2% v/v Triton X-100 (Sigma-Aldrich, cat. no. T9284) with 2U/ul RNase Inhibitor (Clontech, cat. no. 2313A)) in 96 well plates, spun down and immediately frozen at -80 degrees Celsius.",
                                        "The cDNA libraries for sequencing were prepared using Nextera XT DNA Sample Preparation Kit (Illumina, cat. no. FC-131-1096), according to the protocol supplied by Fluidigm (PN 100-5950 B1). Libraries from 96 single cells were pooled and purified using AMPure XP beads (Beckman Coulter).",
@@ -78,8 +77,8 @@ all.out[["Term Source Name"]] <- "EFO"
 all.out[["Term Source File"]] <- "http://www.ebi.ac.uk/efo/"
 all.out[["Term Source Version"]] <- ""
 all.out[["SDRF File"]] <- "sdrf.tsv"
-all.out[["Public Release Date"]] <- "2017-05-31"
-all.out[["Comment[AEExperimentType]"]] <- "RNA-seq of coding RNA"
+all.out[["Public Release Date"]] <- "2018-10-31"
+all.out[["Comment[AEExperimentType]"]] <- "RNA-seq of coding RNA from single cells"
 all.out[["Comment[AdditionalFile:fa]"]] <- "spikes.fa"
 all.out[["Comment[AdditionalFile:txt]"]] <- "spikes.txt"
 
@@ -93,10 +92,11 @@ for (x in names(all.out)) {
 
 # ERCC data taken from https://www.thermofisher.com/order/catalog/product/4456740,
 # under the link "ERCC Controls Analysis: ERCC RNA Spike-In Control Mixes (English)".
-ercc.dil <- 25e6
-ercc.data <- read.table("cms_095046.txt", header=TRUE, check.names=FALSE, sep="\t", stringsAsFactors=FALSE)
+final.vol <- 10
+final.dil <- 25e6
+ercc.data <- read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095046.txt", header=TRUE, check.names=FALSE, sep="\t", stringsAsFactors=FALSE)
 ercc.id <- ercc.data[,"ERCC ID"]
-ercc.quant <- ercc.data[,"concentration in Mix 1 (attomoles/ul)"] / ercc.dil
+ercc.quant <- ercc.data[,"concentration in Mix 1 (attomoles/ul)"] / final.dil * final.vol
 
 spike.dir <- "spike-data"
 dir.create(spike.dir, showWarnings=FALSE)

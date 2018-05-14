@@ -5,7 +5,7 @@
 
 # Genome builds
 
-This combines the mm10 build of the mouse genome with the ERCC sequences:
+This combines the hg38 build of the human genome with the ERCC sequences:
 
 ```sh
 subread-buildindex -o hg38_ERCC /scratchb/bioinformatics/reference_data/reference_genomes/homo_sapiens/hg38/fasta/hsa.hg38.fa ../sequences/spikes/ERCC92.fa
