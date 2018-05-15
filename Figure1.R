@@ -24,8 +24,9 @@ is.down <- de.res$logFC < 0 & de.res$FDR <= 0.05
 x <- de.res$logCPM
 y <- de.res$logFC
 main.col <- "grey50"
-naive.genes <- c("KLF4", "KLF17", "DPPA3", "DNMT3L", "DPPA5", "GATA6", 'TBX3', "IL6ST")
+naive.genes <- c("KLF4", "KLF17", "DPPA3", "DNMT3L", "DPPA5", "GATA6", 'TBX3', "IL6ST", "KLF5")
 primed.genes <- c("DUSP6", "THY1", "CD24", "ZIC2", "SFRP2")
+not.de <- c("OTX2", "T", 'SOX2', "POU5F1", "NANOG")
 
 pdf(file=file.path(figdir, "1c.pdf"), useDingbats=FALSE)
 par(mar = c(5.1, 5.1, 4.1, 2.1), las=1)
@@ -40,14 +41,19 @@ legend(coords[2]-0.5, coords[3]+1, legend=c(sprintf("Upregulated in naive (%i)",
        col=c(naive.col, primed.col, main.col), pch=16, yjust=0, xjust=1)
 
 m <- match(naive.genes, rownames(de.res))
-points(x[m], y[m], col=naive.col, pch=16, cex=1.2)
-pos <- c(4,3,4,4,4,2,3,3)
-text(x[m], y[m], labels = naive.genes, col=naive.col, pos=pos, offset=0.5)
+points(x[m], y[m], col='#D55E00', pch=16, cex=1.2)
+pos <- c(1,3,4,4,4,2,3,3,4)
+text(x[m], y[m], labels = naive.genes, col='#D55E00', pos=pos, offset=0.5)
 
 m <- match(primed.genes, rownames(de.res))
-points(x[m], y[m], col=primed.col, pch=16, cex=1.2)
+points(x[m], y[m], col='royalblue4', pch=16, cex=1.2)
 pos <- c(4,2,4,4,4)
-text(x[m], y[m], labels = primed.genes, col=primed.col, pos=pos, offset=0.5)
+text(x[m], y[m], labels = primed.genes, col='royalblue4', pos=pos, offset=0.5)
+
+m <- match(not.de, rownames(de.res))
+points(x[m], y[m], col='grey20', pch=16, cex=1.2)
+pos <- c(4,4,4,2,4)
+text(x[m], y[m], labels = not.de, col='black', pos=pos, offset=0.5)
 dev.off()
 
 # Figure S1a
@@ -67,9 +73,9 @@ dev.off()
 
 
 # Figure S1b
-pdf(file=file.path(figdir, "s1b.pdf"),width = 10, height = 12, useDingbats=FALSE)
+pdf(file=file.path(figdir, "s1b.pdf"),width = 20, height = 12, useDingbats=FALSE)
 par(las=1, mar = c(2.1, 4.5, 0.1, 0.5), mfrow=c(2,1))
-markers <- c("KLF4", "DNMT3L", "KHDC1L", "FAM151A", "DUSP6", "FAT3", "THY1")
+markers <- c("KLF4", "HORMAD1", "KHDC3L", "ALPP", "ALPPL2", "ZNF729", "TRIM60", "SOX11", "CYTL1", "HMX2", "THY1", "DUSP6", "PTPRZ1")
 
 for (ptype in c("naive", "primed")) {
   object <- sce[,sce$phenotype==ptype]

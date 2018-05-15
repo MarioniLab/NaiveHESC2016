@@ -193,17 +193,16 @@ for (ptype in c("naive", "transition", "primed")) {
     axis(1, at=seq_along(markers), labels=character(length(markers)))
   }
 }
-
 dev.off()
 
 # Figure S2D
 topgo <- read.table(file=file.path("results-naive", "go_unique_trans.tsv"), sep="\t", header = TRUE) 
-topgo <- topgo[1:10,]
-pdf(file=file.path(figdir, "s2d.pdf"), width = 6, height = 10, useDingbats=FALSE)
-plot <- barplot(topgo$P.DE, horiz = TRUE, col='white', ylab = 'GO Term', xlab='Logged P-Val')
+topgo <- topgo[10:1,]
+topgo$P.DE <- -log10(topgo$P.DE)
+pdf(file=file.path(figdir, "s2d.pdf"), width = 8, height = 10, useDingbats=FALSE)
+plot <- barplot(topgo$P.DE, horiz = TRUE, xlim= c(0,11), col='grey90', ylab = 'GO Term', xlab='-log10(P-Val)')
 x<-0.5*topgo$P.DE
-text(x[8:10], plot[8:10],topgo$Term[8:10])
-text((x*2)[1:7], plot[1:7], topgo$Term[1:7], pos =4)
+text(x, plot,topgo$Term)
+numbers <- paste0(topgo$DE, " out of ", topgo$N)
+text(x*2, plot, numbers, pos =4)
 dev.off()
-
-

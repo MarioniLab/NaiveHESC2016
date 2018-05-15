@@ -107,7 +107,7 @@ naive.epi.heat[which(naive.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5
 
 pdf(file.path(figdir, "3c.pdf"), width=5, height = 5, onefile=FALSE)
 pheatmap(naive.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0,cluster_rows = FALSE, cluster_cols = FALSE)
+         treeheight_row = 0, treeheight_col = 0)
 dev.off()
 
 
@@ -123,24 +123,9 @@ pheatmap(primed.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed'
          treeheight_row = 0, treeheight_col = 0,cluster_rows = FALSE, cluster_cols = FALSE)
 dev.off()
 
-
-# 3C
-naive.epi.heat <- readRDS('naive.epi.Rds')
-primed.epi.heat <- readRDS('primed.epi.Rds')
-colour.code <- readRDS('fdr.corr.Rds')
-
-colour.scheme <- c('grey', 'black', naive.col, primed.col)
-colour.code <- colour.scheme[colour.code]
-
-pdf(file.path(figdir, "3c_alt.pdf"), width=10, height = 10, onefile=FALSE)
-plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', pch=16, col = colour.code)
-legend('topleft', legend = c('Total: 1210', 'sig in both: 19', 'sig in naive: 448', 'sig in primed: 0'), pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
-dev.off()
-
-
 ### Supplements
 
-# Figure 3A
+# Figure S3A
 
 naive.plot <- readRDS("naive_plot.Rds")
 primed.plot <- readRDS("primed_plot.rds")
@@ -160,4 +145,16 @@ legend <- tmp$grobs[[leg]]
 legend$vp$x <- unit(.95, "npc")
 legend$vp$y <- unit(.5, "npc")
 grid.draw(legend)
+dev.off()
+
+
+# Figure S3B
+colour.code <- readRDS('fdr.corr.Rds')
+
+colour.scheme <- c('grey', 'black', naive.col, primed.col)
+colour.code <- colour.scheme[colour.code]
+
+pdf(file.path(figdir, "s3b.pdf"), width=10, height = 10, onefile=FALSE)
+plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', pch=16, col = colour.code)
+legend('topleft', legend = c('Total: 625', 'Sig in both: 6', 'Sig in naive: 214', 'Sig in primed: 1'), pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
 dev.off()
