@@ -509,15 +509,18 @@ for (lin in lineage.names){ #Sorts for gene combinations is in the list
 heat.dists <- dist(current_mat1)
 heat.tree <- hclust(heat.dists)
 
+heat.dist2 <- dist(t(current_mat1))
+heat.tree2 <- hclust(heat.dist2)
+
 pvals <- matrix(nrow=length(lineage.names), ncol = length(epi.names), 1)
 pvals[pvals1==TRUE & pvals2==TRUE] <- 2 #significant in both
 pvals[pvals1==TRUE & pvals2==FALSE] <- 3 #significant in naive
 pvals[pvals1==FALSE & pvals2==TRUE] <- 4 #signifcant in primed
   
 pheatmap(current_mat1, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree)
+         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
 pheatmap(current_mat2, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree)
+         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
 
 plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', col = pvals, pch=16)
 

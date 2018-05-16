@@ -102,12 +102,18 @@ library(gridExtra)
 
 naive.epi.heat <- readRDS('naive.epi.Rds')
 
+heat.dists <- dist(current_mat1)
+heat.tree <- hclust(heat.dists)
+
+heat.dist2 <- dist(t(current_mat1))
+heat.tree2 <- hclust(heat.dist2)
+
 naive.epi.heat[which(naive.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
 naive.epi.heat[which(naive.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5
 
 pdf(file.path(figdir, "3c.pdf"), width=5, height = 5, onefile=FALSE)
 pheatmap(naive.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0)
+         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
 dev.off()
 
 
@@ -120,7 +126,7 @@ primed.epi.heat[which(primed.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to s
 
 pdf(file.path(figdir, "3d.pdf"), width=5, height = 5, onefile=FALSE)
 pheatmap(primed.epi.heat, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0,cluster_rows = FALSE, cluster_cols = FALSE)
+         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
 dev.off()
 
 ### Supplements
