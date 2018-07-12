@@ -143,19 +143,18 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10, rand_seed=100)
 sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=10, rand_seed=100)
 
-
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1") + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1",
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1", rerun=TRUE,
     perplexity=5, rand_seed=100) + fontsize
 
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1") + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1",
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = "CDK1", rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", rerun=TRUE,
     perplexity=5, rand_seed=100) + fontsize
 
 multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
 
-saveRDS(tsne_naive, file = 'naive_plot.Rds')
-saveRDS(tsne_primed, file = 'primed_plot.Rds')
+saveRDS(pca_naive, file = 'naive_plot.Rds')
+saveRDS(pca_primed, file = 'primed_plot.Rds')
 ```
 
 # Naive population clustering
@@ -163,9 +162,9 @@ saveRDS(tsne_primed, file = 'primed_plot.Rds')
 We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering.
 
 ```{r}
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
-
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
+saveRDS(tsne_naive, file = 'naive_tsne4.Rds')
 multiplot(pca_naive, tsne_naive)
 
 ```
@@ -175,20 +174,20 @@ We can further colour the plots for specific markers of mesoderm, endoderm and e
 
 ```{r}
 #mesoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun = TRUE) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne1.Rds')
 
 #ectoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, perplexity=50, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, perplexity=50, rand_seed=100, rerun=TRUE) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne2.Rds')
 
 #endoderm
-pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers) + fontsize
-tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
+pca_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = 'naive_tsne3.Rds')
 ```
@@ -199,34 +198,34 @@ saveRDS(tsne_naive, file = 'naive_tsne3.Rds')
 We now repeat the same analysis for the primed population. Again, it is necessary to remove the batch effects, which becomes obvious in the direct comparison to before removal.
 
 ```{r}
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
-
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
+saveRDS(tsne_primed, file = 'primed_tsne4.Rds')
 multiplot(pca_primed, tsne_primed)
 ```
 
 We can also colour the plots again for cell-cycle expression and for key lineage markers.
 
 ```{r}
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'CDK1', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "CDK1", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
 multiplot(pca_primed, tsne_primed)
 
 #mesoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'SNAI1', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "SNAI1", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne1.Rds')
 
 #ectoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'NES', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "NES", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne2.Rds')
 
 #endoderm
-pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers) + fontsize
-tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, perplexity=5, rand_seed=100) + fontsize
+pca_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = lin.markers, rerun=TRUE) + fontsize
+tsne_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by= "GATA4", feature_set =  lin.markers, perplexity=5, rand_seed=100, rerun=TRUE) + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = 'primed_tsne3.Rds')
 ```
@@ -257,7 +256,6 @@ length(epi_reader)
 all_reader <- data.frame(Symbol = rownames(sce[epi_reader,]), Function = 'epi_reader')
 all_modifier <- data.frame(Symbol = rownames(sce[epi_modifier,]), Function = 'epi_modifier')
 whole.list <- rbind(markers, all_reader, all_modifier)
-whole.list <- whole.list[(!duplicated(whole.list$Symbol)),]
 write.table(file=file.path(resdir, "epimarker.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
 ```
 
@@ -516,7 +514,9 @@ pvals <- matrix(nrow=length(lineage.names), ncol = length(epi.names), 1)
 pvals[pvals1==TRUE & pvals2==TRUE] <- 2 #significant in both
 pvals[pvals1==TRUE & pvals2==FALSE] <- 3 #significant in naive
 pvals[pvals1==FALSE & pvals2==TRUE] <- 4 #signifcant in primed
-  
+
+library(pheatmap)
+
 pheatmap(current_mat1, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
          treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
 pheatmap(current_mat2, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
@@ -527,61 +527,6 @@ plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab
 saveRDS(current_mat1, 'naive.epi.Rds')
 saveRDS(current_mat2, 'primed.epi.Rds')
 saveRDS(pvals, 'fdr.corr.Rds')
-
-selection_rows <- tail(order(apply(abs(all.heats),1, mean, na.rm = TRUE)), n=25)
-selection_columns <- tail(order(apply(abs(all.heats),2, mean, na.rm = TRUE)), n=25)
-naive.epi.heat <- all.heats[selection_rows,selection_columns]
-```
-
-
-```{r}
-all.heats <- data.frame()
-for (marker.type in unique(markers[,2])){
-  current_list <- primed_epi[[marker.type]] 
-  current.markers <- rownames(sce[rownames(sce) %in% markers[markers[,2]==marker.type,1],])
-  
-  lineage.names <- unique(c(current_list$gene1[current_list$gene1 %in% current.markers], 
-                          current_list$gene2[current_list$gene2 %in% current.markers]))
-  epi.names <- unique(c(current_list$gene1[current_list$gene1 %in% rownames(sce[c(epi_modifier, epi_reader),])], 
-                           current_list$gene2[current_list$gene2 %in% rownames(sce[c(epi_modifier, epi_reader),])]))
-
-  current_mat <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
-  rownames(current_mat) <- lineage.names
-  colnames(current_mat) <- epi.names
-
-  for (lin in lineage.names){
-    for (epi in epi.names){
-      if (any(current_list$gene1 == lin & current_list$gene2 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene1 == lin & current_list$gene2 == epi)]
-      }
-      else if (any(current_list$gene2 == lin & current_list$gene1 == epi)){
-        current_mat[lin, epi] <- current_list$rho[which(current_list$gene2 == lin & current_list$gene1 == epi)]
-      }
-  else {current_mat[lin, epi] <- 0}  # assuming that there is 0 correlation if the gene combination doesn't show up
-    }}
-  
-  if (!any(dim(all.heats)==0)){
-  current_mat <- current_mat[,intersect(colnames(all.heats), colnames(current_mat))]
-  all.heats <- all.heats[,intersect(colnames(all.heats), colnames(current_mat))]
-  }
-  
-  all.heats <- rbind(all.heats, current_mat)
-  
-}
-selection_rows <- tail(order(apply(abs(all.heats),1, mean, na.rm = TRUE)), n=25)
-selection_columns <- tail(order(apply(abs(all.heats),2, mean, na.rm = TRUE)), n=25)
-primed.epi.heat <- all.heats[selection_rows,selection_columns]
-```
-
-```{r}
-library(pheatmap)
-pheatmap(current_mat1, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0,cluster_rows = F, cluster_cols = F)
-pheatmap(current_mat2, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0,cluster_rows = F, cluster_cols = F)
-
-saveRDS(naive.epi.heat, 'naive.epi.Rds')
-saveRDS(primed.epi.heat, 'primed.epi.Rds')
 ```
 
 Printing session information.
