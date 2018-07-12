@@ -28,8 +28,8 @@ bound <- 5
 colbreaks <- seq(-bound, bound, length.out=length(colramp)+1)
 heat.naive.vals[heat.naive.vals >= bound] <- bound 
 heat.naive.vals[heat.naive.vals <= -bound] <- -bound 
-heat.naive.vals[heat.naive.vals >= bound] <- bound 
-heat.naive.vals[heat.naive.vals <= -bound] <- -bound 
+heat.primed.vals[heat.primed.vals >= bound] <- bound 
+heat.primed.vals[heat.primed.vals <= -bound] <- -bound 
 
 pdf(file=file.path(figdir, "2a.pdf"), width = 10, height = 10)
 layout(rbind(c(13,10,11,12,13), c(8,1,2,3,7),c(9,4,5,6,7)), widths=c(0.2, 1, 1, 1, 0.2), heights=c(0.1, 1, 1))
@@ -135,6 +135,22 @@ imprinted <- c("ENSG00000140443", # IGF1R
 
 heat.imprint.vals <- exprs(sce)[match(imprinted, rowData(sce)$ensembl_gene_id),]
 heat.imprint.vals <- heat.imprint.vals - rowMeans(heat.imprint.vals)
+heat.imprint.vals[which(heat.imprint.vals>5, arr.ind = TRUE)] <- 5
+heat.imprint.vals[which(heat.imprint.vals< (-5), arr.ind = TRUE)] <- -5
+
+pvals <- c()
+for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
+current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="naive"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
+pvals[gene] <- current.test$p.value
+}
+naive.pvals <- p.adjust(pvals, method = 'holm')
+
+pvals <- c()
+for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
+  current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="primed"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
+  pvals[gene] <- current.test$p.value
+}
+primed.pvals <- p.adjust(pvals, method = 'holm')
 
 pdf(file=file.path(figdir, "s2b.pdf"), width = 10, height = 5)
 layout(rbind(c(9,6,7,8,9), c(5,1,2,3,4)), widths=c(0.2, 1, 1, 1, 0.2), heights=c(0.1, 1, 1))
