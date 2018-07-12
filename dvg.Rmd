@@ -52,7 +52,7 @@ We use _edgeR_ to estimate the dispersion for each sample.
 This gives us biological components after we take the residual from the technical trend (fitted based on spike-in counts).
 
 ```{r, fig.height=10, fig.width=10}
-source("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/testing/varfun.R")
+source("testing/varfun.R")
 bio.mat <- weight.mat <- matrix(0, nrow(sce), nlevels(sce$sample))
 colnames(bio.mat) <- colnames(weight.mat) <- levels(sce$sample)
 
@@ -143,7 +143,7 @@ plotExpression(sce, features=matching, x="sample", colour_by="phenotype")
 We throw ROAST at the gene set used to characterize each germ layer (curated by Ferdinand).
 
 ```{r}
-by.lineage <- read.table("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/miscellaneous/commit_lineages.tsv", header=TRUE, stringsAsFactors=FALSE)
+by.lineage <- read.csv("data/marker/commit_lineages.csv", header=TRUE, stringsAsFactors=FALSE, sep = ';')
 endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
 head(endo.set)
 ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
@@ -337,7 +337,7 @@ For this, we import the DE genes and the marker lists.
 ```{r}
 DEgenes <- read.table(file=file.path('results-overall','de.tsv'))
 
-markers <- read.csv("~/Documents/Studium/Master/2016-10 Cambridge/NaiveHESC2016/miscellaneous/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
+markers <- read.csv("data/marker/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
 chosen_markers <- inPresentSet(rowData(sce)$ensembl_gene_id, markers[,1])
 
 #germlayers

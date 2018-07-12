@@ -46,7 +46,7 @@ dir.create(resdir, showWarning=FALSE)
 ```
 
 ```{r}
-by.lineage <- read.table(file.path("data/marker", "commit_lineages.tsv"), header=TRUE, stringsAsFactors=FALSE)
+by.lineage <- read.csv(file.path("data/marker", "commit_lineages.csv"), header=TRUE, stringsAsFactors=FALSE, sep= ';')
 endo.set <- by.lineage$Symbol[grep("endoderm", by.lineage$Germ_layer)]
 head(endo.set)
 ecto.set <- by.lineage$Symbol[grep("ectoderm", by.lineage$Germ_layer)]
