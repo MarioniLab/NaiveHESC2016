@@ -461,6 +461,34 @@ pheatmap(heat.vals, cluster_cols=FALSE,
     annotation_colors=list(Cluster=setNames(clust.cols, unique(all.pheno))))
 ```
 
+Finally, we perform a holms-corrected unpaired t.test to test whether the differences in gene expression between the transition and the other populations,respectively, are more pronounce between transition/primed than transition/naive.
+
+```{r}
+imprinted <- c("ENSG00000140443", # IGF1R
+               "ENSG00000128739", # SNRPN
+               "ENSG00000053438", # NNAT
+               "ENSG00000101294", # HM13
+               "ENSG00000198300", # PEG3
+               "ENSG00000214548") # MEG3
+
+heat.imprint.vals <- exprs(sce)[match(imprinted, rowData(sce)$ensembl_gene_id),]
+pops <- data.frame(Cell=colnames(sce), Type=all.pheno)
+
+pvals <- c()
+for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
+current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="naive"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
+pvals[gene] <- current.test$p.value
+}
+p.adjust(pvals, method = 'holm')
+
+pvals <- c()
+for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
+  current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="primed"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
+  pvals[gene] <- current.test$p.value
+}
+p.adjust(pvals, method = 'holm')
+```
+
 # Wrapping up
 
 We save our object for later use and report the session information.
