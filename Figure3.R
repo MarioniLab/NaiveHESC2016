@@ -102,10 +102,10 @@ library(gridExtra)
 
 naive.epi.heat <- readRDS('naive.epi.Rds')
 
-heat.dists <- dist(current_mat1)
+heat.dists <- dist(naive.epi.heat)
 heat.tree <- hclust(heat.dists)
 
-heat.dist2 <- dist(t(current_mat1))
+heat.dist2 <- dist(t(naive.epi.heat))
 heat.tree2 <- hclust(heat.dist2)
 
 naive.epi.heat[which(naive.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
@@ -161,6 +161,27 @@ colour.scheme <- c('grey', 'black', naive.col, primed.col)
 colour.code <- colour.scheme[colour.code]
 
 pdf(file.path(figdir, "s3b.pdf"), width=10, height = 10, onefile=FALSE)
-plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', pch=16, col = colour.code)
-legend('topleft', legend = c('Total: 625', 'Sig in both: 6', 'Sig in naive: 214', 'Sig in primed: 1'), pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
+plot(naive.epi.heat, primed.epi.heat, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', pch=16, col = colour.code)
+legend('topleft', legend = c('Total: 625', 'Sig in both: 15', 'Sig in naive: 282', 'Sig in primed: 4'), 
+       pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
+dev.off()
+
+# Figure S3C
+tsne4 <- readRDS("naive_tsne4.Rds")
+pdf(file=file.path(figdir, "s3c.pdf"), width=10, useDingbats=FALSE)
+par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
+plot_data <- ggplot_build(tsne4)
+plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, main = 'naive', col = plot_data$data[[2]]$fill, 
+     pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5 , cex=1.5)
+par(mar = c(5.1, 4.1, 4.1, 5.1), las = 1)
+tsne4 <- readRDS("primed_tsne4.Rds")
+plot_data <- ggplot_build(tsne4)
+plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, main = 'primed', col = plot_data$data[[2]]$fill, 
+     pch=16, xlab = plot_data$plot$labels$x , ylab = plot_data$plot$labels$y, cex.lab = 1.5 , cex=1.5)
+tmp <- ggplot_gtable(plot_data) 
+leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+legend <- tmp$grobs[[leg]] 
+legend$vp$x <- unit(.95, "npc")
+legend$vp$y <- unit(.5, "npc")
+grid.draw(legend)
 dev.off()
