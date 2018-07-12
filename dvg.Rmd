@@ -354,8 +354,8 @@ First, we visualize the primed population to check whether it forms any clusters
 ```{r}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
 
-plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = rownames(primed.hvg[1,])) + fontsize
-plotTSNE(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by=rownames(primed.hvg[1,]),
+plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = rownames(primed.hvg[1,]), rerun=T) + fontsize
+plotTSNE(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by=rownames(primed.hvg[1,]),  rerun=T,
     perplexity=5, rand_seed=100) + fontsize
 ```
 
@@ -363,16 +363,16 @@ If cell-cycle related genes colour different clusters/parts of the PCA/tSNE, thi
 
 ```{r}
 
-pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = rownames(sce)[endo_markers][2], feature_set = rownames(sce)[endo_markers]) + fontsize
-pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = rownames(sce)[endo_markers][2], feature_set = rownames(sce)[endo_markers]) + fontsize
+pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = rownames(sce)[endo_markers], rerun=T) + fontsize
+pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = rownames(sce)[endo_markers], rerun=T) + fontsize
 multiplot(pca_primed, pca_naive, cols=2)
 
-pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = rownames(sce)[ecto_markers][2], feature_set = rownames(sce)[ecto_markers]) + fontsize
-pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = rownames(sce)[ecto_markers][2], feature_set = rownames(sce)[ecto_markers]) + fontsize
+pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = 'FGF5', feature_set = rownames(sce)[ecto_markers], rerun=T) + fontsize
+pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = 'FGF5', feature_set = rownames(sce)[ecto_markers], rerun=T) + fontsize
 multiplot(pca_primed, pca_naive, cols=2)
 
-pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = rownames(sce)[meso_markers][2], feature_set = rownames(sce)[meso_markers]) + fontsize
-pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = rownames(sce)[meso_markers][2], feature_set = rownames(sce)[meso_markers]) + fontsize
+pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = 'T', feature_set = rownames(sce)[meso_markers], rerun=T) + fontsize
+pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = 'T', feature_set = rownames(sce)[meso_markers], rerun=T) + fontsize
 multiplot(pca_primed, pca_naive, cols=2)
 
 germlayers <- c(rownames(sce)[meso_markers], rownames(sce)[endo_markers], rownames(sce)[ecto_markers])
@@ -380,6 +380,13 @@ pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs"
 pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = "CDK1", feature_set = germlayers) + fontsize
 multiplot(pca_primed, pca_naive, cols=2)
 
+```
+
+
+```{r}
+pca_primed <- plotPCA(sce[,sce$phenotype == 'primed'], exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = rownames(sce)[c(endo_markers, ecto_markers, meso_markers)], rerun=T) + fontsize
+pca_naive <- plotPCA(sce[,sce$phenotype == 'naive'], exprs_values="norm_exprs", colour_by = 'GATA4', feature_set = rownames(sce)[c(endo_markers, ecto_markers, meso_markers)], rerun=T) + fontsize
+multiplot(pca_primed, pca_naive, cols=2)
 ```
 
 Finally, we can also check what happens if we only use DE genes between naive and primed for clustering.
