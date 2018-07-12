@@ -46,6 +46,8 @@ sce_naive <- normalize(sce_naive)
 We can examine the expression of the various ESC markers in more detail.
 
 ```{r naiveExpMarker}
+library(ggplot2)
+library(scater)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"),
     colour_by="batch") + fontsize
