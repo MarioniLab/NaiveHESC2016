@@ -68,18 +68,18 @@ This is done separately for each batch due to the differences in spike-in quanti
 The trend generally fits quite well, though some deviation of the spike-ins is attributable to amplification-induced variability.
 
 ```{r naive.vartrend, fig.height=6, fig.width=10}
+sce_naive <- multiBlockNorm(sce_naive, sce_naive$batch)
+var.out_naive <- multiBlockVar(sce_naive, block=sce_naive$batch,
+    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
+
 par(mfrow=c(1,2))
-collected.var_naive <- list()
-for (b in levels(sce_naive$batch)) {
-    cur.sce <- sce_naive[,b==sce_naive$batch]
-    cur.sce <- normalize(cur.sce)
-    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit)
-    collected.var_naive[[b]] <- var.out 
-    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-        ylab="Variance of log-expression", main=paste("Batch", b))
-    points(var.fit$mean, var.fit$var, pch=16, col="red")
-    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+is.spike <- isSpike(sce_naive)
+for (batch in levels(sce_naive$batch)) {
+    cur.out <- var.out_naive$per.block[[batch]]
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=batch)
+    curve(metadata(cur.out)$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    points(cur.out$mean[is.spike], cur.out$total[is.spike], col="red", pch=16)
 }
 ```
 
@@ -88,15 +88,7 @@ We also look at the distribution of the gene-wise variances.
 The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
 
 ```{r naive.varplot}
-var.out_naive <- do.call(combineVar, collected.var_naive)
-write.table(file=file.path(resdir, "var.tsv"), var.out_naive, 
-    sep="\t", quote=FALSE, col.names=NA) 
-plot(var.out_naive$mean, var.out_naive$total, pch=16, cex=0.6, xlab="Mean log-expression",
-    ylab="Variance of log-expression")
-is <- which(isSpike(sce_naive))
-points(var.out_naive$mean[is], var.out_naive$total[is], col="red", pch=16)
-o <- is[order(var.out_naive$mean[is])]
-curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+write.table(file=file.path(resdir, "var_g1_naive.tsv"), var.out_naive, sep="\t", quote=FALSE, col.names=NA)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -138,7 +130,6 @@ sig.cor_naive <- var.cor_naive$FDR <= 0.05
 summary(sig.cor_naive)
 chosen_naive <- var.cor_naive$gene[sig.cor_naive]
 saveRDS(file=file.path(resdir, "cor_hvg.rds"), chosen_naive)
-length(chosen_naive)
 ```
 
 # Performing dimensionality reduction
@@ -153,12 +144,10 @@ norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$bat
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.naive, fig.width=15, fig.height=6}
-tsne1_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1],
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
-tsne2_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="KLF4",
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
-tsne3_naive <- plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="batch",
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+sce_naive <- runTSNE(sce_naive, exprs_values="norm_exprs", perplexity=5, set.seed=100, feature_set=chosen_naive)
+tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) + fontsize
+tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
+tsne3_naive <- plotTSNE(sce_naive, colour_by="batch") + fontsize
 multiplot(tsne1_naive, tsne2_naive, tsne3_naive, cols=3)
 ```
 
@@ -166,12 +155,10 @@ All plots suggest that there is a small subpopulation off the main bulk of cells
 We repeat this for PCA plots, though this is not so clear - dominated by variance along the larger population, perhaps?
 
 ```{r pca.naive, fig.width=15, fig.height=6}
-pca1_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by=rownames(hvg.out_naive)[1], 
-    feature_set = chosen_naive) + fontsize
-pca2_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="KLF4", 
-    feature_set = chosen_naive) + fontsize
-pca3_naive <- plotPCA(sce_naive, exprs_values="norm_exprs", colour_by="batch", 
-    feature_set = chosen_naive) + fontsize
+sce_naive <- runPCA(sce_naive, exprs_values="norm_exprs", perplexity=10, set.seed=100, feature_set = chosen_naive)
+pca1_naive <- plotPCA(sce_naive, colour_by=rownames(hvg.out_naive)[1]) + fontsize
+pca2_naive <- plotPCA(sce_naive, colour_by="KLF4") + fontsize
+pca3_naive <- plotPCA(sce_naive, colour_by="batch") + fontsize
 multiplot(pca1_naive, pca2_naive, pca3_naive, cols=3)
 ```
 
@@ -186,7 +173,7 @@ my.tree_naive <- hclust(my.dist_naive, method="ward.D2")
 ```
 
 To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
-These suggest that `k=3` is the best, with cluster 3 being genuinely separated from the others.
+These suggest that `k=3` is the best, with cluster 2 being genuinely separated from the others.
 
 ```{r silhouette, fig.width=10, fig.height=10}
 library(cluster)
@@ -218,11 +205,10 @@ We can have a look at the clustering result on our PCA plots from before, and on
 
 ```{r naive_PCA}
 sce_naive$cluster <- factor(my.clusters_naive)
-plotTSNE(sce_naive, exprs_values="norm_exprs", colour_by="cluster", 
-    perplexity=5, rand_seed=100, feature_set=chosen_naive) + fontsize
+plotTSNE(sce_naive, colour_by="cluster") + fontsize
 ```
 
-# Characterising cluster 3
+# Characterising cluster 2
 
 ## Checking some diagnostics
 
@@ -266,8 +252,8 @@ all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==trans.cluste
 write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
     row.names=FALSE, quote=FALSE, sep="\t")
 sce$phenotype <- all.pheno
-plotPCA(sce, exprs_values="norm_exprs", colour_by="phenotype", 
-    feature_set = readRDS("results-overall/cor_hvg.rds")) + fontsize
+sce <- runPCA(sce, exprs_values="norm_exprs")
+plotPCA(sce, colour_by="phenotype") + fontsize
 ```
 
 ## Identifying marker genes for cluster 3

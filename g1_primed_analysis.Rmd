@@ -68,18 +68,18 @@ This is done separately for each batch due to the differences in spike-in quanti
 The trend is okay, though some deviation of the spike-ins is attributable to amplification-induced variability.
 
 ```{r primed.vartrend, fig.height=6, fig.width=10}
+sce_primed <- multiBlockNorm(sce_primed, sce_primed$batch)
+var.out_primed <- multiBlockVar(sce_primed, block=sce_primed$batch,
+    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
+
 par(mfrow=c(1,2))
-collected.var_primed <- list()
-for (b in levels(sce_primed$batch)) {
-    cur.sce <- sce_primed[,b==sce_primed$batch]
-    cur.sce <- normalize(cur.sce)
-    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit)
-    collected.var_primed[[b]] <- var.out 
-    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-        ylab="Variance of log-expression")
-    points(var.fit$mean, var.fit$var, pch=16, col="red")
-    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+is.spike <- isSpike(sce_primed)
+for (batch in levels(sce_primed$batch)) {
+    cur.out <- var.out_primed$per.block[[batch]]
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=batch)
+    curve(metadata(cur.out)$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    points(cur.out$mean[is.spike], cur.out$total[is.spike], col="red", pch=16)
 }
 ```
 
@@ -88,14 +88,7 @@ We also look at the distribution of the gene-wise variances.
 The biological component is computed as the difference in the total variance and the trend (i.e., the technical component).
 
 ```{r primed.varplot}
-var.out_primed <- do.call(combineVar, collected.var_primed)
-write.table(file=file.path(resdir, "var.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA) 
-plot(var.out_primed$mean, var.out_primed$total, pch=16, cex=0.6, xlab="Mean log-expression",
-     ylab="Variance of log-expression")
-is <- which(isSpike(sce_primed))
-points(var.out_primed$mean[is], var.out_primed$total[is], col="red", pch=16)
-o <- is[order(var.out_primed$mean[is])]
-curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+write.table(file=file.path(resdir, "var_g1_primed.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -104,7 +97,7 @@ Genes with significantly non-zero biological components at a FDR of 5% are defin
 hvg.out_primed <- var.out_primed[which(var.out_primed$FDR <= 0.05 & var.out_primed$bio >= 0.5),]
 hvg.out_primed <- hvg.out_primed[order(hvg.out_primed$bio, decreasing=TRUE),]
 nrow(hvg.out_primed)
-write.table(file=file.path(resdir, "hvg.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "hvg_g1_primed.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
 head(hvg.out_primed)
 ```
 
@@ -155,24 +148,20 @@ norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.primed, fig.width=15, fig.height=6}
-tsne1_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by=rownames(hvg.out_primed)[1],
-    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
-tsne2_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by="KLF4",
-    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
-tsne3_primed <- plotTSNE(sce_primed, exprs_values="norm_exprs", colour_by="batch",
-    perplexity=5, rand_seed=100, feature_set=chosen_primed) + fontsize
+sce_primed <- runTSNE(sce_primed, exprs_values="norm_exprs", perplexity=5, set.seed=100, feature_set=chosen_primed)
+tsne1_primed <- plotTSNE(sce_primed, colour_by=rownames(hvg.out_primed)[1]) + fontsize
+tsne2_primed <- plotTSNE(sce_primed, colour_by="KLF4") + fontsize
+tsne3_primed <- plotTSNE(sce_primed, colour_by="batch") + fontsize
 multiplot(tsne1_primed, tsne2_primed, tsne3_primed, cols=3)
 ```
 
 And again, for PCA plots.
 
 ```{r pca.primed, fig.width=15, fig.height=6}
-pca1_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by=rownames(hvg.out_primed)[1], 
-    feature_set = chosen_primed) + fontsize
-pca2_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by="KLF4", 
-    feature_set = chosen_primed) + fontsize
-pca3_primed <- plotPCA(sce_primed, exprs_values="norm_exprs", colour_by="batch", 
-    feature_set = chosen_primed) + fontsize
+sce_primed <- runPCA(sce_primed, exprs_values="norm_exprs", perplexity=10, set.seed=100, feature_set = chosen_primed)
+pca1_primed <- plotPCA(sce_primed, colour_by=rownames(hvg.out_primed)[1]) + fontsize
+pca2_primed <- plotPCA(sce_primed, colour_by="KLF4") + fontsize
+pca3_primed <- plotPCA(sce_primed, colour_by="batch") + fontsize
 multiplot(pca1_primed, pca2_primed, pca3_primed, cols=3)
 ```
 
@@ -216,13 +205,15 @@ We first look at the number of HVGs detected in each population.
 The number is slightly lower in the primed population, though that's probably due to loss of power from increases in the technical variance.
 
 ```{r}
-var.out_naive <- read.table(file.path("results-naive", "var.tsv"))
-hvg.out_naive <- read.table(file.path("results-naive", "hvg.tsv"))
+var.out_primed <- read.table(file.path("results-primed", "var_primed.tsv"))
+hvg.out_naive <- read.table(file.path("results-naive", "var_naive.tsv"))
+hvg.out_primed <- var.out_naive$bio < 
+hvg.out_naive
 nrow(hvg.out_primed)
 nrow(hvg.out_naive)
-plot(var.out_primed$mean, var.out_primed$tech, col="dodgerblue", pch=16, cex=0.5,
+plot(hvg.out_primed$mean, hvg.out_primed$tech, col="dodgerblue", pch=16, cex=0.5,
     xlab="Mean log-expression", ylab="Technical variance")
-points(var.out_naive$mean, var.out_naive$tech, col="orange", pch=16, cex=0.5)
+points(hvg.out_naive$mean, hvg.out_naive$tech, col="orange", pch=16, cex=0.5)
 ```
 
 A simpler view is that of the differences in the biological component between conditions.
@@ -231,7 +222,7 @@ We plot the difference against the change in the mean expression to see whether 
 (Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.)
 
 ```{r varcomp, fig.width=15, fig.height=6}
-dbio <- var.out_primed$bio - var.out_naive$bio
+dbio <- hvg.out_primed$bio - hvg.out_naive$bio
 
 # Expression values are not directly comparable between separately-normalized objects.
 # Pulling out primed-naive log-fold changes from the overall analysis instead.
@@ -357,6 +348,5 @@ head(n.res)
 We report the session information.
 
 ```{r}
-
 sessionInfo()
 ```
