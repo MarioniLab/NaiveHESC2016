@@ -227,10 +227,10 @@ Cells with high values for either metric are likely to be poor-quality, as cytop
 
 ```{r histoSize, fig.width=10, fig.height=10}
 multiplot(cols=2,
-    plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_counts")),
-    plotPhenoData(sce, aesth=aes_string(x="sample", y="total_features")),
-    plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_ERCC")),
-    plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_Mt"))
+    plotColData(sce, x="sample", y="log10_total_counts"),
+    plotColData(sce, x="sample", y="total_features"),
+    plotColData(sce, x="sample", y="pct_counts_ERCC"),
+    plotColData(sce, x="sample", y="pct_counts_Mt")
 )
 ```
 
@@ -334,7 +334,7 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 We discard genes that are not expressed at all.
 Such genes provide no information for characterizing heterogeneity across the population.
 
-```{r}
+```{r keepAbu}
 keep <- ave.counts > 0
 sce <- sce[keep,]
 summary(keep)
