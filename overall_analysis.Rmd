@@ -68,22 +68,18 @@ For each endogenous gene, the difference between the technical and total varianc
 We do this separately for each batch, as there is at least an order of magnitude difference in the amount of spike-in added to each batch.
 
 ```{r trendvarfit, fig.height=6, fig.width=10}
+sce <- multiBlockNorm(sce, sce$batch)
+var.out <- multiBlockVar(sce, block=sce$batch,
+    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
+
 par(mfrow=c(1,2))
-collected.var <- list()
-collected.npcs <- list()
-for (b in levels(sce$batch)) {
-    cur.sce <- sce[,sce$batch==b]
-    cur.sce <- normalize(cur.sce)
-
-    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
-    dec.out <- decomposeVar(cur.sce, var.fit)
-    collected.var[[b]] <- dec.out
-    collected.npcs[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
-
-    plot(dec.out$mean, dec.out$total, pch=16, cex=0.5, col="grey", xlab="Mean log-expression",
-         ylab="Variance of log-expression", ylim=c(0, 10), xlim=c(0, 15), main=paste("Batch", b))
-    points(var.fit$mean, var.fit$var, pch=16, col="red")
-    curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
+is.spike <- isSpike(sce)
+for (batch in levels(sce$batch)) {
+    cur.out <- var.out$per.block[[batch]]
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=batch)
+    curve(metadata(cur.out)$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    points(cur.out$mean[is.spike], cur.out$total[is.spike], col="red", pch=16)
 }
 ```
 
@@ -91,14 +87,13 @@ The trend passes through the bulk of the spike-ins, which is reassuring.
 We combine the statistics across batches (using Berger's IUT to select genes that are HVG in all batches) and save them to file.
 
 ```{r combinevar}
-var.out <- do.call(combineVar, c(collected.var, method="berger"))
 write.table(file=file.path(resdir, "var.tsv"), var.out, sep="\t", quote=FALSE, col.names = NA) 
 ```
 
 The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
 
 ```{r highvar}
-hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),]
+hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),-7]
 nrow(hvg.out)
 hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),]
 write.table(file = file.path(resdir, "hvg.tsv"), hvg.out, sep="\t", quote=FALSE, col.names = NA) 
@@ -120,6 +115,7 @@ This needs to be repeated as the batch effect for the naive-only cells may be di
 ```{r}
 library(limma)
 norm_exprs(sce) <- removeBatchEffect(exprs(sce), batch=sce$batch) 
+collected.npcs <- denoisePCA(sce, var.out, value="n", assay.type="norm_exprs")
 ```
 
 We examine the lower bound on the number of PCs that should be retained in each data set.
@@ -134,7 +130,7 @@ These differences reflect the fact that the second batch is more biologically no
 We'll use the latter value given that the second batch contains a greater number of cells anyway.
 
 ```{r}
-chosen.npcs <- collected.npcs[[2]]
+chosen.npcs <- collected.npcs #[[2]]
 ```
 
 We apply PCA on the genes with positive biological components in `var.out`.
@@ -163,7 +159,7 @@ plot(pc.out)
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
 
 ```{r tsne, fig.height=10, fig.width=10}
-sce <- runTSNE(sce, use_dimred="PCA", perplexity=30, rand_seed=100)
+sce <- runTSNE(sce, use_dimred="PCA", perplexity=30, set.seed=100)
 tsne1 <- plotTSNE(sce, colour_by=rownames(hvg.out)[1]) +  fontsize
 tsne2 <- plotTSNE(sce, colour_by="KLF4") + fontsize
 tsne3 <- plotTSNE(sce, colour_by="batch") + fontsize

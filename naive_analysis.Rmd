@@ -65,32 +65,25 @@ This is done separately for each batch due to the differences in spike-in quanti
 The trend generally fits quite well, though some deviation of the spike-ins is attributable to amplification-induced variability.
 
 ```{r naive.vartrend, fig.height=6, fig.width=10}
-par(mfrow=c(1,2))
-collected.var_naive <- list()
-collected.npcs_naive <- list()
-for (b in levels(sce_naive$batch)) {
-    cur.sce <- sce_naive[,b==sce_naive$batch]
-    cur.sce <- normalize(cur.sce)
+sce_naive <- multiBlockNorm(sce_naive, sce_naive$batch)
+var.out_naive <- multiBlockVar(sce_naive, block=sce_naive$batch,
+    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
 
-    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit)
-    collected.var_naive[[b]] <- var.out 
-    collected.npcs_naive[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
-    
-    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-        ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
-    points(var.fit$mean, var.fit$var, pch=16, col="red")
-    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+par(mfrow=c(1,2))
+is.spike <- isSpike(sce_naive)
+for (batch in levels(sce_naive$batch)) {
+    cur.out <- var.out_naive$per.block[[batch]]
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=batch)
+    curve(metadata(cur.out)$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    points(cur.out$mean[is.spike], cur.out$total[is.spike], col="red", pch=16)
 }
 ```
 
-We combine statistics across batches and save them to file.
+We save the resulting table to file.
 
 ```{r naive.varplot}
-var.out_naive <- do.call(combineVar, collected.var_naive)
-gzout <- gzfile(file.path(resdir, "var_all.tsv.gz"), open="wb")
-write.table(file=gzout, var.out_naive, sep="\t", quote=FALSE, col.names=NA)
-close(gzout)
+write.table(file=file.path(resdir, "var_naive.tsv"), var.out_naive, sep="\t", quote=FALSE, col.names=NA)
 ```
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
@@ -99,9 +92,7 @@ Genes with significantly non-zero biological components at a FDR of 5% are defin
 hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
 hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
 nrow(hvg.out_naive)
-gzout <- gzfile(file.path(resdir, "hvg.tsv.gz"), open="wb")
-write.table(file=gzout, hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
-close(gzout)
+write.table(file= file.path(resdir, "hvg_naive.tsv"), hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
 head(hvg.out_naive)
 ```
 
@@ -120,19 +111,7 @@ This needs to be repeated as the batch effect for the naive-only cells may be di
 ```{r}
 library(limma)
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
-```
-
-We examine the lower bound on the number of PCs that should be retained in each data set.
-Again, the number of PCs to retain is quite different between the two batches, which is annoying.
-
-```{r}
-unlist(collected.npcs_naive)
-```
-
-We'll use the latter value given that the second batch contains a greater number of cells anyway.
-
-```{r}
-chosen.npcs_naive <- collected.npcs_naive[[2]]
+collected.npcs_naive <- denoisePCA(sce_naive, var.out_naive, value="n", assay.type="norm_exprs")
 ```
 
 We apply PCA on the genes with positive biological components in `var.out_naive`.
@@ -141,7 +120,7 @@ This is done using the `norm_exprs` expression matrix in which the batch effect 
 ```{r}
 keep <- var.out_naive$bio > 0
 summary(keep)
-pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_naive)
+pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=collected.npcs_naive)
 reducedDim(sce_naive, "PCA") <- pc.out$x
 dim(reducedDim(sce_naive, "PCA"))
 plot(pc.out)
@@ -152,7 +131,7 @@ plot(pc.out)
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.naive, fig.width=15, fig.height=6}
-sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10, rand_seed=100)
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10, set.seed=100)
 tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) +  fontsize
 tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
 tsne3_naive <- plotTSNE(sce_naive, colour_by="batch") + fontsize
@@ -199,294 +178,9 @@ for (k in 2:5){
 So, we go on to cluster the cells, and visualize the result of clustering on our _t_-SNE plot.
 
 ```{r naive_PCA}
-my.clusters_naive <- unname(cutree(my.tree_naive, k=3))
+my.clusters_naive <- unname(cutree(my.tree_naive, k=3))er
 sce_naive$cluster <- factor(my.clusters_naive)
-plotTSNE(sce_naive, use_dimred="PCA", colour_by="cluster", 
-    perplexity=10, rand_seed=100) + fontsize
-```
-
-# Characterising cluster 2
-
-## Checking some diagnostics
-
-Cluster 2 seems like the most interesting cluster, with a number of cells breaking away from the bulk primed population.
-We examine the expression of marker genes for this cluster.
-
-```{r naiveexpclust}
-plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
-    colour_by="cluster") + fontsize
-```
-
-We also examine the distribution of size factors and number of expressed genes for each cluster.
-Nothing particularly untoward.
-
-```{r, fig.width=10, fig.height=6}
-par(mfrow=c(1,2))
-boxplot(split(sizeFactors(sce_naive), sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
-boxplot(split(sce_naive$total_features, sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
-```
-
-Most cells in this cluster are in batch 2, but so are most cells in general, so that's not really a problem.
-
-```{r}
-lapply(split(sce_naive$batch, my.clusters_naive), table)
-```
-
-We also check the cell cycle phase for each of the clusters.
-It's a fairly decent mix, so it's unlikely to be driven by cell cycle phase alone.
-
-```{r}
-lapply(split(sce_naive$phase, my.clusters_naive), table)
-```
-
-We also examine the location of this cluster on the overall PCA plot.
-As expected, they show up in the middle, so we will describe this as a "transition" subpopulation.
-
-```{r}
-trans.cluster <- 2
-all.pheno <- as.character(sce$phenotype)
-all.pheno[colnames(sce) %in% colnames(sce_naive)[my.clusters_naive==trans.cluster]] <- "transition"
-write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
-    row.names=FALSE, quote=FALSE, sep="\t")
-sce$phenotype <- all.pheno
-reducedDim(sce, "PCA") <- readRDS("results-overall/pcs.rds")
-plotPCA(sce, colour_by="phenotype") + fontsize
-```
-
-## Identifying marker genes for cluster 2
-
-With these clusters identified, we can assess DE of cluster 2 relative to each other cluster using the `findMarkers` function.
-
-```{r marker_clust_naive}
-blocking <- model.matrix(~sce_naive$batch)
-all.markers_naive <- findMarkers(sce_naive, clusters=my.clusters_naive, design=blocking)
-clust.num_naive <- "2"
-marker.set_naive <- all.markers_naive[[clust.num_naive]]
-write.table(marker.set_naive, file=file.path(resdir, paste0("markers_", clust.num_naive, ".tsv")), 
-    sep="\t", quote=FALSE, col.names=NA) 
-head(marker.set_naive)
-```
-
-We create a heatmap that shows differentially expressed genes relative to the chosen cluster.
-
-```{r clust.naiv2, fig.height=10, fig.width=6}
-top.markers_naive <- marker.set_naive$Gene[marker.set_naive$Top <= 100]
-top.exprs_naive <- norm_exprs(sce_naive)[top.markers_naive,,drop=FALSE]
-heat.vals_naive <- top.exprs_naive - rowMeans(top.exprs_naive)
-library(pheatmap)
-clust.col_naive <- topo.colors(max(my.clusters_naive))
-pheatmap(heat.vals_naive, cluster_cols=my.tree_naive, 
-    annotation_col=data.frame(Cluster=as.character(my.clusters_naive), 
-                              row.names=colnames(heat.vals_naive)),
-    annotation_colors=list(Cluster=setNames(clust.col_naive, unique(my.clusters_naive))))
-```
-
-## Identifying markers relative to primed/naive cells
-
-We do the same for the transition population against the other naive or primed cells in general.
-This is done using _limma_, which seems to provide more protection against outliers than _edgeR_ as you go down the list.
-
-```{r}
-collected <- list()
-for (mode in c("naive", "primed")) {
-    current <- all.pheno %in% c("transition", mode)
-    curE <- exprs(sce)[!isSpike(sce),current]
-    keep <- rowMeans(curE) > 0.1 # modest filtering to avoid distorted mean-var trend.
-    
-    curB <- factor(sce$batch[current])
-    curP <- factor(all.pheno[current])
-    curX <- model.matrix(~0 + curP + curB)
-
-    fit <- lmFit(curE, curX)
-    con <- makeContrasts(contrasts=sprintf("curPtransition - curP%s", mode), levels=curX)
-    fit2 <- contrasts.fit(fit, con)
-    fit2 <- eBayes(fit2, robust=TRUE, trend=TRUE)
-    res <- topTable(fit2, n=Inf, sort.by="p")
-
-    collected[[mode]] <- res
-    write.table(file=file.path(resdir, sprintf("markers_trans_vs_%s.tsv", mode)), res, 
-        sep="\t", quote=FALSE, col.names = NA) 
-}
-```
-
-We briefly examine the top candidate markers in each comparison.
-There's both up- and down-regulation, which indicates that the transition population isn't just a bunch of dead cells with low global expression.
-
-```{r}
-table(sign(collected$naive$logFC[1:100]))
-head(collected$naive)
-table(sign(collected$primed$logFC[1:100]))
-head(collected$primed)
-```
-
-We make a heatmap to visualize the expression of these candidates.
-
-```{r heatNvPvT}
-use.markers <- unique(c(rownames(collected$naive)[1:50], rownames(collected$primed)[1:50]))
-o <- order(all.pheno)
-top.exprs <- norm_exprs(sce)[use.markers,o,drop=FALSE]
-clust.cols <- c("black", "grey", "red")
-heat.vals <- top.exprs - rowMeans(top.exprs)
-pheatmap(heat.vals, cluster_cols=FALSE, 
-    annotation_col=data.frame(Phenotype=all.pheno[o], 
-                              row.names=colnames(top.exprs)),
-    annotation_colors=list(Cluster=setNames(clust.cols, unique(all.pheno))))
-```
-
-We also have a look at the top genes that are uniquely expressed in the transition population.
-These genes must be DE against both naive and primed cells, _and_ in the same direction against both.
-
-```{r}
-norder <- collected$naive[order(rownames(collected$naive)),]
-porder <- collected$primed[order(rownames(collected$primed)),]
-maxp <- pmax(porder$P.Value, norder$P.Value)
-maxp <- ifelse(sign(norder$logFC)==sign(porder$logFC), maxp, 1)
-unique.marker <- data.frame(vsNaive=norder$logFC, vsPrimed=porder$logFC,
-    AveExpr=norder$AveExpr, P.Value=maxp, row.names=rownames(porder))
-unique.marker <-  unique.marker[order(maxp),]
-write.table(unique.marker, file=file.path(resdir, "markers_unique_trans.tsv"),
-    sep="\t", quote=FALSE, col.names=NA)
-head(unique.marker, 20)
-```
-
-## Gene set analysis on unique transition genes
-
-We do gene set analyses on the top set of genes that are uniquely expressed in this transition population.
-First, gene ontology terms:
-
-```{r naivego}
-unique.genes <- rownames(unique.marker)[1:200]
-is.unique <- rownames(sce) %in% unique.genes
-entreznames <- as.character(rowData(sce)$entrezgene)
-has.entrez <- !is.na(entreznames)
-go <- goana(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
-topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go_unique_trans.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
-head(topgo)
-```
-
-And again with KEGG terms:
-
-```{r naivekegg}
-kegg <- kegga(entreznames[has.entrez & is.unique], universe=entreznames[has.entrez], species="Hs")
-topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg_unique_trans.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
-head(topkegg)
-```
-
-We also do this for the top set of genes that are DE between the transition and naive populations.
-
-```{r geneset_vs_naive}
-vs.naive.genes <- rownames(collected$naive)[1:200]
-vs.naive <- rownames(sce) %in% vs.naive.genes
-go <- goana(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species="Hs")
-topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go_trans_vs_naive.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
-head(topgo)
-kegg <- kegga(entreznames[has.entrez & vs.naive], universe=entreznames[has.entrez], species="Hs")
-topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg_trans_vs_naive.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
-head(topkegg)
-```
-
-We repeat this for the top set of genes that are DE between transition and primed populations.
-
-```{r geneset_vs_primed}
-vs.primed.genes <- rownames(collected$primed)[1:200]
-vs.primed <- rownames(sce) %in% vs.primed.genes
-go <- goana(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species="Hs")
-topgo <- topGO(go, n=Inf, ontology = "BP") 
-write.table(file=file.path(resdir, "go_trans_vs_primed.tsv"), topgo, sep="\t", quote=FALSE, col.names = NA) 
-head(topgo)
-kegg <- kegga(entreznames[has.entrez & vs.primed], universe=entreznames[has.entrez], species="Hs")
-topkegg <- topKEGG(kegg, n=Inf)
-write.table(file=file.path(resdir, "kegg_trans_vs_primed.tsv"), topkegg, sep="\t", quote=FALSE, col.names = NA) 
-head(topkegg)
-```
-
-## Looking for imprinted genes
-
-Here, we examine a set of imprinted genes supplied by Ferdinand.
-The idea is to see if these genes change in expression between naive, transition and primed cells.
-If the transition cells have naive-like levels of these genes, it suggests that they once were naive cells themselves.
-
-```{r}
-imprinted <- c("ENSG00000162595", # DIRAS3
-               "ENSG00000177432", # NAP1L5
-               "ENSG00000145945", # FAM50B 
-               "ENSG00000118495", # PLAGL1
-               "ENSG00000197081", # IGF2R
-               "ENSG00000106070", # GRB10
-               "ENSG00000242265", # PEG10
-               "ENSG00000106484", # MEST
-               "ENSG00000167632", # TRAPPC9
-               "ENSG00000198825", # INPP5F
-               "ENSG00000139687", # RB1
-               "ENSG00000179455", # MKRN3
-               "ENSG00000265673", # MIR4508
-               "ENSG00000254585", # MAGEL2
-               "ENSG00000182636", # NDN
-               "ENSG00000128739", # SNRPN
-               "ENSG00000273173", # SNURF
-               "ENSG00000140443", # IGF1R
-               "ENSG00000130844", # ZNF331
-               "ENSG00000198300", # PEG3
-               "ENSG00000101898", # MCTS2P
-               "ENSG00000101294", # HM13
-               "ENSG00000166619", # BLCAP
-               "ENSG00000053438", # NNAT
-               "ENSG00000185513", # L3MBTL
-               "ENSG00000235590", # GNAS-AS1
-               "ENSG00000087460", # GNAS
-               "ENSG00000204186", # ZDBF2
-               "ENSG00000130600", # H19
-               "ENSG00000167244", # IGF2
-               "ENSG00000214548", # MEG3
-               "ENSG00000167981", # ZNF597
-               "ENSG00000122390") # NAA60
-```
-
-Making the heatmap of expression values for these guys.
-It seems like there's changes in expression both ways, not just an increase in naive cells upon loss of imprinting.
-Apparently, this is due to loss of imprinting for the antisense locus that leads to silencing of the corresponding gene.
-
-```{r, fig.height=10, fig.width=6}
-o <- order(all.pheno)
-top.exprs <- norm_exprs(sce)[rowData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
-clust.cols <- c("black", "grey", "red")
-heat.vals <- top.exprs - rowMeans(top.exprs)
-pheatmap(heat.vals, cluster_cols=FALSE, 
-    annotation_col=data.frame(Phenotype=all.pheno[o], 
-                              row.names=colnames(top.exprs)),
-    annotation_colors=list(Cluster=setNames(clust.cols, unique(all.pheno))))
-```
-
-Finally, we perform a holms-corrected unpaired t.test to test whether the differences in gene expression between the transition and the other populations,respectively, are more pronounce between transition/primed than transition/naive.
-
-```{r}
-imprinted <- c("ENSG00000140443", # IGF1R
-               "ENSG00000128739", # SNRPN
-               "ENSG00000053438", # NNAT
-               "ENSG00000101294", # HM13
-               "ENSG00000198300", # PEG3
-               "ENSG00000214548") # MEG3
-
-heat.imprint.vals <- exprs(sce)[match(imprinted, rowData(sce)$ensembl_gene_id),]
-pops <- data.frame(Cell=colnames(sce), Type=all.pheno)
-
-pvals <- c()
-for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
-current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="naive"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
-pvals[gene] <- current.test$p.value
-}
-p.adjust(pvals, method = 'holm')
-
-pvals <- c()
-for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
-  current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="primed"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
-  pvals[gene] <- current.test$p.value
-}
-p.adjust(pvals, method = 'holm')
+plotPCA(sce_naive, colour_by="cluster") + fontsize
 ```
 
 # Wrapping up

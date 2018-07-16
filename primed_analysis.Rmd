@@ -65,33 +65,27 @@ This is done separately for each batch due to the differences in spike-in quanti
 The trend is okay, though some deviation of the spike-ins is attributable to amplification-induced variability.
 
 ```{r primed.vartrend, fig.height=6, fig.width=10}
+sce_primed <- multiBlockNorm(sce_primed, sce_primed$batch)
+var.out_primed <- multiBlockVar(sce_primed, block=sce_primed$batch,
+    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
+
 par(mfrow=c(1,2))
-collected.var_primed <- list()
-collected.npcs_primed <-list()
-for (b in levels(sce_primed$batch)) {
-    cur.sce <- sce_primed[,b==sce_primed$batch]
-    cur.sce <- normalize(cur.sce)
-    
-    var.fit <- trendVar(cur.sce, method="loess", span=0.4)
-    var.out <- decomposeVar(cur.sce, var.fit)
-    collected.var_primed[[b]] <- var.out 
-    collected.npcs_primed[[b]] <- denoisePCA(cur.sce, var.fit$trend, value="n")
-    
-    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
-        ylab="Variance of log-expression", main=paste("Batch", b), col="grey")
-    points(var.fit$mean, var.fit$var, pch=16, col="red")
-    curve(var.fit$trend(x), col="red", add=TRUE, lwd=2)
+is.spike <- isSpike(sce_primed)
+for (batch in levels(sce_primed$batch)) {
+    cur.out <- var.out_primed$per.block[[batch]]
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=batch)
+    curve(metadata(cur.out)$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    points(cur.out$mean[is.spike], cur.out$total[is.spike], col="red", pch=16)
 }
 ```
 
-We combine statistics across batches (requiring a gene to be HVG in both batches in order to be detected) and save them to file.
+We save the resulting table to file.
 
-```{r primed.varplot}
-var.out_primed <- do.call(combineVar, collected.var_primed)
-gzout <- gzfile(file.path(resdir, "var_all.tsv.gz"), open="wb")
-write.table(file=gzout, var.out_primed, sep="\t", quote=FALSE, col.names=NA) 
-close(gzout)
+```{r naive.varplot}
+write.table(file=file.path(resdir, "var_primed.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA)
 ```
+
 
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
 
@@ -99,9 +93,7 @@ Genes with significantly non-zero biological components at a FDR of 5% are defin
 hvg.out_primed <- var.out_primed[which(var.out_primed$FDR <= 0.05 & var.out_primed$bio >= 0.5),]
 hvg.out_primed <- hvg.out_primed[order(hvg.out_primed$bio, decreasing=TRUE),]
 nrow(hvg.out_primed)
-gzout <- gzfile(file.path(resdir, "hvg.tsv.gz"), open="wb")
-write.table(file=gzout, hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
-close(gzout)
+write.table(file= file.path(resdir, "hvg_primed.tsv"), hvg.out_primed, sep="\t", quote=FALSE, col.names = NA) 
 head(hvg.out_primed)
 ```
 
@@ -120,6 +112,7 @@ This needs to be repeated as the batch effect for the primed-only cells may be d
 ```{r}
 library(limma)
 norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
+collected.npcs_primed <- denoisePCA(sce_primed, var.out_primed, value="n", assay.type="norm_exprs")
 ```
 
 We examine the lower bound on the number of PCs that should be retained in each data set.
@@ -132,7 +125,7 @@ unlist(collected.npcs_primed)
 We'll use the latter value given that the second batch contains a greater number of cells anyway.
 
 ```{r}
-chosen.npcs_primed <- collected.npcs_primed[[2]]
+chosen.npcs_primed <- collected.npcs_primed#[[2]]
 ```
 
 We apply PCA on the genes with positive biological components in `var.out_primed`.
@@ -152,7 +145,7 @@ plot(pc.out)
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.primed, fig.width=15, fig.height=6}
-sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=10, rand_seed=100)
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=10, set.seed=100)
 tsne1_primed <- plotTSNE(sce_primed, colour_by=rownames(hvg.out_primed)[1]) +  fontsize
 tsne2_primed <- plotTSNE(sce_primed, colour_by="KLF4") + fontsize
 tsne3_primed <- plotTSNE(sce_primed, colour_by="batch") + fontsize
