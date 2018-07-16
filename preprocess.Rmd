@@ -350,7 +350,7 @@ This is done using only high-abundance genes to avoid problems with having too m
 ```{r sumnorm}
 keep <- rowData(sce)$AveCount >= 1
 clusters <- quickCluster(sce, method="igraph", subset.row=keep)
-sce <- computeSumFactors(sce, cluster=clusters, subset.row=keep, min.mean=NULL)
+sce <- computeSumFactors(sce, cluster=clusters, min.mean=1)
 summary(sizeFactors(sce))
 ```
 
