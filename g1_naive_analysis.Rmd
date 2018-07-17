@@ -19,6 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+set.seed(100)
 ```
 
 # Selecting only the naive subpopulations
@@ -115,7 +116,6 @@ We also assess the pairwise correlations between the genes across the naive cell
 Again, the usual suspects dominate the top set of correlations.
 
 ```{r cor.naive}
-set.seed(100)
 design_naive <- model.matrix(~0 + sce_naive$batch)
 var.cor_naive <- correlatePairs(sce_naive, design = design_naive, 
     subset.row=rownames(hvg.out_naive), per.gene=TRUE) 
@@ -144,7 +144,7 @@ norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$bat
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.naive, fig.width=15, fig.height=6}
-sce_naive <- runTSNE(sce_naive, exprs_values="norm_exprs", perplexity=5, set.seed=100, feature_set=chosen_naive)
+sce_naive <- runTSNE(sce_naive, exprs_values="norm_exprs", perplexity=5, feature_set=chosen_naive)
 tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) + fontsize
 tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
 tsne3_naive <- plotTSNE(sce_naive, colour_by="batch") + fontsize
@@ -155,7 +155,7 @@ All plots suggest that there is a small subpopulation off the main bulk of cells
 We repeat this for PCA plots, though this is not so clear - dominated by variance along the larger population, perhaps?
 
 ```{r pca.naive, fig.width=15, fig.height=6}
-sce_naive <- runPCA(sce_naive, exprs_values="norm_exprs", perplexity=10, set.seed=100, feature_set = chosen_naive)
+sce_naive <- runPCA(sce_naive, exprs_values="norm_exprs", perplexity=10, feature_set = chosen_naive)
 pca1_naive <- plotPCA(sce_naive, colour_by=rownames(hvg.out_naive)[1]) + fontsize
 pca2_naive <- plotPCA(sce_naive, colour_by="KLF4") + fontsize
 pca3_naive <- plotPCA(sce_naive, colour_by="batch") + fontsize

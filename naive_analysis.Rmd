@@ -19,6 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+set.seed(100)
 ```
 
 # Selecting only the naive subpopulations
@@ -131,7 +132,7 @@ plot(pc.out)
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.naive, fig.width=15, fig.height=6}
-sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10, set.seed=100)
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10)
 tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) +  fontsize
 tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
 tsne3_naive <- plotTSNE(sce_naive, colour_by="batch") + fontsize

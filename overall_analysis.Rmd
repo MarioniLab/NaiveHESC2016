@@ -19,6 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+set.seed(100)
 ```
 
 # Reading in the data 
@@ -36,7 +37,6 @@ This is done after shuffling the cell order to avoid all naive cells being plott
 
 ```{r explot}
 library(scater)
-set.seed(100)
 shuffled.sce <- sce[, sample(ncol(sce))]
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(shuffled.sce, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
@@ -159,7 +159,7 @@ plot(pc.out)
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
 
 ```{r tsne, fig.height=10, fig.width=10}
-sce <- runTSNE(sce, use_dimred="PCA", perplexity=30, set.seed=100)
+sce <- runTSNE(sce, use_dimred="PCA", perplexity=30)
 tsne1 <- plotTSNE(sce, colour_by=rownames(hvg.out)[1]) +  fontsize
 tsne2 <- plotTSNE(sce, colour_by="KLF4") + fontsize
 tsne3 <- plotTSNE(sce, colour_by="batch") + fontsize

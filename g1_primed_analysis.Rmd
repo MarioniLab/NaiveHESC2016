@@ -19,6 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+setseed(100)
 ```
 
 # Selecting only the primed subpopulations
@@ -114,7 +115,6 @@ We also assess the pairwise correlations between the genes across the primed cel
 Again, the usual suspects dominate the top set of correlations.
 
 ```{r, cor.primed}
-set.seed(100) 
 design_primed <- model.matrix(~ 0 + sce_primed$batch)
 var.cor_primed <- correlatePairs(sce_primed, design = design_primed, 
     subset.row=rownames(hvg.out_primed), per.gene=TRUE)
@@ -148,7 +148,7 @@ norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.primed, fig.width=15, fig.height=6}
-sce_primed <- runTSNE(sce_primed, exprs_values="norm_exprs", perplexity=5, set.seed=100, feature_set=chosen_primed)
+sce_primed <- runTSNE(sce_primed, exprs_values="norm_exprs", perplexity=5, feature_set=chosen_primed)
 tsne1_primed <- plotTSNE(sce_primed, colour_by=rownames(hvg.out_primed)[1]) + fontsize
 tsne2_primed <- plotTSNE(sce_primed, colour_by="KLF4") + fontsize
 tsne3_primed <- plotTSNE(sce_primed, colour_by="batch") + fontsize
@@ -158,7 +158,7 @@ multiplot(tsne1_primed, tsne2_primed, tsne3_primed, cols=3)
 And again, for PCA plots.
 
 ```{r pca.primed, fig.width=15, fig.height=6}
-sce_primed <- runPCA(sce_primed, exprs_values="norm_exprs", perplexity=10, set.seed=100, feature_set = chosen_primed)
+sce_primed <- runPCA(sce_primed, exprs_values="norm_exprs", perplexity=1, feature_set = chosen_primed)
 pca1_primed <- plotPCA(sce_primed, colour_by=rownames(hvg.out_primed)[1]) + fontsize
 pca2_primed <- plotPCA(sce_primed, colour_by="KLF4") + fontsize
 pca3_primed <- plotPCA(sce_primed, colour_by="batch") + fontsize
@@ -194,153 +194,6 @@ for (k in 2:5){
     plot(sil, main = paste(k, "clusters"), border=sil.cols, 
         col=sil.cols, do.col.sort=FALSE)
 }
-```
-
-# Comparison of subpopulation heterogeneity
-
-## Between naive and primed conditions
-
-We compare the variability of the naive and primed populations to each other.
-We first look at the number of HVGs detected in each population.
-The number is slightly lower in the primed population, though that's probably due to loss of power from increases in the technical variance.
-
-```{r}
-var.out_primed <- read.table(file.path("results-primed", "var_primed.tsv"))
-hvg.out_naive <- read.table(file.path("results-naive", "var_naive.tsv"))
-hvg.out_primed <- var.out_naive$bio < 
-hvg.out_naive
-nrow(hvg.out_primed)
-nrow(hvg.out_naive)
-plot(hvg.out_primed$mean, hvg.out_primed$tech, col="dodgerblue", pch=16, cex=0.5,
-    xlab="Mean log-expression", ylab="Technical variance")
-points(hvg.out_naive$mean, hvg.out_naive$tech, col="orange", pch=16, cex=0.5)
-```
-
-A simpler view is that of the differences in the biological component between conditions.
-This is not affected by the technical variance, at least with respect to loss of power.
-We plot the difference against the change in the mean expression to see whether DE is driving the change in variance.
-(Such genes tend to be difficult to interpret as the biological effect of the change in variability cannot be disentangled from that of differential expression.)
-
-```{r varcomp, fig.width=15, fig.height=6}
-dbio <- hvg.out_primed$bio - hvg.out_naive$bio
-
-# Expression values are not directly comparable between separately-normalized objects.
-# Pulling out primed-naive log-fold changes from the overall analysis instead.
-de.stats <- read.table(file.path("results-overall", "de.tsv"))
-lfc <- -de.stats[rownames(var.out_naive),"logFC"]
-
-par(mfrow=c(1,3))
-phvg <- match(rownames(hvg.out_primed), rownames(var.out_primed))
-nhvg <- match(rownames(hvg.out_naive), rownames(var.out_naive))
-both.hvg <- intersect(phvg, nhvg)
-smoothScatter(lfc[both.hvg], dbio[both.hvg], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Both HVGs")
-phvg.only <- setdiff(phvg, nhvg)
-smoothScatter(lfc[phvg.only], dbio[phvg.only], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Primed-only HVGs")
-nhvg.only <- setdiff(nhvg, phvg)
-smoothScatter(lfc[nhvg.only], dbio[nhvg.only], xlab=expression(Log[2]~"fold change"), 
-    ylab=expression(Delta*"biological component"), main="Naive-only HVGs")
-```
-
-We also check the number of expressed genes between naive and primed cells.
-The primed cells have more-or-less the same number of expressed genes, which means that the number of genes isn't driving the differences.
-(This plot isn't particularly informative because differences in numbers of expressed genes would manifest as a non-zero log-fold change anyway.)
-
-```{r}
-naive.genenum <- sum(var.out_naive$mean > 0)
-primed.genenum <- sum(var.out_primed$mean > 0)
-barplot(cbind(Naive=naive.genenum, Primed=primed.genenum), ylab="Number of expressed genes")
-```
-
-```{r, echo=FALSE, results="hide"}
-gc()
-```
-
-## Interpreting the increased heterogeneity
-
-### Gene set analyses
-
-We assemble genes in every GO term.
-
-```{r gosetup}
-library(org.Hs.eg.db)
-EG.GO <- toTable(org.Hs.egGO2ALLEGS)
-EG.GO <- EG.GO[EG.GO$Ontology=="BP",]
-all.sets <- split(EG.GO$gene_id, EG.GO$go_id)
-```
-
-We run a one-sided sign-test to identify genes that are more variable in one condition compared to the other.
-For example, the p-value for `poutput` represents the probability of obtaining fewer genes that are less variable in the primed condition (i.e., more variability in primed cells).
-
-```{r runsigntest}
-poutput <- list()
-noutput <- list()
-numgenes <- list()
-for (entry in names(all.sets)) {
-    m <- which(rowData(sce_primed)$entrezgene %in% all.sets[[entry]])
-    pbio <- var.out_primed$bio[m]
-    nbio <- var.out_naive$bio[m]
-    keep <- (nbio > 0 | pbio > 0) & nbio!=pbio
-    pbio <- pbio[keep]
-    nbio <- nbio[keep]
-    numgenes[[entry]] <- sum(keep)
-    poutput[[entry]] <- pbinom(sum(pbio < nbio), p=0.5, sum(keep))
-    noutput[[entry]] <- pbinom(sum(nbio < pbio), p=0.5, sum(keep))
-}
-numgenes <- unlist(numgenes)
-poutput <- unlist(poutput)
-noutput <- unlist(noutput)
-```
-
-We summarize the GO terms and save the results to file.
-
-```{r gosumup}
-library(GO.db)
-go.names <- select(GO.db, keys = names(all.sets), columns = "TERM")
-p.res <- data.frame(Term=names(poutput), Description=go.names$TERM, 
-    N=numgenes, P=poutput, FDR=p.adjust(poutput, method="BH"))
-p.res <- p.res[order(p.res$P),]
-write.table(file=file.path(resdir, "go_primed.tsv"), p.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(p.res)
-n.res <- data.frame(Term=names(noutput), Description=go.names$TERM, 
-    N=numgenes, P=noutput, FDR=p.adjust(noutput, method="BH"))
-n.res <- n.res[order(n.res$P),]
-write.table(file=file.path(resdir, "go_naive.tsv"), n.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(n.res)
-```
-
-Doing the same for the KEGG terms.
-
-```{r}
-EG.KEGG <- toTable(org.Hs.egPATH2EG)
-all.sets <- split(EG.KEGG$gene_id, EG.KEGG$path_id)
-```
-
-Running the sign tests again.
-
-```{r, ref.label="runsigntest"}
-```
-
-Summarizing the results.
-
-```{r keggsumup}
-kegg.names <- getKEGGPathwayNames()
-kegg.names <- kegg.names[match(paste0("path:map", names(all.sets)), kegg.names$PathwayID),]
-p.res <- data.frame(Path=names(poutput), Description=kegg.names$Description, 
-     N=numgenes, P=poutput, FDR=p.adjust(poutput, method="BH"))
-p.res <- p.res[order(p.res$P),]
-write.table(file=file.path(resdir, "kegg_primed.tsv"), p.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(p.res)
-n.res <- data.frame(Path=names(noutput), Description=kegg.names$Description, 
-     N=numgenes, P=noutput, FDR=p.adjust(noutput, method="BH"))
-n.res <- n.res[order(n.res$P),]
-write.table(file=file.path(resdir, "kegg_naive.tsv"), n.res, 
-    row.names=FALSE, sep="\t", quote=FALSE)
-head(n.res)
 ```
 
 # Wrapping up
