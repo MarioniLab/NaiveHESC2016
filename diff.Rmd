@@ -19,6 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+set.seed(100)
 ```
 
 # Data preparation
@@ -114,16 +115,16 @@ We can now have a first glimpse on the the naive and primed populations to check
 ```{r}
 library(ggplot2)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
-sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", set.seed=100)
-sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", set.seed=100)
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
 sce_naive <- runPCA(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
 sce_primed <- runPCA(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
 
-pca_naive <- plotPCA(sce_naive, colour_by = "CDK1", rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1", rerun=TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, colour_by = "CDK1") + fontsize
+tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1") + fontsize
 
-pca_primed <- plotPCA(sce_primed, colour_by = "CDK1", rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, colour_by= "CDK1", rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, colour_by = "CDK1") + fontsize
+tsne_primed <- plotTSNE(sce_primed, colour_by= "CDK1") + fontsize
 
 multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
 
@@ -136,11 +137,11 @@ saveRDS(pca_primed, file = file.path(resdir, 'primed_plot.Rds'))
 We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering.
 
 ```{r}
-sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", set.seed=100, feature_set = lin.markers)
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
 sce_naive <- runPCA(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
 
-pca_naive <- plotPCA(sce_naive, colour_by = 'CDK1', rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1", rerun=TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, colour_by = 'CDK1') + fontsize
+tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1") + fontsize
 saveRDS(tsne_naive, file = file.path(resdir, 'naive_tsne4.Rds'))
 multiplot(pca_naive, tsne_naive)
 ```
@@ -150,20 +151,20 @@ We can further colour the plots for specific markers of mesoderm, endoderm and e
 
 ```{r}
 #mesoderm
-pca_naive <- plotPCA(sce_naive, colour_by = 'SNAI1', rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, colour_by= "SNAI1", rerun = TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, colour_by = 'SNAI1') + fontsize
+tsne_naive <- plotTSNE(sce_naive, colour_by= "SNAI1") + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = file.path(resdir, 'naive_tsne1.Rds'))
 
 #ectoderm
-pca_naive <- plotPCA(sce_naive, colour_by = 'NES', rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, colour_by= "NES", rerun=TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, colour_by = 'NES') + fontsize
+tsne_naive <- plotTSNE(sce_naive, colour_by= "NES") + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = file.path(resdir, 'naive_tsne2.Rds'))
 
 #endoderm
-pca_naive <- plotPCA(sce_naive, colour_by = 'GATA4', rerun=TRUE) + fontsize
-tsne_naive <- plotTSNE(sce_naive, colour_by= "GATA4", rerun=TRUE) + fontsize
+pca_naive <- plotPCA(sce_naive, colour_by = 'GATA4') + fontsize
+tsne_naive <- plotTSNE(sce_naive, colour_by= "GATA4") + fontsize
 multiplot(pca_naive, tsne_naive)
 saveRDS(tsne_naive, file = file.path(resdir, 'naive_tsne3.Rds'))
 ```
@@ -173,11 +174,11 @@ saveRDS(tsne_naive, file = file.path(resdir, 'naive_tsne3.Rds'))
 We now repeat the same analysis for the primed population. Again, it is necessary to remove the batch effects, which becomes obvious in the direct comparison to before removal. We perform Dim-reduction only on lineage markers and colours for cell-cycle expression.
 
 ```{r}
-sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", set.seed=100, feature_set = lin.markers)
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
 sce_primed <- runPCA(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
 
-pca_primed <- plotPCA(sce_primed, colour_by = 'CDK1', rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, colour_by= "CDK1", rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, colour_by = 'CDK1') + fontsize
+tsne_primed <- plotTSNE(sce_primed, colour_by= "CDK1") + fontsize
 saveRDS(tsne_primed, file = file.path(resdir, 'primed_tsne4.Rds'))
 multiplot(pca_primed, tsne_primed)
 ```
@@ -186,20 +187,20 @@ We can also colour the plots again for key lineage markers.
 
 ```{r}
 #mesoderm
-pca_primed <- plotPCA(sce_primed, colour_by = 'SNAI1', rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, colour_by= "SNAI1", rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, colour_by = 'SNAI1') + fontsize
+tsne_primed <- plotTSNE(sce_primed, colour_by= "SNAI1") + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = file.path(resdir, 'primed_tsne1.Rds'))
 
 #ectoderm
-pca_primed <- plotPCA(sce_primed, colour_by = 'NES', rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, colour_by= "NES", rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, colour_by = 'NES') + fontsize
+tsne_primed <- plotTSNE(sce_primed, colour_by= "NES") + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = file.path(resdir, 'primed_tsne2.Rds'))
 
 #endoderm
-pca_primed <- plotPCA(sce_primed, colour_by = 'GATA4', rerun=TRUE) + fontsize
-tsne_primed <- plotTSNE(sce_primed, colour_by= "GATA4", rerun=TRUE) + fontsize
+pca_primed <- plotPCA(sce_primed, colour_by = 'GATA4') + fontsize
+tsne_primed <- plotTSNE(sce_primed, colour_by= "GATA4") + fontsize
 multiplot(pca_primed, tsne_primed)
 saveRDS(tsne_primed, file = file.path(resdir, 'primed_tsne3.Rds'))
 ```

@@ -19,6 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+set.seed(100)
 ```
 
 # Data preparation
@@ -97,10 +98,10 @@ for (marker.type in unique(markers[,2])){
   marker.set <- rownames(sce_naive[rownames(sce_naive) %in% markers[markers[,2]==marker.type,1],])
   
   sce_naive <- runPCA(sce_naive, exprs_values="norm_exprs", feature_set = marker.set)
-  sce_naive <- runTSNE(sce_naive, exprs_values="norm_exprs", feature_set = marker.set, perplexity=5, set.seed=100)
+  sce_naive <- runTSNE(sce_naive, exprs_values="norm_exprs", feature_set = marker.set, perplexity=5)
   
-  all.pca[[marker.type]] <- plotPCA(sce_naive, colour_by = markers[markers[,2]==marker.type,1][1], rerun=TRUE) + fontsize
-  all.tsne[[marker.type]] <- plotTSNE(sce_naive, colour_by='batch', rerun=TRUE) + fontsize
+  all.pca[[marker.type]] <- plotPCA(sce_naive, colour_by = markers[markers[,2]==marker.type,1][1]) + fontsize
+  all.tsne[[marker.type]] <- plotTSNE(sce_naive, colour_by='batch') + fontsize
 }
 
 do.call(multiplot, c(all.pca, list(cols=2)))
@@ -117,11 +118,10 @@ for (marker.type in unique(markers[,2])){
   marker.set <- rownames(sce_primed[rownames(sce_primed) %in% markers[markers[,2]==marker.type,1],])
   
   sce_primed <- runPCA(sce_primed, exprs_values="norm_exprs", feature_set = marker.set)
-  sce_primed <- runTSNE(sce_primed, exprs_values="norm_exprs", feature_set = marker.set, perplexity=5, set.seed=100)
-
+  sce_primed <- runTSNE(sce_primed, exprs_values="norm_exprs", feature_set = marker.set, perplexity=5)
   
-  all.pca[[marker.type]] <- plotPCA(sce_primed, colour_by = markers[markers[,2]==marker.type,1][1], rerun=TRUE) + fontsize
-  all.tsne[[marker.type]] <- plotTSNE(sce_primed,colour_by= 'batch', rerun=TRUE) + fontsize
+  all.pca[[marker.type]] <- plotPCA(sce_primed, colour_by = markers[markers[,2]==marker.type,1][1]) + fontsize
+  all.tsne[[marker.type]] <- plotTSNE(sce_primed,colour_by= 'batch') + fontsize
 }
   
 do.call(multiplot, c(all.pca, list(cols=2)))
@@ -149,7 +149,6 @@ for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
   chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
 
-  set.seed(10000)
   design <- model.matrix(~sce_naive$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
   vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, per.gene=TRUE,
@@ -179,7 +178,6 @@ for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
   chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
 
-  set.seed(10000)
   design <- model.matrix(~sce_primed$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
   vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, per.gene = TRUE,
@@ -234,7 +232,6 @@ for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
   chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
 
-  set.seed(10000)
   design <- model.matrix(~sce_naive$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
   vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist,
@@ -264,7 +261,6 @@ for (marker.type in unique(markers[,2])){
   current.markers <- markers[markers[,2] == marker.type,]
   chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
 
-  set.seed(10000)
   design <- model.matrix(~sce_primed$batch)
   null.dist <- correlateNull(iters=1e6, design=design)
   vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
