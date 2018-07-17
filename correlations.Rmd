@@ -357,9 +357,9 @@ pheatmap(current_mat2, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', c
 
 plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', col = pvals, pch=16)
 
-saveRDS(current_mat1, 'naive.epi.Rds')
-saveRDS(current_mat2, 'primed.epi.Rds')
-saveRDS(pvals, 'fdr.corr.Rds')
+saveRDS(current_mat1, file = file.path(resdir, 'naive.epi.Rds'))
+saveRDS(current_mat2, file = file.path(resdir, 'primed.epi.Rds'))
+saveRDS(pvals, file = file.path(resdir, 'fdr.corr.Rds'))
 ```
 
 Printing session information.
