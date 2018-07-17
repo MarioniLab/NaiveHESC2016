@@ -12,9 +12,9 @@ library(scater)
 library(ggplot2)
 library(grid)
 
-tsne1 <- readRDS("naive_tsne1.Rds")
-tsne2 <- readRDS("naive_tsne2.Rds")
-tsne3 <- readRDS("naive_tsne3.Rds")
+tsne1 <- readRDS("results-diff/naive_tsne1.Rds")
+tsne2 <- readRDS("results-diff/naive_tsne2.Rds")
+tsne3 <- readRDS("results-diff/naive_tsne3.Rds")
 
 pdf(file=file.path(figdir, "3a.pdf"), height=5, width=10, useDingbats=FALSE)
 
@@ -54,9 +54,9 @@ grid.draw(legend)
 dev.off()
 
 # Figure 3B
-tsne1 <- readRDS("primed_tsne1.Rds")
-tsne2 <- readRDS("primed_tsne2.Rds")
-tsne3 <- readRDS("primed_tsne3.Rds")
+tsne1 <- readRDS("results-diff/primed_tsne1.Rds")
+tsne2 <- readRDS("results-diff/primed_tsne2.Rds")
+tsne3 <- readRDS("results-diff/primed_tsne3.Rds")
 
 pdf(file=file.path(figdir, "3b.pdf"), height=5, width=10, useDingbats=FALSE)
 
@@ -133,8 +133,8 @@ dev.off()
 
 # Figure S3A
 
-naive.plot <- readRDS("naive_plot.Rds")
-primed.plot <- readRDS("primed_plot.rds")
+naive.plot <- readRDS("results-diff/naive_plot.Rds")
+primed.plot <- readRDS("results-diff/primed_plot.rds")
 
 pdf(file=file.path(figdir, "s3a.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
