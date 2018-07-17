@@ -1,4 +1,4 @@
-source("central.R")
+source("Figures/central.R")
 
 # Loading in the expression values.
 library(scater)
@@ -89,7 +89,7 @@ for (ptype in c("naive", "transition", "primed")) {
     plot_data <- ggplot_build(ugly.plot)
   
     pcol <- switch(ptype, naive=naive.col, primed=primed.col, transition=trans.col)      
-    plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = pcol, 
+    plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = pcol, 
          ylab=bquote(.(stuff)~log[2]*"-expression", list(stuff=paste0(toupper(substring(ptype, 1, 1)), substring(ptype, 2)))),
          pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,11), cex.axis=1.2)
     if (ptype == "primed"){
@@ -200,7 +200,7 @@ for (ptype in c("naive", "transition", "primed")) {
   plot_data <- ggplot_build(ugly.plot)
   
   pcol <- switch(ptype, naive=naive.col, primed=primed.col, transition=trans.col)      
-  plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = pcol, 
+  plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = pcol, 
        ylab=bquote(.(stuff)~log[2]*"-expression", list(stuff=paste0(toupper(substring(ptype, 1, 1)), substring(ptype, 2)))),
        pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,11), cex.axis=1.2)
   if (ptype == "primed"){

@@ -1,7 +1,7 @@
-Rscript Figure1.R
-Rscript Figure2.R
-Rscript Figure3.R
-Rscript Figure4.R
+Rscript Figures/Figure1.R
+Rscript Figures/Figure2.R
+Rscript Figures/Figure3.R
+Rscript Figures/Figure4.R
 
 
 

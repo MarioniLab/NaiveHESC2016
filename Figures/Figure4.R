@@ -1,4 +1,4 @@
-source("central.R")
+source("Figures/central.R")
 remapdir <- "results-remapping"
 
 # Make mapping plots.

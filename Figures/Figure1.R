@@ -1,4 +1,4 @@
-source("central.R")
+source("Figures/central.R")
 
 # Figure 1B
 sce <- readRDS("sce_all.rds")
@@ -58,10 +58,10 @@ dev.off()
 
 # Figure S1a
 library(scater)
-ugly1 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_counts"))
-ugly2 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="log10_total_features"))
-ugly3 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_ERCC"))
-ugly4 <- plotPhenoData(sce, aesth=aes_string(x="sample", y="pct_counts_Mt"))
+ugly1 <- plotColData(sce, x="sample", y="log10_total_counts")
+ugly2 <- plotColData(sce, x="sample", y="log10_total_features")
+ugly3 <- plotColData(sce, x="sample", y="pct_counts_ERCC")
+ugly4 <- plotColData(sce, x="sample", y="pct_counts_Mt")
 
 pdf(file=file.path(figdir, "s1a.pdf"),width = 10, height = 10, useDingbats=FALSE)
 multiplot(ugly1 + geom_boxplot(width=0.1) + theme_classic() + ylab('Total Counts [log10]') + xlab(''),
@@ -70,7 +70,6 @@ ugly3 + geom_boxplot(width=0.1) + theme_classic() + ylab('PCT Counts ERCC') + xl
 ugly4 + geom_boxplot(width=0.1) + theme_classic() + ylab('PCT Counts Mt') + xlab('Batch'),
 cols=2)
 dev.off()
-
 
 # Figure S1b
 pdf(file=file.path(figdir, "s1b.pdf"),width = 20, height = 12, useDingbats=FALSE)
@@ -83,7 +82,7 @@ for (ptype in c("naive", "primed")) {
   plot_data <- ggplot_build(ugly.plot)
   
   pcol <- switch(ptype, naive=naive.col, primed=primed.col, transition=trans.col)      
-  plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, col = pcol, 
+  plot(plot_data$data[[2]]$x, plot_data$data[[2]]$y, col = pcol, 
        ylab=bquote(.(stuff)~log[2]*"-expression", list(stuff=paste0(toupper(substring(ptype, 1, 1)), substring(ptype, 2)))),
        pch=16, xlab = "" , cex.lab = 1.5, xaxt = "n", cex=2, ylim=c(0,13.3), cex.axis=1.2)
   if (ptype == "primed"){
@@ -93,4 +92,3 @@ for (ptype in c("naive", "primed")) {
   }
 }
 dev.off()
-
