@@ -179,7 +179,7 @@ for (k in 2:5){
 So, we go on to cluster the cells, and visualize the result of clustering on our _t_-SNE plot.
 
 ```{r naive_PCA}
-my.clusters_naive <- unname(cutree(my.tree_naive, k=3))er
+my.clusters_naive <- unname(cutree(my.tree_naive, k=3))
 sce_naive$cluster <- factor(my.clusters_naive)
 plotPCA(sce_naive, colour_by="cluster") + fontsize
 ```

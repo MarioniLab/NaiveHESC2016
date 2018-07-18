@@ -33,7 +33,7 @@ This ensures that we're identifying effects of homogeneous populations.
 ```{r}
 library(scran)
 sce <- readRDS("sce_all.rds")
-true.groups <- read.table(file.path("results-naive", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
+true.groups <- read.table(file.path("results-transition", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
 sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
 sce_naive <- sce[,sce$phenotype == "naive"]
 sce_primed <- sce[,sce$phenotype == "primed"]
