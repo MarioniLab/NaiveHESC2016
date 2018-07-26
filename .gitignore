@@ -2,8 +2,6 @@
 *.rds
 *.md
 .DS_Store
-objects
-output
 figure-*
 results-*
 .Rhistory
