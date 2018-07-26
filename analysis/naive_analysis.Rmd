@@ -1,0 +1,194 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: naive-only analysis"
+author: Tobias Messmer and Aaron Lun
+date: 13 November 2017
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-naive/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-naive/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+set.seed(100)
+```
+
+# Selecting only the naive subpopulations
+
+We select only the naive cells and attempt to identify subpopulations within the naive condition.
+This is more sensitive than doing so on the entire data set, where the naive/primed differences dominate.
+
+```{r naivein}
+library(scran)
+sce <- readRDS("sce_all.rds")
+sce_naive <- sce[,colData(sce)$phenotype=="naive"] 
+dim(sce_naive)
+```
+
+We adjust the `batch` factor to get rid of the now-unnecessary "primed" level. 
+We also re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
+
+```{r}
+sce_naive$batch <- factor(sce_naive$batch)
+sce_naive <- normalize(sce_naive)
+```
+
+We can examine the expression of the various ESC markers in more detail.
+
+```{r naiveExpMarker}
+library(scater)
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"),
+    colour_by="batch") + fontsize
+```
+
+We also set up an output directory for the results.
+
+```{r naiveout}
+resdir <- "results-naive"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Detecting naive-only HVGs
+
+We detect HVGs in the naive population, using the variance of the normalized log-expression values.
+A trend is fitted to the spike-in variances and represents the technical aspect of variability.
+This is done separately for each batch due to the differences in spike-in quantity.
+The trend generally fits quite well, though some deviation of the spike-ins is attributable to amplification-induced variability.
+
+```{r naive.vartrend, fig.height=6, fig.width=10}
+sce_naive <- multiBlockNorm(sce_naive, sce_naive$batch)
+var.out_naive <- multiBlockVar(sce_naive, block=sce_naive$batch,
+    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
+
+par(mfrow=c(1,2))
+is.spike <- isSpike(sce_naive)
+for (batch in levels(sce_naive$batch)) {
+    cur.out <- var.out_naive$per.block[[batch]]
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=batch)
+    curve(metadata(cur.out)$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    points(cur.out$mean[is.spike], cur.out$total[is.spike], col="red", pch=16)
+}
+```
+
+We save the resulting table to file.
+
+```{r naive.varplot}
+write.table(file=file.path(resdir, "var_naive.tsv"), var.out_naive, sep="\t", quote=FALSE, col.names=NA)
+```
+
+Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
+
+```{r var.naive}
+hvg.out_naive <- var.out_naive[which(var.out_naive$FDR <= 0.05 & var.out_naive$bio >= 0.5),]
+hvg.out_naive <- hvg.out_naive[order(hvg.out_naive$bio, decreasing=TRUE),]
+nrow(hvg.out_naive)
+write.table(file= file.path(resdir, "hvg_naive.tsv"), hvg.out_naive, sep="\t", quote=FALSE, col.names = NA) 
+head(hvg.out_naive)
+```
+
+We check that the HVGs are not being driven by outliers or batch effects.
+
+```{r violin.hvg}
+plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], alpha=0.05, 
+    colour_by="batch", jitter="jitter") + fontsize
+```
+
+# Performing dimensionality reduction
+
+We remove the batch effect prior to performing dimensionality reduction.
+This needs to be repeated as the batch effect for the naive-only cells may be different from the batch effect of the entire data set.
+
+```{r}
+library(limma)
+norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
+collected.npcs_naive <- denoisePCA(sce_naive, var.out_naive, value="n", assay.type="norm_exprs")
+```
+
+We apply PCA on the genes with positive biological components in `var.out_naive`.
+This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
+
+```{r}
+keep <- var.out_naive$bio > 0
+summary(keep)
+pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=collected.npcs_naive)
+reducedDim(sce_naive, "PCA") <- pc.out$x
+dim(reducedDim(sce_naive, "PCA"))
+plot(pc.out)
+```
+
+# Visualization in low-dimensional space
+
+We then create _t_-SNE plots, using only the set of correlated HVGs.
+
+```{r tsne.naive, fig.width=15, fig.height=6}
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=10)
+tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) +  fontsize
+tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
+tsne3_naive <- plotTSNE(sce_naive, colour_by="batch") + fontsize
+multiplot(tsne1_naive, tsne2_naive, tsne3_naive, cols=3)
+```
+
+All plots suggest that there is a small subpopulation off the main bulk of cells.
+We repeat this for PCA plots, though this is not so clear - dominated by variance along the larger population, perhaps?
+
+```{r pca.naive, fig.width=15, fig.height=6}
+pca1_naive <- plotPCA(sce_naive, colour_by=rownames(hvg.out_naive)[1]) + fontsize
+pca2_naive <- plotPCA(sce_naive, colour_by="KLF4") + fontsize
+pca3_naive <- plotPCA(sce_naive, colour_by="batch") + fontsize 
+multiplot(pca1_naive, pca2_naive, pca3_naive, cols=3)
+```
+
+# Clustering to identify putative subpopulations
+
+We perform hierarchical clustering on the Euclidean distance in the PC space.
+
+```{r naiveclust}
+pcs_naive <- reducedDim(sce_naive, "PCA")
+my.dist_naive <- dist(pcs_naive)
+my.tree_naive <- hclust(my.dist_naive)
+```
+
+To identify the "best" number of clusters, we vary the `k` for tree cutting and examine the resulting silhouette plots.
+These suggest that `k=2` is the best, with cluster 3 being genuinely separated from the others.
+
+```{r silhouette, fig.width=10, fig.height=10}
+library(cluster)
+par(mfrow=c(2,2))
+for (k in 2:5){
+    my.clusters_naive <- unname(cutree(my.tree_naive, k=k))
+    col <- rainbow(k)
+    sil <- silhouette(my.clusters_naive, dist = my.dist_naive)
+    sil.cols <- col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
+    sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
+    plot(sil, main = paste(k, "clusters"), border=sil.cols, 
+        col=sil.cols, do.col.sort=FALSE)
+}
+```
+
+So, we go on to cluster the cells, and visualize the result of clustering on our _t_-SNE plot.
+
+```{r naive_PCA}
+my.clusters_naive <- unname(cutree(my.tree_naive, k=3))
+sce_naive$cluster <- factor(my.clusters_naive)
+plotPCA(sce_naive, colour_by="cluster") + fontsize
+```
+
+# Wrapping up
+
+We save our object for later use and report the session information.
+
+```{r}
+saveRDS(sce_naive, file="sce_naive.rds")
+sessionInfo()
+```

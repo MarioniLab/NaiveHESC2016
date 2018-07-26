@@ -1,0 +1,304 @@
+---
+title: "Single-cell RNA-seq Analysis of naive/primed embryonic stem cells: remapping naivete"
+author: Tobias Messmer and Aaron Lun
+date: 13 November 2017
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-remapping/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-remapping/")
+options(bitmapType="cairo", width=100)
+```
+
+# Locating ESCs according to their naive/primed-ness
+
+We want to relate the naive/primed axis identified in this data set to other single-cell data sets examining early mammalian development.
+To do so, we use the DE genes between naive/primed cells as markers, and we examine how other cells express (or do not express) these marker genes.
+We do this on three separate data sets, listed below.
+
+- Human ESCs (`petro.counts.txt`): 
+  * __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
+  * __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
+- Mouse ESCs (`mouse.counts.txt`):
+  * __Publication:__ Mohammed et al. (2017). Not yet published.
+  * __Data source:__ Supplied by Ferdinand von Meyenn and Wolf Reik.
+- Monkey ESCs (`monkey.counts.txt`):
+  * __Publication:__ Nakamura et al. (2016), _Nature_. A developmental coordinate of pluripotency among mice, monkeys and humans.
+  * __Data source:__ `GSE74767_SC3seq_Cy_ProcessedData.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767
+
+The aim is to study when the naive-primed transition occurs in each of these organisms.
+We first create a directory to save various results in.
+
+```{r}
+resdir <- "results-remapping"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Identifying marker genes
+
+We identify naive- and primed-specific markers as those genes that are differentially expressed at a FDR of 5%.
+They must also have a log-fold change between conditions above 10; 
+be expressed in more than 25% of cells in the current condition.
+and be expressed in less than 5% of cells in the other condition.
+
+```{r}
+library(scran)
+library(scater)
+sce <- readRDS("sce_all.rds")
+naive.cells <- sce$phenotype=='naive'
+naive.prop <- nexprs(sce[,naive.cells], byrow=TRUE)/sum(naive.cells)
+primed.cells <- sce$phenotype=='primed'
+primed.prop <- nexprs(sce[,primed.cells], byrow=TRUE)/sum(primed.cells)
+de.genes <- read.table("results-overall/de.tsv", header=TRUE, row.names=1)
+```
+
+First, we identify the naive markers.
+
+```{r}
+naive.de <- rownames(de.genes)[de.genes$FDR <= 0.05 & de.genes$logFC > 10]
+naive.markers <- rownames(sce)[naive.prop > 0.25 & primed.prop < 0.05]
+naive.markers <- intersect(naive.markers, naive.de)
+length(naive.markers)
+saveRDS(file=file.path(resdir, "naive_markers.rds"), naive.markers)
+head(naive.markers, n=50)
+```
+
+We then identify some primed markers.
+
+```{r}
+primed.de <- rownames(de.genes)[de.genes$FDR <= 0.05 & de.genes$logFC < 10]
+primed.markers <- rownames(sce)[primed.prop > 0.25 & naive.prop < 0.05]
+primed.markers <- intersect(primed.markers, primed.de)
+length(primed.markers)
+saveRDS(file=file.path(resdir, "primed_markers.rds"), primed.markers)
+head(primed.markers, n=50)
+```
+
+# Mapping of von Meyenn hESCs 
+
+Our remapping procedure is demonstrated on our own data, as a proof of concept.
+For each cell, we count the number of marker genes that have normalized counts above 10.
+The ratio of the number of expressed primed/naive marker genes is used as a measure of the naivete of each cell.
+
+```{r vonmap, fig.width=15, fig.height=6}
+threshold <- log2(10)
+par(mfrow=c(1,3))
+collected <- list()
+all.types <- read.table(file.path("results-transition", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
+for (type in unique(all.types$Type)) {
+    of.type <- all.types$Cell[type==all.types$Type]
+    naive.exprs <- exprs(sce)[naive.markers,of.type]
+    primed.exprs <- exprs(sce)[primed.markers,of.type]
+    naive.num <- colMeans(naive.exprs >= threshold)
+    primed.num <- colMeans(primed.exprs >= threshold)
+    plot(naive.num, primed.num, xlim = c(0,1), ylim = c(0,1), main = type, pch=16,
+        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+    abline(0,1, col = "red")
+    collected[[type]] <- data.frame(type=type, naive=naive.num, primed=primed.num)
+}
+```
+
+We save these coordinates for later use in plotting.
+
+```{r vonsave}
+names(collected) <- NULL
+collected <- do.call(rbind, collected)
+write.table(file=file.path(resdir, "own_coords.tsv"), collected, col.names=NA, sep="\t", quote=FALSE)
+```
+
+# Mapping of Petropoulos human ESCs
+
+We read in the counts for the Petropoulos hESCs.
+
+```{r petroin}
+petro.counts <- as.matrix(read.table(file.path("counts", "petro.counts.txt")))
+dim(petro.counts)
+```
+
+We perform some normalization to correct for differences in library size and other biases.
+
+```{r petronorm}
+library(scran)
+small.clust <- quickCluster(petro.counts)
+sf.out <- computeSumFactors(petro.counts, cluster=small.clust)
+norm.petro.counts <- log2(t(t(petro.counts)/sf.out + 1))
+plot(colSums(petro.counts)/1e6, sf.out, log="xy", 
+    xlab="Library size (millions)", ylab="Size factors")
+```
+
+Again, we calculate the number of genes that express each set of markers.
+These are saved to file, along with the reported stage for each cell.
+
+```{r, petroprop}
+naive.exprs <- norm.petro.counts[intersect(rownames(norm.petro.counts),naive.markers),]
+nrow(naive.exprs)
+primed.exprs <- norm.petro.counts[intersect(rownames(norm.petro.counts),primed.markers),]
+nrow(primed.exprs)
+naive.num <- colMeans(naive.exprs >= threshold)
+primed.num <- colMeans(primed.exprs >= threshold)
+stages <- sub("^(E[0-9]+(\\.(early|late))?)\\..*", "\\1", colnames(norm.petro.counts))
+write.table(file=file.path(resdir, "petro_coords.tsv"), 
+    data.frame(stage=stages, naive=naive.num, primed=primed.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+We plot all stages separately to identify if there is a shift in the primed-ness of cells over time.
+
+```{r petroplots, fig.height=15, width=6}
+par(mfrow=c(4,2))
+for (stage in c("E3", "E4", "E4.late", "E5.early", "E5", "E6", "E7")) {
+    current <- stages==stage
+    plot(naive.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+    abline(0,1, col = "red")
+}
+```
+
+```{r, echo=FALSE, results="hide"}
+rm(petro.counts, norm.petro.counts)
+gc()
+```
+
+# Mapping of Mohammed mouse ESCs
+
+We repeat the dose with mouse ESCs, after identifying the homologous genes for all markers.
+
+```{r homomouse}
+library(biomaRt)
+human.mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+mouse.mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl") 
+naive.ensembl <- rowData(sce)$ensembl_gene_id[match(naive.markers, rownames(sce))]
+naive.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
+    values = naive.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
+naive.mm.markers <- unique(naive.homo[,2])
+length(naive.mm.markers)
+primed.ensembl <- rowData(sce)$ensembl_gene_id[match(primed.markers, rownames(sce))]
+primed.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
+    values = primed.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
+primed.mm.markers <- unique(primed.homo[,2])
+length(primed.mm.markers)
+```
+
+We read in the mouse ESC data and pull out the counts.
+
+```{r mousecounts}
+mouse.counts <- read.table(file.path("counts", "mouse.counts.txt"), sep = "\t", header = TRUE)
+gene.ids <- mouse.counts$ID
+mouse.counts <- as.matrix(mouse.counts[,grep("^E[0-9]", colnames(mouse.counts))])
+stages <- sub("_.*", "", colnames(mouse.counts))
+table(stages)
+```
+
+We also do a bit of normalization.
+Nothing too strange happening here, fortunately.
+
+```{r mousenorm}
+small.clust <- quickCluster(mouse.counts)
+sf.out <- computeSumFactors(mouse.counts, cluster=small.clust)
+norm.mouse.counts <- log2(t(t(mouse.counts)/sf.out + 1))
+plot(colSums(mouse.counts)/1e6, sf.out, log="xy", 
+    xlab="Library size (millions)", ylab="Size factors")
+```
+
+We compute naive/primed proportions using the previously identified homologues.
+
+```{r mouseprop}
+naive.exprs <- norm.mouse.counts[gene.ids %in% naive.mm.markers,]
+nrow(naive.exprs)
+primed.exprs <- norm.mouse.counts[gene.ids %in% primed.mm.markers,]
+nrow(primed.exprs)
+naive.num <- colMeans(naive.exprs >= threshold)
+primed.num <- colMeans(primed.exprs >= threshold)
+write.table(file=file.path(resdir, "mouse_coords.tsv"), 
+    data.frame(stage=stages, naive=naive.num, primed=primed.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+We also make a plot for each stage, as was previously done.
+
+```{r mouseplot, fig.height=12, fig.width=6}
+par(mfrow=c(3,2))
+for (stage in unique(stages)) {
+    current <- stages==stage
+    plot(naive.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+    abline(0,1, col = "red")
+}
+```
+
+```{r, results="hide", echo=FALSE}
+rm(mouse.counts, norm.mouse.counts)
+gc()
+```
+
+## Mapping of Nakamura monkey ESCs
+
+Finally, we load in the monkey data.
+We remove some rows that contain missing values.
+These are also CPM values, so there's no point in normalizing them.
+
+```{r monkeyin}
+monkey.counts <- read.table(file.path('counts', "monkey.counts.txt"), sep = "\t", header = TRUE)
+gene.names <- monkey.counts$macFas5_gene_symbol
+monkey.counts <- monkey.counts[,-(1:2)]
+keep <- rowSums(is.na(monkey.counts))==0
+monkey.counts <- monkey.counts[keep,]
+gene.names <- gene.names[keep]
+norm.monkey.counts <- log2(as.matrix(monkey.counts) + 1)
+```
+
+We exploit the fact that there are many shared gene names between human and marmoset, to avoid the need for explicit remapping.
+
+```{r monkeygenes}
+naive.exprs <- norm.monkey.counts[gene.names %in% naive.markers,]
+nrow(naive.exprs)
+primed.exprs <- norm.monkey.counts[gene.names %in% primed.markers,]
+nrow(primed.exprs)
+```
+
+We'll use the same threshold, despite the fact that we're dealing with CPMs rather than raw counts.
+This effectively assumes that each cell was sequenced at around 1 million reads per sample.
+It should be okay as this shouldn't particularly affect naive or primed markers.
+
+```{r monkeyprop}
+naive.num <- colMeans(naive.exprs >= threshold)
+primed.num <- colMeans(primed.exprs >= threshold)
+stages <- sub("_.*", "\\1", colnames(norm.monkey.counts))
+write.table(file=file.path(resdir, "monkey_coords.tsv"), 
+    data.frame(stage=stages, naive=naive.num, primed=primed.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+Finally, we make a plot for each stage, as was previously done.
+
+```{r monkeyplot, fig.height=15, fig.width=6}
+par(mfrow=c(4,2))
+ustages <- stages[grep("^E", stages)]
+ustages <- ustages[!duplicated(ustages)]
+for (stage in sort(ustages)) {
+    current <- stages==stage
+    plot(naive.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+    abline(0,1, col = "red")
+}
+```
+
+```{r, results="hide", echo=FALSE}
+rm(monkey.counts, norm.monkey.counts)
+gc()
+```
+
+# Session information
+
+```{r}
+sessionInfo()
+```
