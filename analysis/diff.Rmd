@@ -19,7 +19,7 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
-set.seed(100)
+set.seed(1000)
 ```
 
 # Data preparation
@@ -115,8 +115,8 @@ We can now have a first glimpse on the the naive and primed populations to check
 ```{r}
 library(ggplot2)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
-sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
-sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=30, exprs_values="norm_exprs")
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=30, exprs_values="norm_exprs")
 sce_naive <- runPCA(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
 sce_primed <- runPCA(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs")
 
@@ -137,7 +137,7 @@ saveRDS(pca_primed, file = file.path(resdir, 'primed_plot.Rds'))
 We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering.
 
 ```{r}
-sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
+sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=30, exprs_values="norm_exprs", feature_set = lin.markers)
 sce_naive <- runPCA(sce_naive, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
 
 pca_naive <- plotPCA(sce_naive, colour_by = 'CDK1') + fontsize
@@ -174,7 +174,7 @@ saveRDS(tsne_naive, file = file.path(resdir, 'naive_tsne3.Rds'))
 We now repeat the same analysis for the primed population. Again, it is necessary to remove the batch effects, which becomes obvious in the direct comparison to before removal. We perform Dim-reduction only on lineage markers and colours for cell-cycle expression.
 
 ```{r}
-sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=30, exprs_values="norm_exprs", feature_set = lin.markers)
 sce_primed <- runPCA(sce_primed, use_dimred="PCA", perplexity=5, exprs_values="norm_exprs", feature_set = lin.markers)
 
 pca_primed <- plotPCA(sce_primed, colour_by = 'CDK1') + fontsize

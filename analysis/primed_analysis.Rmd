@@ -146,7 +146,7 @@ plot(pc.out)
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.primed, fig.width=15, fig.height=6}
-sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=10)
+sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=30)
 tsne1_primed <- plotTSNE(sce_primed, colour_by=rownames(hvg.out_primed)[1]) +  fontsize
 tsne2_primed <- plotTSNE(sce_primed, colour_by="KLF4") + fontsize
 tsne3_primed <- plotTSNE(sce_primed, colour_by="batch") + fontsize
