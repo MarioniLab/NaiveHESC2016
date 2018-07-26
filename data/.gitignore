@@ -1,6 +1,7 @@
 *.err
 *.out
 *.tsv
+*.txt
 *.Rout
 */logs
 */bam
