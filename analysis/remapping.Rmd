@@ -120,7 +120,7 @@ write.table(file=file.path(resdir, "own_coords.tsv"), collected, col.names=NA, s
 We read in the counts for the Petropoulos hESCs.
 
 ```{r petroin}
-petro.counts <- as.matrix(read.table(file.path("counts", "petro.counts.txt")))
+petro.counts <- as.matrix(read.table(file.path("../data/counts", "petro.counts.txt")))
 dim(petro.counts)
 ```
 
@@ -191,7 +191,7 @@ length(primed.mm.markers)
 We read in the mouse ESC data and pull out the counts.
 
 ```{r mousecounts}
-mouse.counts <- read.table(file.path("counts", "mouse.counts.txt"), sep = "\t", header = TRUE)
+mouse.counts <- read.table(file.path("../data/counts", "mouse.counts.txt"), sep = "\t", header = TRUE)
 gene.ids <- mouse.counts$ID
 mouse.counts <- as.matrix(mouse.counts[,grep("^E[0-9]", colnames(mouse.counts))])
 stages <- sub("_.*", "", colnames(mouse.counts))
@@ -247,7 +247,7 @@ We remove some rows that contain missing values.
 These are also CPM values, so there's no point in normalizing them.
 
 ```{r monkeyin}
-monkey.counts <- read.table(file.path('counts', "monkey.counts.txt"), sep = "\t", header = TRUE)
+monkey.counts <- read.table(file.path('../data/counts', "monkey.counts.txt"), sep = "\t", header = TRUE)
 gene.names <- monkey.counts$macFas5_gene_symbol
 monkey.counts <- monkey.counts[,-(1:2)]
 keep <- rowSums(is.na(monkey.counts))==0

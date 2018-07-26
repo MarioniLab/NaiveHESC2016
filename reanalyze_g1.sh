@@ -4,7 +4,7 @@
 
 for mode in naive primed
 do
-    newfile=g1_${mode}_analysis.Rmd
+    newfile=analysis/g1_${mode}_analysis.Rmd
     cat ${mode}_analysis.Rmd | sed "s/figure-${mode}/figure-g1_${mode}/g" \
         | sed -r 's/(sce <- readRDS\("sce_all.rds"\))/\1\nsce <- sce[,sce$phase=="G1"]/' \
         | sed "s/resdir <- \"results-${mode}\"/resdir <- \"results-g1_${mode}\"/" \

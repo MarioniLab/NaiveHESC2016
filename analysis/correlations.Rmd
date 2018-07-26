@@ -54,18 +54,18 @@ inPresentSet <- function(present, desired) {
     which(present %in% ensembls)    
 }
 
-markers <- read.csv("data/marker/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
+markers <- read.csv("../data/marker/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
 head(markers)
 chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, markers[,1])
 markers <-  markers[markers$V1 %in% rownames(sce)[chosen_markers],]
 colnames(markers) <- c('Symbol','Function')
 
-epi_modifier <- read.csv("data/marker/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
+epi_modifier <- read.csv("../data/marker/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_modifier)
 epi_modifier <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_modifier[,1])
 length(epi_modifier)
 
-epi_reader <- read.csv("data/marker/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
+epi_reader <- read.csv("../data/marker/epigen_readers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_reader)
 epi_reader <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_reader[,1])
 length(epi_reader)

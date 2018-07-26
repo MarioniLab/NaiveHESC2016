@@ -14,8 +14,6 @@ output:
 ---
 
 ```{r, echo=FALSE, results="hide"}
-dir.create("figure-preprocess/", showWarning=FALSE)
-knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-preprocess/")
 options(bitmapType="cairo", width=100)
 ```
 
@@ -30,7 +28,7 @@ overall.maps <- list()
 overall.counts <- list()
 total.maps <- list()
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){  
-    cur.file <- list.files("counts", pattern=paste0("my_qual_", sample), full=TRUE)
+    cur.file <- list.files("../data/counts", pattern=paste0("my_qual_", sample), full=TRUE)
     qual.data <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
     total <- rowSums(qual.data)
     reads.mapped <- total - qual.data$Unassigned_Unmapped - qual.data$Unassigned_MappingQuality

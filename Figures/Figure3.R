@@ -1,13 +1,13 @@
-source("Figures/central.R")
+source("central.R")
 
 # Figure 3A
 library(scater)
 library(ggplot2)
 library(grid)
 
-tsne1 <- readRDS("results-diff/naive_tsne1.Rds")
-tsne2 <- readRDS("results-diff/naive_tsne2.Rds")
-tsne3 <- readRDS("results-diff/naive_tsne3.Rds")
+tsne1 <- readRDS("../analysis/results-diff/naive_tsne1.Rds")
+tsne2 <- readRDS("../analysis/results-diff/naive_tsne2.Rds")
+tsne3 <- readRDS("../analysis/results-diff/naive_tsne3.Rds")
 
 pdf(file=file.path(figdir, "3a.pdf"), height=5, width=10, useDingbats=FALSE)
 
@@ -47,9 +47,9 @@ grid.draw(legend)
 dev.off()
 
 # Figure 3B
-tsne1 <- readRDS("results-diff/primed_tsne1.Rds")
-tsne2 <- readRDS("results-diff/primed_tsne2.Rds")
-tsne3 <- readRDS("results-diff/primed_tsne3.Rds")
+tsne1 <- readRDS("../analysis/results-diff/primed_tsne1.Rds")
+tsne2 <- readRDS("../analysis/results-diff/primed_tsne2.Rds")
+tsne3 <- readRDS("../analysis/results-diff/primed_tsne3.Rds")
 
 pdf(file=file.path(figdir, "3b.pdf"), height=5, width=10, useDingbats=FALSE)
 
@@ -93,7 +93,7 @@ dev.off()
 library(pheatmap)
 library(gridExtra)
 
-naive.epi.heat <- readRDS('results-correlations/naive.epi.Rds')
+naive.epi.heat <- readRDS('../analysis/results-correlations/naive.epi.Rds')
 
 heat.dists <- dist(naive.epi.heat)
 heat.tree <- hclust(heat.dists)
@@ -112,7 +112,7 @@ dev.off()
 
 # 3D
 
-primed.epi.heat <- readRDS('results-correlations/primed.epi.Rds')
+primed.epi.heat <- readRDS('../analysis/results-correlations/primed.epi.Rds')
 
 primed.epi.heat[which(primed.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
 primed.epi.heat[which(primed.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
@@ -126,8 +126,8 @@ dev.off()
 
 # Figure S3A
 
-naive.plot <- readRDS("results-diff/naive_plot.Rds")
-primed.plot <- readRDS("results-diff/primed_plot.rds")
+naive.plot <- readRDS("../analysis/results-diff/naive_plot.Rds")
+primed.plot <- readRDS("../analysis/results-diff/primed_plot.rds")
 
 pdf(file=file.path(figdir, "s3a.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
@@ -148,7 +148,7 @@ dev.off()
 
 
 # Figure S3B
-colour.code <- readRDS('results-correlations/fdr.corr.Rds')
+colour.code <- readRDS('../analysis/results-correlations/fdr.corr.Rds')
 
 colour.scheme <- c('grey', 'black', naive.col, primed.col)
 colour.code <- colour.scheme[colour.code]
@@ -160,7 +160,7 @@ legend('topleft', legend = c('Total: 625', 'Sig in both: 15', 'Sig in naive: 282
 dev.off()
 
 # Figure S3C
-tsne4 <- readRDS("results-diff/naive_tsne4.Rds")
+tsne4 <- readRDS("../analysis/results-diff/naive_tsne4.Rds")
 pdf(file=file.path(figdir, "s3c.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
 plot_data <- ggplot_build(tsne4)

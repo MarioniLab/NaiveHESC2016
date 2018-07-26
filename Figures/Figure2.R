@@ -1,9 +1,9 @@
-source("Figures/central.R")
+source("central.R")
 
 # Loading in the expression values.
 library(scater)
-sce <- readRDS("sce_all.rds")
-pops <- read.table(file.path("results-naive", "groups.tsv"), stringsAsFactors=FALSE, header=TRUE)
+sce <- readRDS("../analysis/sce_all.rds")
+pops <- read.table(file.path("../analysis/results-naive", "groups.tsv"), stringsAsFactors=FALSE, header=TRUE)
 m <- match(colnames(sce), pops$Cell)
 pops <- pops[m,]
 
@@ -11,8 +11,8 @@ pops <- pops[m,]
 # Figure 2A
 
 # Loading in the DE marker genes.
-de.naive <- read.table(file.path("results-naive", "markers_trans_vs_naive.tsv"), header=TRUE, nrows=50)
-de.primed <- read.table(file.path("results-naive", "markers_trans_vs_primed.tsv"), header=TRUE, nrows=50)
+de.naive <- read.table(file.path("../analysis/results-naive", "markers_trans_vs_naive.tsv"), header=TRUE, nrows=50)
+de.primed <- read.table(file.path("../analysis/results-naive", "markers_trans_vs_primed.tsv"), header=TRUE, nrows=50)
 o <- order(-de.naive$logFC)
 top.naive <- rownames(de.naive)[o]
 o <- order(de.primed$logFC)
@@ -103,7 +103,7 @@ dev.off()
 
 ###############################
 # Figure S2A
-pcs <- readRDS(file.path("results-overall", "pcs.rds"))
+pcs <- readRDS(file.path("../analysis/results-overall", "pcs.rds"))
 
 all.colors <- character(ncol(sce))
 all.colors[pops$Type=="naive"] <- naive.col
@@ -212,7 +212,7 @@ for (ptype in c("naive", "transition", "primed")) {
 dev.off()
 
 # Figure S2D
-topgo <- read.table(file=file.path("results-naive", "go_unique_trans.tsv"), sep="\t", header = TRUE) 
+topgo <- read.table(file=file.path("../analysis/results-naive", "go_unique_trans.tsv"), sep="\t", header = TRUE) 
 topgo <- topgo[10:1,]
 topgo$P.DE <- -log10(topgo$P.DE)
 pdf(file=file.path(figdir, "s2d.pdf"), width = 8, height = 10, useDingbats=FALSE)

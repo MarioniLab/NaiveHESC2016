@@ -32,7 +32,7 @@ all.counts <- list()
 gene.names <- NULL
 gene.length <- NULL
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
-    cur.file <- list.files("counts", pattern=paste0("genic_counts_", sample), full=TRUE)
+    cur.file <- list.files("../data/counts", pattern=paste0("genic_counts_", sample), full=TRUE)
     current_counts <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
 
     # Checking gene names and length are the same as those in other files.

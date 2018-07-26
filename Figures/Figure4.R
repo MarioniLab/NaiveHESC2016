@@ -1,5 +1,5 @@
-source("Figures/central.R")
-remapdir <- "results-remapping"
+source("central.R")
+remapdir <- "../analysis/results-remapping"
 
 # Make mapping plots.
 mapper <- function(x, y, colors, width=0.01, xlim=NULL, ylim=NULL, xlab=NULL, ylab=NULL, ...) {

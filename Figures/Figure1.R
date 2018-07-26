@@ -1,8 +1,8 @@
-source("Figures/central.R")
+source("central.R")
 
 # Figure 1B
-sce <- readRDS("sce_all.rds")
-pcs <- readRDS(file.path("results-overall", "pcs.rds"))
+sce <- readRDS("../analysis/sce_all.rds")
+pcs <- readRDS(file.path("../analysis/results-overall", "pcs.rds"))
 
 pdf(file=file.path(figdir, "1b.pdf"), width=9, height=8, useDingbats=FALSE)
 layout(cbind(1,2), width=c(5, 1))
@@ -18,7 +18,7 @@ legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch
 dev.off()
 
 # Figure 1C
-de.res <- read.table(file.path("results-overall", "de.tsv"), header=TRUE)
+de.res <- read.table(file.path("../analysis/results-overall", "de.tsv"), header=TRUE)
 is.up <- de.res$logFC > 0 & de.res$FDR <= 0.05
 is.down <- de.res$logFC < 0 & de.res$FDR <= 0.05
 x <- de.res$logCPM
