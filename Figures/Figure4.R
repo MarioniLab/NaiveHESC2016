@@ -1,5 +1,5 @@
-source("central.R")
-remapdir <- "../analysis/results-remapping"
+source("Figures/central.R")
+remapdir <- "analysis/results-remapping"
 
 # Make mapping plots.
 mapper <- function(x, y, colors, width=0.01, xlim=NULL, ylim=NULL, xlab=NULL, ylab=NULL, ...) {
@@ -50,39 +50,9 @@ plotTheRest <- function(colors, skiprow=TRUE) {
 
 library(viridis)
 
+
+
 # Figure 4A
-
-blah <- read.table(file.path(remapdir, "petro_coords.tsv"), header=TRUE)
-colors <- viridis(8)
-
-mat <- matrix(1:8, nrow=2, byrow=TRUE)
-n <- length(mat)
-final.mat <- cbind(n+3, mat, c(n+1, n+2))
-final.mat <- rbind(final.mat, n+4)
-lwidths <- c(0.2, rep(1, ncol(mat)), 0.3)
-lheights <- c(rep(1, nrow(mat)), 0.2)
-
-pdf(file.path(figdir, "4a.pdf"), width=sum(lwidths)*5, height=sum(lheights)*5)
-par(mar=c(2.1, 2.1, 4.1, 2.1))
-layout(final.mat, width=lwidths, height=lheights)
-
-i <- 1L
-for (stage in c("E3", "E4", "E4.late","E5.early", "E5", "E6", "E7")) {
-    current <- blah$stage==stage
-    x <- blah$naive
-    y <- blah$primed
-    mapper(x[current], y[current], colors, xlim=c(0, 0.8), ylim=c(0, 0.8), xaxt="n", yaxt="n",
-           main=sub("\\.", " ", stage), cex.main=2.5, width=0.02) 
-    axis(2, cex.axis=1.7, labels=(i==mat[1,1] || i==mat[2,1]))
-    axis(1, cex.axis=1.7, labels=(i %in% mat[2,] || i %in% mat[,4]))
-    i <- i+1L
-}
-
-plot.new()
-plotTheRest(colors)
-dev.off()
-
-# Figure 4B
 
 blah <- read.table(file.path(remapdir, "mouse_coords.tsv"), header=TRUE)
 colors <- viridis(5)
@@ -94,7 +64,7 @@ final.mat <- rbind(final.mat, n+4)
 lwidths <- c(0.2, rep(1, ncol(mat)), 0.3)
 lheights <- c(rep(1, nrow(mat)), 0.2)
 
-pdf(file.path(figdir, "4b.pdf"), width=sum(lwidths)*5, height=sum(lheights)*5)
+pdf(file.path(figdir, "4a.pdf"), width=sum(lwidths)*5, height=sum(lheights)*5)
 par(mar=c(2.1, 2.1, 4.1, 2.1))
 layout(final.mat, width=lwidths, height=lheights)
 
@@ -114,7 +84,7 @@ plot.new()
 plotTheRest(colors)
 dev.off()
 
-# Figure 4C
+# Figure 4B
 
 blah <- read.table(file.path(remapdir, "monkey_coords.tsv"), header=TRUE)
 colors <- viridis(5)
@@ -126,7 +96,7 @@ final.mat <- rbind(final.mat, n+4)
 lwidths <- c(0.2, rep(1, ncol(mat)), 0.3)
 lheights <- c(rep(1, nrow(mat)), 0.2)
 
-pdf(file.path(figdir, "4c.pdf"), width=sum(lwidths)*5, height=sum(lheights)*5)
+pdf(file.path(figdir, "4b.pdf"), width=sum(lwidths)*5, height=sum(lheights)*5)
 par(mar=c(2.1, 2.1, 4.1, 2.1))
 layout(final.mat, width=lwidths, height=lheights)
 
@@ -142,6 +112,38 @@ for (stage in c("E06", "E07", "E08", "E09", "E13", "E14", "E16", "E17")) {
     i <- i + 1L
 }
 
+plotTheRest(colors)
+dev.off()
+
+# Figure 4C
+
+blah <- read.table(file.path(remapdir, "petro_coords.tsv"), header=TRUE)
+colors <- viridis(8)
+
+mat <- matrix(1:8, nrow=2, byrow=TRUE)
+n <- length(mat)
+final.mat <- cbind(n+3, mat, c(n+1, n+2))
+final.mat <- rbind(final.mat, n+4)
+lwidths <- c(0.2, rep(1, ncol(mat)), 0.3)
+lheights <- c(rep(1, nrow(mat)), 0.2)
+
+pdf(file.path(figdir, "4c.pdf"), width=sum(lwidths)*5, height=sum(lheights)*5)
+par(mar=c(2.1, 2.1, 4.1, 2.1))
+layout(final.mat, width=lwidths, height=lheights)
+
+i <- 1L
+for (stage in c("E3", "E4", "E4.late","E5.early", "E5", "E6", "E7")) {
+  current <- blah$stage==stage
+  x <- blah$naive
+  y <- blah$primed
+  mapper(x[current], y[current], colors, xlim=c(0, 0.8), ylim=c(0, 0.8), xaxt="n", yaxt="n",
+         main=sub("\\.", " ", stage), cex.main=2.5, width=0.02) 
+  axis(2, cex.axis=1.7, labels=(i==mat[1,1] || i==mat[2,1]))
+  axis(1, cex.axis=1.7, labels=(i %in% mat[2,] || i %in% mat[,4]))
+  i <- i+1L
+}
+
+plot.new()
 plotTheRest(colors)
 dev.off()
 
