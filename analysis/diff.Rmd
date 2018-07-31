@@ -14,12 +14,12 @@ output:
 ---
 
 ```{r, echo=FALSE, results="hide"}
-dir.create("figure-dif/", showWarning=FALSE)
+dir.create("figure-diff/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-diff/")
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
-set.seed(1000)
+set.seed(100)
 ```
 
 # Data preparation
