@@ -3,13 +3,12 @@ title: "Single-cell RNA-seq of naive/primed embryonic stem cells: data preproces
 author: Tobias Messmer and Aaron Lun
 date: 13 November 2017
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
     number_sections: true
     theme: united 
-    highlight: tango 
     fig_caption: false
 ---
 
@@ -32,7 +31,7 @@ all.counts <- list()
 gene.names <- NULL
 gene.length <- NULL
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
-    cur.file <- list.files("../data/counts", pattern=paste0("genic_counts_", sample), full=TRUE)
+    cur.file <- list.files("../data/all_counts", pattern=paste0("genic_counts_", sample), full=TRUE)
     current_counts <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
 
     # Checking gene names and length are the same as those in other files.
@@ -95,8 +94,7 @@ gc()
 ## Adding feature-level annotation 
 
 Next, we add information such as gene symbols and chromosome locations.
-We download annotation from BioMart and store it along with the length information.
-For some reason, _biomaRt_ has decided to pad the Entrez ID; we get rid of that as well.
+We download human Ensembl annotation from BioMart.
 
 ```{r, echo=FALSE, results="asis"}
 library(BiocFileCache)
@@ -108,10 +106,10 @@ already.present <- nrow(out) > 0
 ```{r biomarting, eval=!already.present}
 library(biomaRt)
 ensembl <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset="hsapiens_gene_ensembl", 
-                   host="aug2017.archive.ensembl.org") # Ensembl version 90.
+    host="aug2017.archive.ensembl.org") # Ensembl version 90.
 ensemblGenes <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 
-                                   'external_gene_name', 'entrezgene'), filters="ensembl_gene_id", 
-                                   values=gene.names, mart=ensembl) 
+    'external_gene_name', 'entrezgene'), filters="ensembl_gene_id", 
+    values=gene.names, mart=ensembl) 
 ```
 
 ```{r, echo=FALSE}
@@ -123,6 +121,8 @@ if (already.present) {
 }
 ```
 
+We store annotation along with the length information in our `SingleCellExperiment` object.
+For some reason, _biomaRt_ has decided to pad the Entrez ID; we get rid of that as well.
 
 ```{r featureData}
 features <- ensemblGenes[match(gene.names, ensemblGenes$ensembl_gene_id),]
@@ -175,7 +175,7 @@ We need to specify the spike-in set at this point.
 ```{r newSCESet}
 library(SingleCellExperiment)
 sce <- SingleCellExperiment(list(counts=as.matrix(combined.counts)), 
-    rowData=as.matrix(features), colData=as.matrix(pheno))
+    rowData=features, colData=pheno)
 isSpike(sce, "ERCC") <- is.spike 
 sce
 ```
@@ -196,25 +196,21 @@ To enable a user-friendly analysis, it is convenient to exchange the ENSEMBL IDs
 For duplicated gene names, we merge them with the ENSEMBL IDs to avoid confusion.
 
 ```{r nameForID}
-new.row.names <- as.vector(rowData(sce)$external_gene_name)
-missing.name <- is.na(new.row.names)
-new.row.names[missing.name] <- as.vector(rowData(sce)$ensembl_gene_id[missing.name])
-dup.name <- duplicated(new.row.names)
-new.row.names[dup.name] <-
-  as.vector(paste0(rowData(sce)$external_gene_name[dup.name], "_",
-         rowData(sce)$ensembl_gene_id[dup.name]))
+library(scater)
+new.row.names <- uniquifyFeatureNames(
+    rowData(sce)$ensembl_gene_id,
+    rowData(sce)$external_gene_name
+)
 rownames(sce) <- new.row.names
 ```
-
 
 ## Removing low-quality cells
 
 A number of QC metrics are calculated for each cell using the `calculateQCMetrics` function.
-We also specify the set of feature controls that correspond to spike-in transcripts.
+Note that the spike-in transcripts are automatically used in the `feature_controls`.
 
 ```{r QCMetrics}
-library(scater)
-sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
+sce <- calculateQCMetrics(sce, feature_controls=list(Mt=is.mito))
 colnames(colData(sce))
 ```
 
@@ -255,11 +251,14 @@ suppressWarnings({
     lost <- calcAverage(counts(sce)[,discard])
     kept <- calcAverage(counts(sce)[,!discard])
 })
-logfc <- log2((lost+1)/(kept+1))
+log.vals <- edgeR::cpm(cbind(lost, kept), log=TRUE, prior=1)
+logfc <- log.vals[,1] - log.vals[,2]
 head(sort(logfc, decreasing=TRUE), 20)
-```
 
-```{r}
+# Avoid loss of points when either average is zero.
+lost <- pmax(lost, min(lost[lost > 0]))
+kept <- pmax(kept, min(kept[kept > 0]))
+
 plot(lost, kept, xlab="Average count (discarded)", 
     ylab="Average count (retained)", log="xy", pch=16)
 is.spike <- isSpike(sce)
@@ -286,6 +285,7 @@ As part of the quality checks, we can also examine the distribution of cells int
 ```{r filterPhase}
 library(scran)
 hs.pairs <- readRDS(system.file("exdata", "human_cycle_markers.rds", package="scran"))
+set.seed(10000)
 assigned <- cyclone(sce, pairs=hs.pairs, gene.names=rowData(sce)$ensembl_gene_id)
 write.table(file=file.path(resdir, "phases.tsv"), assigned, row.names=FALSE, sep="\t", quote=TRUE)
 head(assigned$scores)
@@ -348,8 +348,8 @@ Cells are clustered together and scaling biases are removed using the deconvolut
 This is done using only high-abundance genes to avoid problems with having too many zeroes in low-abundance genes.
 
 ```{r sumnorm}
-keep <- rowData(sce)$AveCount >= 1
-clusters <- quickCluster(sce, method="igraph", subset.row=keep)
+set.seed(10000)
+clusters <- quickCluster(sce, method="igraph", min.mean=1)
 sce <- computeSumFactors(sce, cluster=clusters, min.mean=1)
 summary(sizeFactors(sce))
 ```
