@@ -80,11 +80,7 @@ var.out_naive <- multiBlockVar(sce_naive, block=sce_naive$batch,
     trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
 
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
-chosen.npcs_naive <- denoisePCA(sce_naive, var.out_naive, value="n", assay.type="norm_exprs")
-
-#keep <- var.out_naive$bio > 0
-#pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_naive)
-#reducedDim(sce_naive, "PCA") <- pc.out$x
+sce_naive <- denoisePCA(sce_naive, var.out_naive, value="pca", assay.type="norm_exprs")
 ```
 
 Now we repeat the same for the primed population.
@@ -96,11 +92,7 @@ var.out_primed <- multiBlockVar(sce_primed, block=sce_primed$batch,
     trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
 
 norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
-chosen.npcs_primed <- denoisePCA(sce_primed, var.out_primed, value="n", assay.type="norm_exprs")
-
-#keep <- var.out_primed$bio > 0
-#pc.out <- prcomp(t(assay(sce_primed, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_primed)
-#reducedDim(sce_primed, "PCA") <- pc.out$x
+sce_primed <- denoisePCA(sce_primed, var.out_primed, value="pca", assay.type="norm_exprs")
 ```
 
 We can now have a first glimpse on the the naive and primed populations to check whether they form any clusters and color the PCA/tSNE according to their expression of cell-cycle related genes. If cell-cycle related genes colour different parts of the PCA/tSNE, this is an indication that cell-cycle is the great driver for heterogeneity in the populations.
@@ -110,14 +102,12 @@ library(ggplot2)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
 
 pca_naive <- plotPCA(sce_naive, colour_by = "CDK1") + fontsize
-tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1") + fontsize
+pca_primed <- plotPCA(sce_primed, colour_by = "CDK1") + fontsize
 
 sce_naive <- runTSNE(sce_naive, perplexity=30, exprs_values="norm_exprs")
 sce_primed <- runTSNE(sce_primed, perplexity=30, exprs_values="norm_exprs")
-#sce_naive <- runPCA(sce_naive, use_dimred="PCA", exprs_values="norm_exprs")
-#sce_primed <- runPCA(sce_primed, use_dimred="PCA", exprs_values="norm_exprs")
 
-pca_primed <- plotPCA(sce_primed, colour_by = "CDK1") + fontsize
+tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1") + fontsize
 tsne_primed <- plotTSNE(sce_primed, colour_by= "CDK1") + fontsize
 
 multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
@@ -135,6 +125,7 @@ We can further colour the plots for specific markers of mesoderm, endoderm and e
 ```{r pca.naive}
 lin.sce_naive <- sce_naive[lin.markers,]
 lin.sce_naive$CDK1 <- norm_exprs(sce_naive['CDK1',])
+lin.sce_naive <- runPCA(lin.sce_naive, exprs_values = "norm_exprs")
 
 #mesoderm
 pca_naive1 <- plotPCA(lin.sce_naive, colour_by = 'SNAI1') + fontsize
@@ -179,6 +170,7 @@ We now repeat the same analysis for the primed population. Again, it is necessar
 ```{r pca.primed}
 lin.sce_primed <- sce_primed[lin.markers,]
 lin.sce_primed$CDK1 <- norm_exprs(sce_primed['CDK1',])
+lin.sce_primed <- runPCA(lin.sce_primed, exprs_values = "norm_exprs")
 
 #mesoderm
 pca_primed1 <- plotPCA(lin.sce_primed, colour_by = 'SNAI1') + fontsize
