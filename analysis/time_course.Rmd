@@ -1,0 +1,103 @@
+---
+title: "Single-cell RNA-seq of naive/primed embryonic stem cells: differential variability" 
+author: Tobias Messmer and Aaron Lun
+date: 07 August 2018
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-time/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-time/")
+options(bitmapType="cairo", width=100)
+library(BiocParallel)
+register(SerialParam())
+set.seed(100)
+```
+
+We want to check whether we can follow the expression of the markers that we identified for the naive, transition and primed hESChs through a time course from naive to primed cells in vitro.
+These H9 ESCs were cultured (in triplicates) in naive conditions and then transferred to primed conditions for 0, 1, 2, 3, 7 , 10 days. 
+At every time points, bulk RNA seq was performed.
+Reads were mapped to GRCh38.
+
+# Data import
+
+First, we have to import the count table and the markers lists that we identified previously.
+
+
+```{r data.in}
+time.counts <- read.table(file.path("../data/counts", "Naive2Primed_H9ESCs.txt"), fill = TRUE, header = TRUE)
+time.counts <- time.counts[-which(duplicated(time.counts$Probe)),]
+
+library(biomaRt)
+ensembl <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset="hsapiens_gene_ensembl", 
+                   host="aug2017.archive.ensembl.org") # Ensembl version 90.
+ensemblGenes <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'chromosome_name', 'gene_biotype', 'entrezgene'), filters="external_gene_name", 
+                                   values=time.counts$Probe, mart=ensembl) 
+features <- ensemblGenes[match(time.counts$Probe, ensemblGenes$external_gene_name),]
+time.counts <- time.counts[-which(is.na(features$ensembl_gene_id)),]
+features <- features[-which(is.na(features$ensembl_gene_id)),]
+features <- cbind(features, time.counts[2:16])
+
+rownames(time.counts) <- features$ensembl_gene_id
+time.counts <- time.counts[,17:28]
+head(time.counts)
+```
+
+```{r se.object}
+library(SummarizedExperiment)
+se <- SummarizedExperiment(assays = time.counts)
+#time.counts <- time.counts[2:34,]
+
+se
+```
+
+```{r lists.in}
+de.genes <- read.table("results-overall/de.tsv", header=TRUE, row.names=1)
+naive.genes <- de.genes[de.genes$logFC > 0 & de.genes$FDR < 0.05,]
+primed.genes <- de.genes[de.genes$logFC < 0 & de.genes$FDR < 0.05,]
+trans.genes <- read.table("results-transition/markers_unique_trans.tsv", header=TRUE, row.names=1)
+```
+
+# Count preparation
+
+```{r }
+library(DESeq2)
+dds <- DESeqDataSet(time.counts, design = ~bla)
+dds
+```
+
+Quick PCA to estimate how similar the data is.
+
+```{r}
+vsd <- vst(dds)
+data <- plotPCA(cur.vsd, intgroup = 'bla', returnData=TRUE)
+percentVar <- round(100 * attr(data, "percentVar"))
+
+par(mar=c(5.1, 4.2, 4.1, 8.1), xpd = TRUE, mfrow=c(1,1))
+pca.cols <- ifelse(data$phenotype == 'LFD', lfd_col, hfd_col)
+plot(data[,1], data[,2], col = pca.cols, pch=16, xlab = paste0('Component 1: ', percentVar[1], '%'), 
+     ylab = paste0('Component 2: ', percentVar[2], '%'), cex.lab = 1.5 , cex.axis=1.2, cex=1.5)
+legend('right',  inset=c(-0.2,0), legend=c("LFD", "HFD"), col=c(lfd_col,hfd_col), pch=16, cex=1.5, bty='n', title = 'Phenotype')
+```
+
+Select the genes to be plotted.
+
+```{r}
+library("pheatmap")
+mat <- assay(cur.vsd)[ head(order(res$padj),30), ]
+mat <- mat - rowMeans(mat)
+rownames(mat)[!is.na(res$symbol[ head(order(res$padj),30)])] <- res$symbol[ head(order(res$padj),30)][!is.na(res$symbol[ head(order(res$padj),30)])]
+df <- data.frame(Phenotype = colData(cur.vsd)[,c("phenotype")], row.names = rownames(colData(cur.vsd)))
+ann.colors <- list(Phenotype = c(LFD=lfd_col, HFD=hfd_col))
+pheatmap(mat, treeheight_row = 0, treeheight_col = 0, annotation_col = df, annotation_colors = ann.colors)
+```
+
+
