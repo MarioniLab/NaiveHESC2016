@@ -75,7 +75,7 @@ head(naive.markers, n=50)
 We then identify some primed markers.
 
 ```{r}
-primed.de <- rownames(de.genes)[de.genes$FDR <= 0.05 & de.genes$logFC < 10]
+primed.de <- rownames(de.genes)[de.genes$FDR <= 0.05 & de.genes$logFC < -10]
 primed.markers <- rownames(sce)[primed.prop > 0.25 & naive.prop < 0.05]
 primed.markers <- intersect(primed.markers, primed.de)
 length(primed.markers)
