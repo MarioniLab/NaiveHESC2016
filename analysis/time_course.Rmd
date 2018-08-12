@@ -19,6 +19,11 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 library(BiocParallel)
 register(SerialParam())
+
+primed.col <- "#0072B2"
+naive.col <- "#e79f00"
+transition.col <- "#009E73"
+
 set.seed(100)
 ```
 
@@ -45,17 +50,19 @@ features <- ensemblGenes[match(time.counts$Probe, ensemblGenes$external_gene_nam
 time.counts <- time.counts[-which(is.na(features$ensembl_gene_id)),]
 features <- features[-which(is.na(features$ensembl_gene_id)),]
 features <- cbind(features, time.counts[2:16])
+rownames(features) <- features$ensembl_gene_id
 
 rownames(time.counts) <- features$ensembl_gene_id
-time.counts <- time.counts[,17:28]
+time.counts <- as.matrix(time.counts[,17:28])
 head(time.counts)
+
+Day <- data.frame(day = c('0', '0', '0', '1', '1', '1', '2', '2', '2', '3', '3', '3'))
+rownames(Day) <- colnames(time.counts)
 ```
 
-```{r se.object}
+```{r time.object}
 library(SummarizedExperiment)
-se <- SummarizedExperiment(assays = time.counts)
-#time.counts <- time.counts[2:34,]
-
+se <- SummarizedExperiment(time.counts, rowData = features, colData = Day)
 se
 ```
 
@@ -64,13 +71,14 @@ de.genes <- read.table("results-overall/de.tsv", header=TRUE, row.names=1)
 naive.genes <- de.genes[de.genes$logFC > 0 & de.genes$FDR < 0.05,]
 primed.genes <- de.genes[de.genes$logFC < 0 & de.genes$FDR < 0.05,]
 trans.genes <- read.table("results-transition/markers_unique_trans.tsv", header=TRUE, row.names=1)
+trans.genes <- trans.genes[trans.genes$P.Value < 0.05 & trans.genes$vsNaive > 1 & trans.genes$vsPrimed > 1,]
 ```
 
 # Count preparation
 
 ```{r }
 library(DESeq2)
-dds <- DESeqDataSet(time.counts, design = ~bla)
+dds <- DESeqDataSet(se, design = ~day)
 dds
 ```
 
@@ -78,26 +86,54 @@ Quick PCA to estimate how similar the data is.
 
 ```{r}
 vsd <- vst(dds)
-data <- plotPCA(cur.vsd, intgroup = 'bla', returnData=TRUE)
+data <- plotPCA(vsd, intgroup = 'day', returnData=TRUE)
 percentVar <- round(100 * attr(data, "percentVar"))
 
 par(mar=c(5.1, 4.2, 4.1, 8.1), xpd = TRUE, mfrow=c(1,1))
-pca.cols <- ifelse(data$phenotype == 'LFD', lfd_col, hfd_col)
+pca.cols <- ifelse(data$day == '0', 'red', ifelse(data$day == '1', 'blue', 
+                                                           ifelse(data$day == '2', 'green','black')))
 plot(data[,1], data[,2], col = pca.cols, pch=16, xlab = paste0('Component 1: ', percentVar[1], '%'), 
      ylab = paste0('Component 2: ', percentVar[2], '%'), cex.lab = 1.5 , cex.axis=1.2, cex=1.5)
-legend('right',  inset=c(-0.2,0), legend=c("LFD", "HFD"), col=c(lfd_col,hfd_col), pch=16, cex=1.5, bty='n', title = 'Phenotype')
+legend('right',  inset=c(-0.2,0), legend=c("0", "1", '2', '3'), col=c('red','blue', 'green', 'black'), pch=16, cex=1.5, bty='n', title = 'Day')
 ```
 
 Select the genes to be plotted.
 
 ```{r}
-library("pheatmap")
-mat <- assay(cur.vsd)[ head(order(res$padj),30), ]
-mat <- mat - rowMeans(mat)
-rownames(mat)[!is.na(res$symbol[ head(order(res$padj),30)])] <- res$symbol[ head(order(res$padj),30)][!is.na(res$symbol[ head(order(res$padj),30)])]
-df <- data.frame(Phenotype = colData(cur.vsd)[,c("phenotype")], row.names = rownames(colData(cur.vsd)))
-ann.colors <- list(Phenotype = c(LFD=lfd_col, HFD=hfd_col))
-pheatmap(mat, treeheight_row = 0, treeheight_col = 0, annotation_col = df, annotation_colors = ann.colors)
+naive.markers <- rownames(dds[rowData(dds)$external_gene_name %in% rownames(naive.genes)])
+primed.markers <- rownames(dds[rowData(dds)$external_gene_name %in% rownames(primed.genes)])
+trans.markers <- rownames(dds[rowData(dds)$external_gene_name %in% rownames(trans.genes)])
 ```
 
+Plot them in a heatmap
+```{r naive.heat}
+library("pheatmap")
+mat <- assay(vsd)[naive.markers,]
+mat <- mat - rowMeans(mat)
+rownames(mat) <- naive.markers
+
+df <- data.frame(Day = colData(vsd)[,c("day")], row.names = rownames(colData(vsd)))
+ann.colors <- list(Day = c('0'='red', '1'='blue', '2'='green', '3'='black'))
+pheatmap(mat, treeheight_row = 0, treeheight_col = 0, annotation_col = df, annotation_colors = ann.colors, show_rownames = FALSE)
+```
+
+```{r primed.heat}
+mat <- assay(vsd)[primed.markers,]
+mat <- mat - rowMeans(mat)
+rownames(mat) <- primed.markers
+
+df <- data.frame(Day = colData(vsd)[,c("day")], row.names = rownames(colData(vsd)))
+ann.colors <- list(Day = c('0'='red', '1'='blue', '2'='green', '3'='black'))
+pheatmap(mat, treeheight_row = 0, treeheight_col = 0, annotation_col = df, annotation_colors = ann.colors, show_rownames = FALSE)
+```
+
+```{r trans.heat}
+mat <- assay(vsd)[trans.markers,]
+mat <- mat - rowMeans(mat)
+rownames(mat) <- trans.markers
+
+df <- data.frame(Day = colData(vsd)[,c("day")], row.names = rownames(colData(vsd)))
+ann.colors <- list(Day = c('0'='red', '1'='blue', '2'='green', '3'='black'))
+pheatmap(mat, treeheight_row = 0, treeheight_col = 0, annotation_col = df, annotation_colors = ann.colors, show_rownames = FALSE)
+```
 
