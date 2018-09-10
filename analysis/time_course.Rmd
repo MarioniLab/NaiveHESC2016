@@ -264,8 +264,9 @@ library(SingleCellExperiment)
 sce.all <- readRDS("sce_all.rds")
 identities <- read.table("results-transition/groups.tsv", header=TRUE)
 per.pop <- sumTechReps(counts(sce.all), identities[,2])  # make bulk out of single cell data
+per.pop <- edgeR::cpm(per.pop)
 per.pop <- per.pop[rownames(out),] # choose only the markers that are present in bulk
-per.pop <- 
+
 
 #pdf("reference.pdf")
 fit <- lm.fit(y=out, x=per.pop)  
@@ -275,11 +276,11 @@ cols <- c('grey20', 'grey20', 'grey20', 'grey40', 'grey40', 'grey40',
           'grey60', 'grey60', 'grey60', 'grey80', 'grey80', 'grey80')
 
 par(mfrow=c(1,3))
-plot(props[1,], main=rownames(props)[1], xaxt = 'n', xlab = '', pch = 16, col = cols, cex = 1.5)
-axis(1, c(2,5,8,11), labels = c(0,1,2,3), ylab = 'Coefficient')
-plot(props[2,], main=rownames(props)[2], xaxt = 'n', xlab = 'Day', pch = 16, col = cols, cex = 1.5)
-axis(1, c(2,5,8,11), labels = c(0,1,2,3), ylab = '')
-plot(props[3,], main=rownames(props)[3], xaxt = 'n', xlab = '', pch = 16, col = cols, cex = 1.5)
-axis(1, c(2,5,8,11), labels = c(0,1,2,3), ylab = '')
+plot(props[1,], main=rownames(props)[1], xaxt = 'n', xlab = '', pch = 16, col = cols, cex = 1.5, ylab = 'Coefficient')
+axis(1, c(2,5,8,11), labels = c(0,1,2,3))
+plot(props[2,], main=rownames(props)[2], xaxt = 'n', xlab = 'Day', pch = 16, col = cols, cex = 1.5, ylab = '')
+axis(1, c(2,5,8,11), labels = c(0,1,2,3))
+plot(props[3,], main=rownames(props)[3], xaxt = 'n', xlab = '', pch = 16, col = cols, cex = 1.5, ylab = '')
+axis(1, c(2,5,8,11), labels = c(0,1,2,3))
 #dev.off()
 ```
