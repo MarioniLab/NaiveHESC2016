@@ -15,7 +15,6 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-preprocess/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-preprocess/")
-options(bitmapType="cairo", width=100)
 ```
 
 # Creating a `SingleCellExperiment` object
@@ -30,6 +29,7 @@ library(edgeR)
 all.counts <- list()
 gene.names <- NULL
 gene.length <- NULL
+
 for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
     cur.file <- list.files("../data/all_counts", pattern=paste0("genic_counts_", sample), full=TRUE)
     current_counts <- read.table(cur.file, sep="\t", header=TRUE, row.names=1)
@@ -61,7 +61,7 @@ for (sample in c("2383", "2384", "2677", "2678", "2739", "2740")){
 sapply(all.counts, ncol)
 ```
 
-We then merge the replicates across batches (2677 + 2678, and 2739 + 2740).
+We then merge technical replicates across batches (2677 + 2678, and 2739 + 2740).
 
 ```{r mergetech}
 stopifnot(identical(colnames(all.counts[["2677"]]), colnames(all.counts[["2678"]])))
@@ -127,7 +127,7 @@ For some reason, _biomaRt_ has decided to pad the Entrez ID; we get rid of that 
 ```{r featureData}
 features <- ensemblGenes[match(gene.names, ensemblGenes$ensembl_gene_id),]
 features$ensembl_gene_id <- gene.names
-features$entrezgene <- as.character(gsub(" ", "", features$entrezgene))
+features$entrezgene <- gsub(" ", "", as.character(features$entrezgene))
 row.names(features) <- gene.names
 features$Length <- gene.length
 head(features)
@@ -144,9 +144,8 @@ summary(is.spike)
 
 ## Adding sample-level annotation
 
-We then add information about the phenotype of the cells. 
-The cells are either in a native or primed state. 
-Furthermore, cells are categorized by their respective batch number.
+We then add information about the phenotype of the cells, i.e., naive or primed. 
+Cells are also categorized by their respective batch number.
 
 ```{r phenData}
 sample <- sub("^([0-9]+)\\..*", "\\1", colnames(combined.counts))
@@ -169,8 +168,8 @@ head(pheno)
 
 ## Constructing the `SingleCellExperiment` object
 
-We create a object to facilitate further processing of the data.
-We need to specify the spike-in set at this point.
+We create a `SingleCellExperiment` container to facilitate further processing of the data.
+We specify the spike-in set for use in downstream processing.
 
 ```{r newSCESet}
 library(SingleCellExperiment)
@@ -202,6 +201,7 @@ new.row.names <- uniquifyFeatureNames(
     rowData(sce)$external_gene_name
 )
 rownames(sce) <- new.row.names
+head(rownames(sce), 20)
 ```
 
 ## Removing low-quality cells
@@ -220,11 +220,10 @@ Cells with small library sizes (below ~100,000) or few expressed genes (below ~5
 We do the same for the proportion of reads mapped to mitochondrial and spike-in transcripts.
 Cells with high values for either metric are likely to be poor-quality, as cytoplasmic/nuclear RNA has been lost.
 
-
 ```{r histoSize, fig.width=10, fig.height=10}
 multiplot(cols=2,
     plotColData(sce, x="sample", y="log10_total_counts"),
-    plotColData(sce, x="sample", y="total_features"),
+    plotColData(sce, x="sample", y="total_features_by_counts"),
     plotColData(sce, x="sample", y="pct_counts_ERCC"),
     plotColData(sce, x="sample", y="pct_counts_Mt")
 )
@@ -235,7 +234,7 @@ We do this for each batch separately due to differences in sequencing depth and 
 
 ```{r, remOutliers1}
 libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE, batch=sce$sample) 
-feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE, batch=sce$sample) 
+feature.drop <- isOutlier(sce$total_features_by_counts, nmads=3, type="lower", log=TRUE, batch=sce$sample) 
 mito.drop <- isOutlier(sce$pct_counts_Mt, nmads=3, type="higher", batch=sce$sample)
 spike.drop <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", batch=sce$sample)
 discard <- libsize.drop | feature.drop | spike.drop | mito.drop
@@ -243,7 +242,7 @@ data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop), ByMito=sum(
            BySpike=sum(spike.drop), Remaining.in.batch=sum(!discard))
 ```
 
-Before we remove the cells, we can should double check that we don't throw away one particular cell type that is hidden in the discarded cells.
+Before we remove the cells, we check that we don't throw away one particular cell type that is hidden in the discarded cells.
 To do so, we look at the differences in gene expression between the cells we keep and the cells we filter out.
 
 ```{r}
@@ -267,7 +266,7 @@ is.mito <- rowData(sce)$is_feature_control_Mt
 points(lost[is.mito], kept[is.mito], col="dodgerblue", pch=16)
 ```
 
-If it doesn't look like this is the case, we can remove these cells from our `sce` object prior to further analysis.
+It doesn't look like this is the case, so we can remove these cells from our `sce` object prior to further analysis.
 
 ```{r, remOutliers3}
 sce <- sce[, !discard]
@@ -280,7 +279,7 @@ gc()
 
 ## Classification into cell cycle phase
 
-As part of the quality checks, we can also examine the distribution of cells into different cell cycle phases.
+We also examine the distribution of cells into different cell cycle phases.
 
 ```{r filterPhase}
 library(scran)
@@ -308,15 +307,15 @@ table(assigned$phases)
 
 # Examining the genes
 
-We have a look at the average abundance of the genes.
+We look at the average abundance of each gene.
 
 ```{r aveGenes}
-ave.counts <- calcAverage(sce)
+ave.counts <- calcAverage(sce, use_size_factors=FALSE)
 rowData(sce)$AveCount <- ave.counts
 hist(log10(ave.counts), breaks=100, main="", col="grey", xlab=expression(Log[10]~"average count"))
 ```
 
-We have a look at the number of cells expressing each gene.
+We look at the number of cells expressing each gene.
 
 ```{r numGenes}
 ncells <- nexprs(sce, byrow=TRUE)
@@ -324,11 +323,11 @@ rowData(sce)$Ncells <- ncells
 plot(ave.counts, ncells, xlab="Average count", ylab="Number of cells", log="x", pch=16, cex=0.5)
 ```
 
-Inspecting the 50 most highly expressed genes should show constitutively expressed genes like mitochondrial transcripts, ribosomal proteins, actin and other usual suspects.
+The most highly expressed genes should be constitutively expressed genes like mitochondrial transcripts, ribosomal proteins, actin and other usual suspects.
 
 ```{r highEx, fig.height=12, fig.width=6}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-plotQC(sce, type = "highest-expression", n=50) + fontsize
+plotHighestExprs(sce, n=50) + fontsize
 ```
 
 We discard genes that are not expressed at all.
@@ -386,23 +385,12 @@ Phenotype is the largest contributor (obviously) but the batch effect also needs
 plotExplanatoryVariables(sce, variables=c("phenotype", "batch")) + fontsize
 ```
 
-The spike-in variance measures any leftover technical bias from scaling normalization, assuming that library quantification was _not_ performed.
-In this case, the spike-ins are correlated with batch, so let's get rid of that first.
-After doing so, you can see that there's not a lot of leftover bias.
-
-```{r}
-library(limma)
-norm_exprs(sce) <- removeBatchEffect(logcounts(sce), sce$batch)
-plotExplanatoryVariables(sce, variables=c("total_counts_ERCC",
-    "log10_total_counts_ERCC"), exprs_values="norm_exprs") + fontsize
-```
-
 # Wrapping up
 
 We save the object to file for use in downstream analyses.
 
 ```{r}
-saveRDS(sce, file="sce_all.rds")
+saveRDS(sce, file="results-preprocess/sce_all.rds")
 sessionInfo()
 ```
 
