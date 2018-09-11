@@ -1,9 +1,9 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: overall analysis"
 author: Tobias Messmer and Aaron Lun
-date: 13 November 2017
+date: "`r Sys.Date()`"
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -16,19 +16,15 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-overall/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-overall/")
-options(bitmapType="cairo", width=100)
-library(BiocParallel)
-register(SerialParam())
-set.seed(100)
 ```
 
 # Reading in the data 
 
-First, we read in the processed data set.
+First, we read in the processed data set from the previous script.
 
 ```{r readin}
 library(scran)
-sce <- readRDS("sce_all.rds")
+sce <- readRDS("results-preprocess/sce_all.rds")
 sce
 ```
 
@@ -41,13 +37,6 @@ shuffled.sce <- sce[, sample(ncol(sce))]
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(shuffled.sce, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
     colour_by="phenotype", shape_by = "batch", show_violin = FALSE) + fontsize
-```
-
-There is a strong batch effect in this data, so we construct a design matrix containing batch blocking factors.
-This ensures that downstream results will not be driven by differences between batches.
-
-```{r makedesign}
-design <- model.matrix(~0 + sce$batch)
 ```
 
 Based on the variabilty of gene expression over the whole population, we can identify subpopulations within the data set. 
@@ -84,13 +73,15 @@ for (batch in levels(sce$batch)) {
 ```
 
 The trend passes through the bulk of the spike-ins, which is reassuring.
-We combine the statistics across batches (using Berger's IUT to select genes that are HVG in all batches) and save them to file.
+We save the combined statistics across batches to file.
 
 ```{r combinevar}
-write.table(file=file.path(resdir, "var.tsv"), var.out, sep="\t", quote=FALSE, col.names = NA) 
+write.table(file=file.path(resdir, "var.tsv"), 
+    var.out[,setdiff(colnames(var.out), "per.block")], # don't save the DFs.
+    sep="\t", quote=FALSE, col.names = NA) 
 ```
 
-The computed variance can be used to identify highly variable genes, which are subsequently saved to file. 
+The computed variance is used to identify highly variable genes, which are subsequently saved to file. 
 
 ```{r highvar}
 hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),-7]
@@ -103,54 +94,30 @@ head(hvg.out)
 The most highly variable genes across the whole population are shown to ensure that they are not driven by one or two outliers.
 
 ```{r vioplot}
-plotExpression(shuffled.sce, rownames(hvg.out)[1:10], alpha=0.5, 
+plotExpression(shuffled.sce, rownames(hvg.out)[1:10], point_alpha=0.5, 
     colour_by="phenotype", jitter="jitter") + fontsize 
 ```
 
 # Dimensionality reduction based on the technical noise
 
 We remove the batch effect prior to performing dimensionality reduction.
-This needs to be repeated as the batch effect for the naive-only cells may be different from the batch effect of the entire data set.
 
 ```{r}
 library(limma)
 norm_exprs(sce) <- removeBatchEffect(exprs(sce), batch=sce$batch) 
-collected.npcs <- denoisePCA(sce, var.out, value="n", assay.type="norm_exprs")
 ```
 
-We examine the lower bound on the number of PCs that should be retained in each data set.
-This is based on discarding later PCs until the variance in the discarded PCs is equal to the total technical noise.
-Unfortunately, the number of PCs to retain is quite different between the two batches, which is less-than-helpful.
+We then estimate the number of PCs to retain based on our estimates of the technical noise.
 
 ```{r}
-unlist(collected.npcs)
+sce <- denoisePCA(sce, var.out, assay.type="norm_exprs")
+ncol(reducedDim(sce))
 ```
 
-These differences reflect the fact that the second batch is more biologically noisy, possibly due to the manner in which it was prepared.
-We'll use the latter value given that the second batch contains a greater number of cells anyway.
-
-```{r}
-chosen.npcs <- collected.npcs #[[2]]
-```
-
-We apply PCA on the genes with positive biological components in `var.out`.
-This mirrors what is done within `denoisePCA`, where only the genes with positive components are used to select the number of PCs.
-We do this with the `norm_exprs` expression matrix in which the batch effect has been regressed out (see the pre-processing script for details).
-
-```{r}
-keep <- var.out$bio > 0
-summary(keep)
-pc.out <- prcomp(t(norm_exprs(sce)[keep,,drop=FALSE]), rank=chosen.npcs)
-reducedDim(sce, "PCA") <- pc.out$x
-dim(reducedDim(sce, "PCA"))
-attr(pc.out$x, "percentVar") <- pc.out$sdev^2/sum(pc.out$sdev^2)
-```
-
-We save the PCs to file for future use.
 We also examine the variance explained by the first few PCs.
 
 ```{r}
-saveRDS(pc.out$x, file=file.path(resdir, "pcs.rds"))
+pc.out <- attr(reducedDim(sce), "percentVar")
 plot(pc.out)
 ```
 
@@ -159,6 +126,7 @@ plot(pc.out)
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
 
 ```{r tsne, fig.height=10, fig.width=10}
+set.seed(100)
 sce <- runTSNE(sce, use_dimred="PCA", perplexity=30)
 tsne1 <- plotTSNE(sce, colour_by=rownames(hvg.out)[1]) +  fontsize
 tsne2 <- plotTSNE(sce, colour_by="KLF4") + fontsize
