@@ -3,7 +3,7 @@ title: "Single-cell RNA-seq of naive/primed embryonic stem cells: differential v
 author: Tobias Messmer and Aaron Lun
 date: 13 November 2017
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -16,27 +16,35 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-diff/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-diff/")
-options(bitmapType="cairo", width=100)
-library(BiocParallel)
-register(SerialParam())
-set.seed(100)
 ```
 
 # Data preparation
 
-The idea here is to test for whether there are any changes in gene expression of germlayer specific markers within the naive and the primed population, respectively.
+The idea here is to test for whether there are any changes in gene expression of germ layer-specific markers within the naive and the primed population, respectively.
 This will allow us to determine whether the primed cells prepare for differentiation into the three germ layers.
-First, we load the counts of our cells and the germ layer markers.
-We identify the transition cells in the naive population to prune them out.
-This ensures that we're identifying effects of homogeneous populations.
+We focus on the genes in the germ layer to maximize our power to seee any heterogeneity that might be present.
+The logic is that, if the populations are really homogeneous, even a highly biased view should not yield any structure.
 
-```{r load.objects}
-library(scran)
-sce <- readRDS("sce_all.rds")
-true.groups <- read.table(file.path("results-transition", "groups.tsv"), header=TRUE, stringsAsFactors=FALSE)
-sce <- sce[,true.groups$Type[match(colnames(sce), true.groups$Cell)]!="transition"]
-sce_naive <- sce[,sce$phenotype == "naive"]
-sce_primed <- sce[,sce$phenotype == "primed"]
+We load in the lineage markers that we'll use for focused examination of heterogeneity.
+
+```{r get.list}
+by.lineage <- read.csv(file.path("../data/marker", "commit_lineages.csv"), 
+    header=TRUE, stringsAsFactors=FALSE, sep= ';')
+head(by.lineage)
+```
+
+```{r adj.list}
+library(org.Hs.eg.db)
+ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", 
+    keys=by.lineage$Symbol, column="ENSEMBL")
+
+library(SingleCellExperiment)
+sce_naive <- readRDS("results-naive/sce_naive.rds")
+chosen <- ensembls %in% rowData(sce_naive)$ensembl_gene_id 
+table(chosen, by.lineage$Germ_layer)
+
+by.lineage <- by.lineage[chosen,]
+keep <- rowData(sce_naive)$ensembl_gene_id %in% ensembls
 ```
 
 We also set up an output directory.
@@ -46,177 +54,168 @@ resdir <- "results-diff"
 dir.create(resdir, showWarning=FALSE)
 ```
 
-```{r get.list}
-by.lineage <- read.csv(file.path("../data/marker", "commit_lineages.csv"), header=TRUE, stringsAsFactors=FALSE, sep= ';')
-lin.markers <- by.lineage$Symbol
+# Heterogeneity in the naive population 
+
+We remove the transition cells from the naive subpopulation to ensure that they don't contribute to heterogeneity.
+
+```{r}
+groups <- read.table("results-transition/groups.tsv", 
+    header=TRUE, stringsAsFactors=FALSE)
+is.transition <- groups$Cell[groups$Type=="transition"]
+sce_naive <- sce_naive[,!colnames(sce_naive) %in% is.transition]
+ncol(sce_naive)
 ```
 
-Setting up a function to identify the surviving genes.
-
-```{r adj.list}
-library(org.Hs.eg.db)
-inPresentSet <- function(present, desired) {
-    ensembls <- mapIds(org.Hs.eg.db, keytype="SYMBOL", keys=desired, column="ENSEMBL")
-    which(present %in% ensembls)    
-}
-lin.markers <- inPresentSet(rowData(sce)$ensembl_gene_id, lin.markers)
-lin.markers <- rownames(sce)[lin.markers]
-
-#Export the table of the used markers
-whole.list <- by.lineage[which(by.lineage$Symbol %in% lin.markers),]
-whole.list <- whole.list[(!duplicated(whole.list$Symbol)),]
-write.table(file=file.path(resdir, "linmarkers.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
-```
-
-Because we removed the transition cells from the naive subpopulation, we have to calculate the PCs freshly.
+We calculate the PCs from the subset of lineage markers.
 It is important not to forget to remove the batch effect to ensure that they don't distord the clustering. 
 
 ```{r naive.vartrend}
-library(limma)
 library(scater)
+sce_naive <- normalize(sce_naive)
 
-sce_naive <- multiBlockNorm(sce_naive, sce_naive$batch)
-var.out_naive <- multiBlockVar(sce_naive, block=sce_naive$batch,
-    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
-
+library(limma)    
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
-sce_naive <- denoisePCA(sce_naive, var.out_naive, value="pca", assay.type="norm_exprs")
+sce_naive <- runPCA(sce_naive, subset_row=keep, exprs_values="norm_exprs", scale=FALSE)
 ```
 
-Now we repeat the same for the primed population.
-
-```{r primed.vartrend, fig.height=6, fig.width=10}
-par(mfrow=c(1,2))
-sce_primed <- multiBlockNorm(sce_primed, sce_primed$batch)
-var.out_primed <- multiBlockVar(sce_primed, block=sce_primed$batch,
-    trend.args=list(parametric=TRUE, loess.args=list(span=0.4)))
-
-norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
-sce_primed <- denoisePCA(sce_primed, var.out_primed, value="pca", assay.type="norm_exprs")
-```
-
-We can now have a first glimpse on the the naive and primed populations to check whether they form any clusters and color the PCA/tSNE according to their expression of cell-cycle related genes. If cell-cycle related genes colour different parts of the PCA/tSNE, this is an indication that cell-cycle is the great driver for heterogeneity in the populations.
-
-```{r plot.all}
-library(ggplot2)
-fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
-
-pca_naive <- plotPCA(sce_naive, colour_by = "CDK1") + fontsize
-pca_primed <- plotPCA(sce_primed, colour_by = "CDK1") + fontsize
-
-sce_naive <- runTSNE(sce_naive, perplexity=30, exprs_values="norm_exprs")
-sce_primed <- runTSNE(sce_primed, perplexity=30, exprs_values="norm_exprs")
-
-tsne_naive <- plotTSNE(sce_naive, colour_by= "CDK1") + fontsize
-tsne_primed <- plotTSNE(sce_primed, colour_by= "CDK1") + fontsize
-
-multiplot(pca_naive, tsne_naive, pca_primed, tsne_primed, cols=2)
-
-saveRDS(pca_naive, file = file.path(resdir, 'naive_plot.Rds'))
-saveRDS(pca_primed, file = file.path(resdir, 'primed_plot.Rds'))
-```
-
-# Naive population clustering
-
-We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. Again, we use PCA and tSNE to visualize potential clustering.
-
-We can further colour the plots for specific markers of mesoderm, endoderm and ectoderm to see whether the clustering is in fact independent of the lineage.
+We now want to further assess whether clusters form in the naive population if we only use genes that are specific for the three germlayers. 
+We use PCA and tSNE to visualize potential clustering, and we can colour the points by expression of specific markers of mesoderm, endoderm and ectoderm.
+This shows whether the distribution of cells in each embedding is related to the lineage.
 
 ```{r pca.naive}
-lin.sce_naive <- sce_naive[lin.markers,]
-lin.sce_naive$CDK1 <- norm_exprs(sce_naive['CDK1',])
-lin.sce_naive <- runPCA(lin.sce_naive, exprs_values = "norm_exprs")
+library(ggplot2)
+fontsize <- theme(axis.text=element_text(size=12), 
+    axis.title=element_text(size=16), title = element_text(size=12))
 
-#mesoderm
-pca_naive1 <- plotPCA(lin.sce_naive, colour_by = 'SNAI1') + fontsize
-#ectoderm
-pca_naive2 <- plotPCA(lin.sce_naive, colour_by = 'ITGA6') + fontsize
-#endoderm
-pca_naive3 <- plotPCA(lin.sce_naive, colour_by = 'PAF1') + fontsize
-#cell cycle
-pca_naive4 <- plotPCA(lin.sce_naive, colour_by = 'CDK1') + fontsize
+pca_naive1 <- plotPCA(sce_naive, colour_by = 'SNAI1') + fontsize # mesoderm
+pca_naive2 <- plotPCA(sce_naive, colour_by = 'ITGA6') + fontsize # ectoderm
+pca_naive3 <- plotPCA(sce_naive, colour_by = 'PAF1') + fontsize # endoderm
+pca_naive4 <- plotPCA(sce_naive, colour_by = 'CDK1') + fontsize # cell cycle
 
 multiplot(pca_naive1, pca_naive2, pca_naive3, pca_naive4, cols = 2)
 ```
 
-There are no distinct clusters visible and the first principal component is separating the cells with <5% variance, thus we assume that cells are still in a uncommited stage. We want to see whether the same results can be obtained via  tSNE.
+There are no distinct clusters visible, so we assume that cells are still in an uncommited stage. 
+We want to see whether the same results can be obtained via t-SNE.
 
 ```{r tsne.naive}
-lin.sce_naive <- runTSNE(lin.sce_naive, perplexity=30, exprs_values="norm_exprs")
+set.seed(100)
+sce_naive <- runTSNE(sce_naive, subset_row=keep, scale=FALSE, perplexity=30)
 
 #mesoderm
-tsne_naive1 <- plotTSNE(lin.sce_naive, colour_by= "SNAI1") + fontsize
+tsne_naive1 <- plotTSNE(sce_naive, colour_by= "SNAI1") + fontsize
 saveRDS(tsne_naive1, file = file.path(resdir, 'naive_tsne1.Rds'))
 
 #ectoderm
-tsne_naive2 <- plotTSNE(lin.sce_naive, colour_by= "ITGA6") + fontsize
+tsne_naive2 <- plotTSNE(sce_naive, colour_by= "ITGA6") + fontsize
 saveRDS(tsne_naive2, file = file.path(resdir, 'naive_tsne2.Rds'))
 
 #endoderm
-tsne_naive3 <- plotTSNE(lin.sce_naive, colour_by= "PAF1") + fontsize
+tsne_naive3 <- plotTSNE(sce_naive, colour_by= "PAF1") + fontsize
 saveRDS(tsne_naive3, file = file.path(resdir, 'naive_tsne3.Rds'))
 
 #cell cycle
-tsne_naive4 <- plotTSNE(lin.sce_naive, colour_by= 'CDK1') + fontsize
+tsne_naive4 <- plotTSNE(sce_naive, colour_by= 'CDK1') + fontsize
 saveRDS(tsne_naive4, file = file.path(resdir, 'naive_tsne4.Rds'))
 
 multiplot(tsne_naive1, tsne_naive2, tsne_naive3, tsne_naive4, cols = 2)
 ```
 
-# Primed subpopulation
+# Heterogeneity in the primed subpopulation
 
-We now repeat the same analysis for the primed population. Again, it is necessary to remove the batch effects, which becomes obvious in the direct comparison to before removal. We perform Dim-reduction only on lineage markers and colours for cell-cycle expression for key lineage markers. First, PCA.
+We repeat the same analysis for the primed population.
+
+```{r primed.vartrend, fig.height=6, fig.width=10}
+sce_primed <- readRDS("results-primed/sce_primed.rds")
+sce_primed <- normalize(sce_primed)
+norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
+sce_primed <- runPCA(sce_primed, subset_row=keep, exprs_values="norm_exprs", scale=FALSE)
+```
+
+We perform dimensionality reduction only on lineage markers and colour based on their expression. 
+First, PCA.
 
 ```{r pca.primed}
-lin.sce_primed <- sce_primed[lin.markers,]
-lin.sce_primed$CDK1 <- norm_exprs(sce_primed['CDK1',])
-lin.sce_primed <- runPCA(lin.sce_primed, exprs_values = "norm_exprs")
-
-#mesoderm
-pca_primed1 <- plotPCA(lin.sce_primed, colour_by = 'SNAI1') + fontsize
-#ectoderm
-pca_primed2 <- plotPCA(lin.sce_primed, colour_by = 'ITGA6') + fontsize
-#endoderm
-pca_primed3 <- plotPCA(lin.sce_primed, colour_by = 'PAF1') + fontsize
-#cell cycle
-pca_primed4 <- plotPCA(lin.sce_primed, colour_by = 'CDK1') + fontsize
-
+pca_primed1 <- plotPCA(sce_primed, colour_by = 'SNAI1') + fontsize # mesoderm
+pca_primed2 <- plotPCA(sce_primed, colour_by = 'ITGA6') + fontsize # ectoderm
+pca_primed3 <- plotPCA(sce_primed, colour_by = 'PAF1') + fontsize # endoderm
+pca_primed4 <- plotPCA(sce_primed, colour_by = 'CDK1') + fontsize # cell cycle
 multiplot(pca_primed1, pca_primed2, pca_primed3, pca_primed4, cols = 2)
 ```
 
-Then, se do the same with tSNE.
+Then, we do the same with t-SNE.
 
 ```{r tsne.primed}
-lin.sce_primed <- runTSNE(lin.sce_primed, perplexity=30, exprs_values="norm_exprs")
+set.seed(100)
+sce_primed <- runTSNE(sce_primed, perplexity=30, subset_row=keep, scale=FALSE)
 
 #mesoderm
-tsne_primed1 <- plotTSNE(lin.sce_primed, colour_by= "SNAI1") + fontsize
+tsne_primed1 <- plotTSNE(sce_primed, colour_by= "SNAI1") + fontsize
 saveRDS(tsne_primed1, file = file.path(resdir, 'primed_tsne1.Rds'))
 
 #ectoderm
-tsne_primed2 <- plotTSNE(lin.sce_primed, colour_by= "ITGA6") + fontsize
+tsne_primed2 <- plotTSNE(sce_primed, colour_by= "ITGA6") + fontsize
 saveRDS(tsne_primed2, file = file.path(resdir, 'primed_tsne2.Rds'))
 
 #endoderm
-tsne_primed3 <- plotTSNE(lin.sce_primed, colour_by= "PAF1") + fontsize
+tsne_primed3 <- plotTSNE(sce_primed, colour_by= "PAF1") + fontsize
 saveRDS(tsne_primed3, file = file.path(resdir, 'primed_tsne3.Rds'))
 
 #cell cycle
-tsne_primed4 <- plotTSNE(lin.sce_primed, colour_by= 'CDK1') + fontsize
+tsne_primed4 <- plotTSNE(sce_primed, colour_by= 'CDK1') + fontsize
 saveRDS(tsne_primed4, file = file.path(resdir, 'primed_tsne4.Rds'))
 
 multiplot(tsne_primed1, tsne_primed2, tsne_primed3, tsne_primed4, cols = 2)
 ```
 
+# Testing for correlations
+
+To be more quantitative, we compare the pairwise correlations within each condition.
+First, naive:
+
+```{r}
+library(scran)
+cor.out_naive <- correlatePairs(sce_naive, subset.row=keep)
+sig.cor_naive <- cor.out_naive$FDR <= 0.05
+summary(sig.cor_naive)
+```
+
+We can examine between which layers these correlations are occurring:
+
+```{r}
+LAYER <- function(vals) {
+    by.lineage$Germ_layer[match(vals, by.lineage$Symbol)]
+}
+
+sig.cor_naive_pos <- cor.out_naive[sig.cor_naive & cor.out_naive$rho > 0,]
+table(LAYER(sig.cor_naive_pos$gene1), LAYER(sig.cor_naive_pos$gene2))
+
+sig.cor_naive_neg <- cor.out_naive[sig.cor_naive & cor.out_naive$rho < 0,]
+table(LAYER(sig.cor_naive_neg$gene1), LAYER(sig.cor_naive_neg$gene2))
+```
+
+We repeat this for the primed population:
+
+```{r}
+cor.out_primed <- correlatePairs(sce_primed, subset.row=keep)
+sig.cor_primed <- cor.out_primed$FDR <= 0.05
+summary(sig.cor_primed)
+
+sig.cor_primed_pos <- cor.out_primed[sig.cor_primed & cor.out_primed$rho > 0,]
+table(LAYER(sig.cor_primed_pos$gene1), LAYER(sig.cor_primed_pos$gene2))
+
+sig.cor_primed_neg <- cor.out_primed[sig.cor_primed & cor.out_primed$rho < 0,]
+table(LAYER(sig.cor_primed_neg$gene1), LAYER(sig.cor_primed_neg$gene2))
+```
+
+There is a minor increase in the number of correlated gene pairs in the primed condition.
+However, there is no evidence for an enrichment in positive intra-layer correlations and negative inter-layer correlations,
+which would be expected if commitment into the germ layers was beginning to occur.
+
 # Wrapping up
 
-We save relevant objects for subsequent analysis and print the sessionInfo.
+Returning the session information:
 
 ```{r end}
-saveRDS(lin.markers, file = file.path(resdir, 'lin.markers.rds'))
-saveRDS(sce_naive, file = file.path(resdir, "sce_naive_diff.rds"))
-saveRDS(sce, file = file.path(resdir, "sce_all_diff.rds"))
-saveRDS(sce_primed, file = file.path(resdir, "sce_primed_diff.rds"))
-gc()
 sessionInfo()
 ```
