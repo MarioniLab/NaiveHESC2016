@@ -1,9 +1,9 @@
 ---
 title: "Single-cell RNA-seq Analysis of naive/primed embryonic stem cells: remapping naivete"
 author: Tobias Messmer and Aaron Lun
-date: 13 November 2017
+date: "`r Sys.Date()`"
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -25,15 +25,15 @@ We want to relate the naive/primed axis identified in this data set to other sin
 To do so, we use the DE genes between naive/primed cells as markers, and we examine how other cells express (or do not express) these marker genes.
 We do this on three separate data sets, listed below.
 
-- Human ESCs (`petro.counts.txt`): 
-  * __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
-  * __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
-- Mouse ESCs (`mouse.counts.txt`):
-  * __Publication:__ Mohammed et al. (2017), _Cell Reports_. Single-Cell Landscape of Transcriptional Heterogeneity and Cell Fate Decisions during Mouse Early Gastrulation
-  * __Data source:__ `GSE100597_count_table_QC_filtered.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE100597
-- Monkey ESCs (`monkey.counts.txt`):
-  * __Publication:__ Nakamura et al. (2016), _Nature_. A developmental coordinate of pluripotency among mice, monkeys and humans.
-  * __Data source:__ `GSE74767_SC3seq_Cy_ProcessedData.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767
+- Human ESCs:
+    - __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
+    - __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
+- Mouse ESCs:
+    - __Publication:__ Mohammed et al. (2017), _Cell Reports_. Single-Cell Landscape of Transcriptional Heterogeneity and Cell Fate Decisions during Mouse Early Gastrulation
+    - __Data source:__ `GSE100597_count_table_QC_filtered.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE100597
+- Monkey ESCs:
+    - __Publication:__ Nakamura et al. (2016), _Nature_. A developmental coordinate of pluripotency among mice, monkeys and humans.
+    - __Data source:__ `GSE74767_SC3seq_Cy_ProcessedData.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767
 
 The aim is to study when the naive-primed transition occurs in each of these organisms.
 We first create a directory to save various results in.
@@ -53,11 +53,11 @@ and be expressed in less than 5% of cells in the other condition.
 ```{r}
 library(scran)
 library(scater)
-sce <- readRDS("sce_all.rds")
+sce <- readRDS("results-preprocess/sce_all.rds")
 naive.cells <- sce$phenotype=='naive'
-naive.prop <- nexprs(sce[,naive.cells], byrow=TRUE)/sum(naive.cells)
+naive.prop <- nexprs(sce, subset_col=naive.cells, byrow=TRUE)/sum(naive.cells)
 primed.cells <- sce$phenotype=='primed'
-primed.prop <- nexprs(sce[,primed.cells], byrow=TRUE)/sum(primed.cells)
+primed.prop <- nexprs(sce, subset_col=primed.cells, byrow=TRUE)/sum(primed.cells)
 de.genes <- read.table("results-overall/de.tsv", header=TRUE, row.names=1)
 ```
 
@@ -120,7 +120,8 @@ write.table(file=file.path(resdir, "own_coords.tsv"), collected, col.names=NA, s
 We read in the counts for the Petropoulos hESCs.
 
 ```{r petroin}
-petro.counts <- as.matrix(read.table(file.path("../data/counts", "petro.counts.txt")))
+petro.counts <- as.matrix(read.table(file.path("../data/other_counts", 
+    "E-MTAB-3929", "counts.txt")))
 dim(petro.counts)
 ```
 
@@ -194,9 +195,9 @@ length(primed.mm.markers)
 We read in the mouse ESC data and pull out the counts.
 
 ```{r mousecounts}
-mouse.counts <- read.table(file.path("../data/counts", "mouse.counts.txt"), sep = "\t", header = TRUE)
-gene.ids <- mouse.counts$ID
-mouse.counts <- as.matrix(mouse.counts[,grep("^E[0-9]", colnames(mouse.counts))])
+mouse.counts <- read.delim(file.path("../data/other_counts", 
+    "GSE100597_count_table_QC_filtered.txt.gz"), row.names=1)
+mouse.counts <- as.matrix(mouse.counts)
 stages <- sub("_.*", "", colnames(mouse.counts))
 table(stages)
 ```
@@ -212,12 +213,21 @@ plot(colSums(mouse.counts)/1e6, sf.out, log="xy",
     xlab="Library size (millions)", ylab="Size factors")
 ```
 
+We convert the gene symbols to Ensembl IDs.
+
+```{r}
+gene.symbols <- sub("_.*", "", rownames(mouse.counts))
+library(EnsDb.Mmusculus.v79)
+to.ensembl <- mapIds(EnsDb.Mmusculus.v79, keys=gene.symbols, keytype="SYMBOL", column="GENEID")
+to.ensembl[is.na(to.ensembl)] <- ""
+```
+
 We compute naive/primed proportions using the previously identified homologues.
 
 ```{r mouseprop}
-naive.exprs <- norm.mouse.counts[gene.ids %in% naive.mm.markers,]
+naive.exprs <- norm.mouse.counts[to.ensembl %in% naive.mm.markers,]
 nrow(naive.exprs)
-primed.exprs <- norm.mouse.counts[gene.ids %in% primed.mm.markers,]
+primed.exprs <- norm.mouse.counts[to.ensembl %in% primed.mm.markers,]
 nrow(primed.exprs)
 naive.num <- colMeans(naive.exprs >= threshold)
 primed.num <- colMeans(primed.exprs >= threshold)
@@ -250,7 +260,8 @@ We remove some rows that contain missing values.
 These are also CPM values, so there's no point in normalizing them.
 
 ```{r monkeyin}
-monkey.counts <- read.table(file.path('../data/counts', "monkey.counts.txt"), sep = "\t", header = TRUE)
+monkey.counts <- read.delim(file.path('../data/other_counts', 
+    "GSE74767_SC3seq_Cy_ProcessedData.txt.gz"))
 gene.names <- monkey.counts$macFas5_gene_symbol
 monkey.counts <- monkey.counts[,-(1:2)]
 keep <- rowSums(is.na(monkey.counts))==0
