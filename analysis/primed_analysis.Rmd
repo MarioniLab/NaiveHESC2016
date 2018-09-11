@@ -1,9 +1,9 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: primed-only analysis"
 author: Tobias Messmer and Aaron Lun
-date: 13 November 2017
+date: "`r Sys.Date()`"
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -16,10 +16,6 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-primed/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-primed/")
-options(bitmapType="cairo", width=100)
-library(BiocParallel)
-register(SerialParam())
-set.seed(100)
 ```
 
 # Selecting only the primed subpopulations
@@ -29,7 +25,7 @@ This is more sensitive than doing so on the entire data set, where the naive/pri
 
 ```{r primedin}
 library(scran)
-sce <- readRDS("sce_all.rds")
+sce <- readRDS("results-preprocess/sce_all.rds")
 sce_primed <- sce[,colData(sce)$phenotype=="primed"] 
 dim(sce_primed)
 ```
@@ -87,7 +83,6 @@ We save the resulting table to file.
 write.table(file=file.path(resdir, "var_primed.tsv"), var.out_primed, sep="\t", quote=FALSE, col.names=NA)
 ```
 
-
 Genes with significantly non-zero biological components at a FDR of 5% are defined as HVGs.
 
 ```{r var.primed}
@@ -101,8 +96,8 @@ head(hvg.out_primed)
 We check that the HVGs are not being driven by outliers or batch effects.
 
 ```{r violin.hvg}
-plotExpression(sce_primed, rownames(hvg.out_primed)[1:10], alpha=0.05, 
-    colour_by="batch", jitter="jitter") + fontsize
+plotExpression(sce_primed, rownames(hvg.out_primed)[1:10], point_alpha=0.05, 
+    colour_by="batch", jitter_type="jitter") + fontsize
 ```
 
 # Performing dimensionality reduction
@@ -113,31 +108,14 @@ This needs to be repeated as the batch effect for the primed-only cells may be d
 ```{r}
 library(limma)
 norm_exprs(sce_primed) <- removeBatchEffect(exprs(sce_primed), batch=sce_primed$batch) 
-collected.npcs_primed <- denoisePCA(sce_primed, var.out_primed, value="n", assay.type="norm_exprs")
+sce_primed <- denoisePCA(sce_primed, var.out_primed, assay.type="norm_exprs")
+ncol(reducedDim(sce_primed))
 ```
 
-We examine the lower bound on the number of PCs that should be retained in each data set.
-Again, the number of PCs to retain is quite different between the two batches, which is annoying.
+We also examine the variance explained by the first few PCs.
 
 ```{r}
-unlist(collected.npcs_primed)
-```
-
-We'll use the latter value given that the second batch contains a greater number of cells anyway.
-
-```{r}
-chosen.npcs_primed <- collected.npcs_primed#[[2]]
-```
-
-We apply PCA on the genes with positive biological components in `var.out_primed`.
-This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
-
-```{r}
-keep <- var.out_primed$bio > 0
-summary(keep)
-pc.out <- prcomp(t(assay(sce_primed, "norm_exprs")[keep,,drop=FALSE]), rank=chosen.npcs_primed)
-reducedDim(sce_primed, "PCA") <- pc.out$x
-dim(reducedDim(sce_primed, "PCA"))
+pc.out <- attr(reducedDim(sce_primed), "percentVar")
 plot(pc.out)
 ```
 
@@ -146,6 +124,7 @@ plot(pc.out)
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.primed, fig.width=15, fig.height=6}
+set.seed(100)
 sce_primed <- runTSNE(sce_primed, use_dimred="PCA", perplexity=30)
 tsne1_primed <- plotTSNE(sce_primed, colour_by=rownames(hvg.out_primed)[1]) +  fontsize
 tsne2_primed <- plotTSNE(sce_primed, colour_by="KLF4") + fontsize
@@ -193,12 +172,11 @@ for (k in 2:5){
 }
 ```
 
-
 # Wrapping up
 
 We save our object for later use and report the session information.
 
 ```{r}
-saveRDS(sce_primed, file="sce_primed.rds")
+saveRDS(sce_primed, file=file.path(resdir, "sce_primed.rds"))
 sessionInfo()
 ```
