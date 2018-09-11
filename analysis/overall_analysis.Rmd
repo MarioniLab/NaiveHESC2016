@@ -121,6 +121,12 @@ pc.out <- attr(reducedDim(sce), "percentVar")
 plot(pc.out)
 ```
 
+We save the PCs to file for future use.
+
+```{r}
+saveRDS(reducedDim(sce), file=file.path(resdir, "pcs.rds"))
+```
+
 # Visualization in low-dimensional space
 
 We perform dimensionality reduction using _t_-SNE, colouring by various attributes.
