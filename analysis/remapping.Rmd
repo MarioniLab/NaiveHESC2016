@@ -29,8 +29,8 @@ We do this on three separate data sets, listed below.
   * __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
   * __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
 - Mouse ESCs (`mouse.counts.txt`):
-  * __Publication:__ Mohammed et al. (2017). Not yet published.
-  * __Data source:__ Supplied by Ferdinand von Meyenn and Wolf Reik.
+  * __Publication:__ Mohammed et al. (2017), _Cell Reports_. Single-Cell Landscape of Transcriptional Heterogeneity and Cell Fate Decisions during Mouse Early Gastrulation
+  * __Data source:__ `GSE100597_count_table_QC_filtered.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE100597
 - Monkey ESCs (`monkey.counts.txt`):
   * __Publication:__ Nakamura et al. (2016), _Nature_. A developmental coordinate of pluripotency among mice, monkeys and humans.
   * __Data source:__ `GSE74767_SC3seq_Cy_ProcessedData.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74767
@@ -143,6 +143,7 @@ naive.exprs <- norm.petro.counts[intersect(rownames(norm.petro.counts),naive.mar
 nrow(naive.exprs)
 primed.exprs <- norm.petro.counts[intersect(rownames(norm.petro.counts),primed.markers),]
 nrow(primed.exprs)
+
 naive.num <- colMeans(naive.exprs >= threshold)
 primed.num <- colMeans(primed.exprs >= threshold)
 stages <- sub("^(E[0-9]+(\\.(early|late))?)\\..*", "\\1", colnames(norm.petro.counts))
@@ -176,11 +177,13 @@ We repeat the dose with mouse ESCs, after identifying the homologous genes for a
 library(biomaRt)
 human.mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 mouse.mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl") 
+
 naive.ensembl <- rowData(sce)$ensembl_gene_id[match(naive.markers, rownames(sce))]
 naive.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
     values = naive.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
 naive.mm.markers <- unique(naive.homo[,2])
 length(naive.mm.markers)
+
 primed.ensembl <- rowData(sce)$ensembl_gene_id[match(primed.markers, rownames(sce))]
 primed.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
     values = primed.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
