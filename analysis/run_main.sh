@@ -11,14 +11,3 @@ echo "rmarkdown::render('analysis/correlations.Rmd', output_file = 'correlations
 echo "rmarkdown::render('analysis/remapping.Rmd', output_file = 'remapping.html')" | R --no-save --vanilla
 echo "rmarkdown::render('analysis/qualitycheck.Rmd', output_file = 'qualitycheck.html')" | R --no-save --vanilla
 
-targetdir="~/Desktop/Ergebnisse
-"
-if [ -e $targetdir ]
-then
-    cp *.html $targetdir
-    cp -r results-* $targetdir
-    cp -r Figures $targetdir
-else 
-    echo "'$targetdir' does not exist!"
-    exit 1    
-fi
