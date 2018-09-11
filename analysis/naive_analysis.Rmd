@@ -1,9 +1,9 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: naive-only analysis"
 author: Tobias Messmer and Aaron Lun
-date: 13 November 2017
+date: "`r Sys.Date()`"
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -16,10 +16,6 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-naive/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-naive/")
-options(bitmapType="cairo", width=100)
-library(BiocParallel)
-register(SerialParam())
-set.seed(100)
 ```
 
 # Selecting only the naive subpopulations
@@ -29,7 +25,7 @@ This is more sensitive than doing so on the entire data set, where the naive/pri
 
 ```{r naivein}
 library(scran)
-sce <- readRDS("sce_all.rds")
+sce <- readRDS("results-preprocess/sce_all.rds")
 sce_naive <- sce[,colData(sce)$phenotype=="naive"] 
 dim(sce_naive)
 ```
@@ -100,8 +96,8 @@ head(hvg.out_naive)
 We check that the HVGs are not being driven by outliers or batch effects.
 
 ```{r violin.hvg}
-plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], alpha=0.05, 
-    colour_by="batch", jitter="jitter") + fontsize
+plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], point_alpha=0.05, 
+    colour_by="batch", jitter_type="jitter") + fontsize
 ```
 
 # Performing dimensionality reduction
@@ -112,18 +108,14 @@ This needs to be repeated as the batch effect for the naive-only cells may be di
 ```{r}
 library(limma)
 norm_exprs(sce_naive) <- removeBatchEffect(exprs(sce_naive), batch=sce_naive$batch) 
-collected.npcs_naive <- denoisePCA(sce_naive, var.out_naive, value="n", assay.type="norm_exprs")
+sce_naive <- denoisePCA(sce_naive, var.out_naive, assay.type="norm_exprs")
+ncol(reducedDim(sce_naive))
 ```
 
-We apply PCA on the genes with positive biological components in `var.out_naive`.
-This is done using the `norm_exprs` expression matrix in which the batch effect has been regressed out. 
+We also examine the variance explained by the first few PCs.
 
 ```{r}
-keep <- var.out_naive$bio > 0
-summary(keep)
-pc.out <- prcomp(t(assay(sce_naive, "norm_exprs")[keep,,drop=FALSE]), rank=collected.npcs_naive)
-reducedDim(sce_naive, "PCA") <- pc.out$x
-dim(reducedDim(sce_naive, "PCA"))
+pc.out <- attr(reducedDim(sce_naive), "percentVar")
 plot(pc.out)
 ```
 
@@ -132,6 +124,7 @@ plot(pc.out)
 We then create _t_-SNE plots, using only the set of correlated HVGs.
 
 ```{r tsne.naive, fig.width=15, fig.height=6}
+set.seed(100)
 sce_naive <- runTSNE(sce_naive, use_dimred="PCA", perplexity=30)
 tsne1_naive <- plotTSNE(sce_naive, colour_by=rownames(hvg.out_naive)[1]) +  fontsize
 tsne2_naive <- plotTSNE(sce_naive, colour_by="KLF4") + fontsize
@@ -181,7 +174,7 @@ So, we go on to cluster the cells, and visualize the result of clustering on our
 ```{r naive_PCA}
 my.clusters_naive <- unname(cutree(my.tree_naive, k=3))
 sce_naive$cluster <- factor(my.clusters_naive)
-plotPCA(sce_naive, colour_by="cluster") + fontsize
+plotTSNE(sce_naive, colour_by="cluster") + fontsize
 ```
 
 # Wrapping up
@@ -189,6 +182,6 @@ plotPCA(sce_naive, colour_by="cluster") + fontsize
 We save our object for later use and report the session information.
 
 ```{r}
-saveRDS(sce_naive, file="sce_naive.rds")
+saveRDS(sce_naive, file=file.path(resdir, "sce_naive.rds"))
 sessionInfo()
 ```
