@@ -1,9 +1,9 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: naive-only analysis"
 author: Tobias Messmer and Aaron Lun
-date: 13 November 2017
+date: "`r Sys.Date()`"
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -16,9 +16,6 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-transition/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-transition/")
-options(bitmapType="cairo", width=100)
-library(BiocParallel)
-register(SerialParam())
 ```
 
 # Selecting only the naive subpopulations
@@ -28,7 +25,7 @@ This is more sensitive than doing so on the entire data set, where the naive/pri
 
 ```{r naivein}
 library(scran)
-sce_naive <- readRDS("sce_naive.rds")
+sce_naive <- readRDS("results-naive/sce_naive.rds")
 ```
 
 We also set up an output directory for the results.
@@ -38,9 +35,9 @@ resdir <- "results-transition"
 dir.create(resdir, showWarning=FALSE)
 ```
 
-# Characterising cluster 2
+# Characterizing cluster 2
 
-## Checking some diagnostics
+## Checking diagnostics
 
 Cluster 2 seems like the most interesting cluster, with a number of cells breaking away from the bulk primed population.
 We examine the expression of marker genes for this cluster. 
@@ -50,7 +47,7 @@ As cluster 3 consists of only 1 cell, we consider this an outlier that is not re
 library(scater)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(sce_naive, c("KLF4", "KLF17", "DPPA3", "TFCP2L1", "NANOG", "ZFP42", "POU5F1"), 
-    colour_by="cluster") + fontsize
+    x="cluster") + fontsize
 ```
 
 We also examine the distribution of size factors and number of expressed genes for each cluster.
@@ -58,8 +55,10 @@ Nothing particularly untoward.
 
 ```{r, fig.width=10, fig.height=6}
 par(mfrow=c(1,2))
-boxplot(split(sizeFactors(sce_naive), sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
-boxplot(split(sce_naive$total_features, sce_naive$cluster), xlab="Cluster", ylab="Size factor", log="y")
+boxplot(split(sizeFactors(sce_naive), sce_naive$cluster), 
+    xlab="Cluster", ylab="Size factor", log="y")
+boxplot(split(sce_naive$total_features_by_counts, sce_naive$cluster), 
+    xlab="Cluster", ylab="Size factor", log="y")
 ```
 
 Most cells in this cluster are in batch 2, but so are most cells in general, so that's not really a problem.
@@ -75,51 +74,76 @@ It's a fairly decent mix, so it's unlikely to be driven by cell cycle phase alon
 lapply(split(sce_naive$phase, sce_naive$cluster), table)
 ```
 
-We also examine the location of this cluster on the overall PCA plot.
-As expected, they show up in the middle, so we will describe this as a "transition" subpopulation.
+## Identifying DE between clusters 
+
+With these clusters identified, we can assess DE of cluster 2 relative to each other cluster in the naive population using the `findMarkers` function.
+We also block on the batch to avoid batch effects.
+Note that single-cell clusters are automatically ignored here by the t-test.
+
+```{r marker_clust_naive}
+all.markers_naive_up <- findMarkers(sce_naive, clusters=sce_naive$cluster, 
+    block=sce_naive$batch, direction="up")
+all.markers_naive_down <- findMarkers(sce_naive, clusters=sce_naive$cluster, 
+    block=sce_naive$batch, direction="down")
+```
+
+We then focus on the DE genes in cluster 2.
+We need to rank the up- and down-regulated genes separately due to asymmetry in power when using the Welch t-test for unbalanced designs.
 
 ```{r}
 trans.cluster <- 2
-sce <- readRDS("sce_all.rds")
+marker.set_naive_up <- all.markers_naive_up[[as.character(trans.cluster)]]
+write.table(marker.set_naive_up, 
+    file=file.path(resdir, paste0("markers_", trans.cluster, "_up.tsv")), 
+    sep="\t", quote=FALSE, col.names=NA) 
+head(marker.set_naive_up)
+
+marker.set_naive_down <- all.markers_naive_down[[as.character(trans.cluster)]]
+write.table(marker.set_naive_down, 
+    file=file.path(resdir, paste0("markers_", trans.cluster, "_down.tsv")), 
+    sep="\t", quote=FALSE, col.names=NA) 
+head(marker.set_naive_down)
+```
+
+We create a heatmap that shows differentially expressed genes relative to the chosen cluster.
+Clearly, some strong differential expression exists.
+
+```{r clust.naiv2, fig.height=10, fig.width=6}
+top.markers_naive <- unique(c(
+    rownames(marker.set_naive_up)[marker.set_naive_up$Top <= 50],
+    rownames(marker.set_naive_down)[marker.set_naive_down$Top <= 50]
+))
+
+plotHeatmap(sce_naive, exprs_values="norm_exprs",
+    center=TRUE, symmetric=TRUE, features=top.markers_naive,
+    columns=order(sce_naive$cluster), cluster_cols=FALSE,
+    colour_columns_by="cluster", show_colnames = FALSE, show_rownames=FALSE)
+```
+
+## Comparing to all cells
+
+We record the identity of cells in this cluster in the context of the entire data set.
+
+```{r}
+trans.cluster <- 2
+sce <- readRDS("results-preprocess/sce_all.rds")
 all.pheno <- as.character(sce$phenotype)
 all.pheno[colnames(sce) %in% colnames(sce_naive)[sce_naive$cluster==trans.cluster]] <- "transition"
-write.table(data.frame(Cell=colnames(sce), Type=all.pheno), file=file.path(resdir, "groups.tsv"),
+write.table(data.frame(Cell=colnames(sce), Type=all.pheno), 
+    file=file.path(resdir, "groups.tsv"),
     row.names=FALSE, quote=FALSE, sep="\t")
+```
+
+If we map the transition cells back to the whole-data PCA plot, they show up in the middle.
+This motivates their description as a "transition" subpopulation.
+
+```{r}
 sce$phenotype <- all.pheno
 reducedDim(sce, "PCA") <- readRDS("results-overall/pcs.rds")
 plotPCA(sce, colour_by="phenotype") + fontsize
 ```
 
-## Identifying marker genes for cluster 2
-
-With these clusters identified, we can assess DE of cluster 2 relative to each other cluster using the `findMarkers` function.
-
-```{r marker_clust_naive}
-blocking <- model.matrix(~sce_naive$batch)
-all.markers_naive <- findMarkers(sce_naive, clusters=sce_naive$cluster, design=blocking)
-clust.num_naive <- "2"
-marker.set_naive <- all.markers_naive[[clust.num_naive]]
-write.table(marker.set_naive, file=file.path(resdir, paste0("markers_", clust.num_naive, ".tsv")), 
-    sep="\t", quote=FALSE, col.names=NA) 
-head(marker.set_naive)
-```
-
-We create a heatmap that shows differentially expressed genes relative to the chosen cluster.
-
-```{r clust.naiv2, fig.height=10, fig.width=6}
-top.markers_naive <- rownames(marker.set_naive)[which(marker.set_naive$Top <= 100)]
-top.exprs_naive <- norm_exprs(sce_naive)[top.markers_naive,,drop=FALSE]
-heat.vals_naive <- top.exprs_naive - rowMeans(top.exprs_naive)
-library(pheatmap)
-clust.col_naive <- topo.colors(3)
-
-pheatmap(heat.vals_naive, 
-    annotation_col=data.frame(Cluster=as.character(sce_naive$cluster), row.names=colnames(heat.vals_naive)), 
-    show_rownames = FALSE, show_colnames = FALSE,
-    annotation_colors=list(Cluster=setNames(clust.col_naive, unique(sce_naive$cluster))))
-```
-
-## Identifying markers relative to primed/naive cells
+# Identifying markers relative to primed/naive cells
 
 We do the same for the transition population against the other naive or primed cells in general.
 This is done using _limma_, which seems to provide more protection against outliers than _edgeR_ as you go down the list.
@@ -164,8 +188,10 @@ We make a heatmap to visualize the expression of these candidates.
 use.markers <- unique(c(rownames(collected$naive)[1:50], rownames(collected$primed)[1:50]))
 o <- order(all.pheno)
 top.exprs <- norm_exprs(sce)[use.markers,o,drop=FALSE]
-clust.cols <- c("black", "grey", "red")
 heat.vals <- top.exprs - rowMeans(top.exprs)
+
+library(pheatmap)
+clust.cols <- c("black", "grey", "red")
 pheatmap(heat.vals, cluster_cols=FALSE, 
     annotation_col=data.frame(Phenotype=all.pheno[o], row.names=colnames(top.exprs)),
     show_rownames = FALSE, show_colnames = FALSE,
@@ -188,7 +214,7 @@ write.table(unique.marker, file=file.path(resdir, "markers_unique_trans.tsv"),
 head(unique.marker, 20)
 ```
 
-## Gene set analysis on unique transition genes
+# Gene set analysis for unique transition genes
 
 We do gene set analyses on the top set of genes that are uniquely expressed in this transition population.
 First, gene ontology terms:
@@ -243,7 +269,7 @@ write.table(file=file.path(resdir, "kegg_trans_vs_primed.tsv"), topkegg, sep="\t
 head(topkegg)
 ```
 
-## Looking for imprinted genes
+# Looking for imprinted genes
 
 Here, we examine a set of imprinted genes supplied by Ferdinand.
 The idea is to see if these genes change in expression between naive, transition and primed cells.
@@ -292,40 +318,13 @@ Apparently, this is due to loss of imprinting for the antisense locus that leads
 ```{r, fig.height=10, fig.width=6}
 o <- order(all.pheno)
 top.exprs <- norm_exprs(sce)[rowData(sce)$ensembl_gene_id %in% imprinted,o,drop=FALSE]
-clust.cols <- c("black", "grey", "red")
 heat.vals <- top.exprs - rowMeans(top.exprs)
+
+clust.cols <- c("black", "grey", "red")
 pheatmap(heat.vals, cluster_cols=FALSE, 
     annotation_col=data.frame(Phenotype=all.pheno[o], 
-                              row.names=colnames(top.exprs)),
+        row.names=colnames(top.exprs)),
     annotation_colors=list(Cluster=setNames(clust.cols, unique(all.pheno))))
-```
-
-Finally, we perform a holms-corrected unpaired t.test to test whether the differences in gene expression between the transition and the other populations,respectively, are more pronounce between transition/primed than transition/naive.
-
-```{r}
-imprinted <- c("ENSG00000140443", # IGF1R
-               "ENSG00000128739", # SNRPN
-               "ENSG00000053438", # NNAT
-               "ENSG00000101294", # HM13
-               "ENSG00000198300", # PEG3
-               "ENSG00000214548") # MEG3
-
-heat.imprint.vals <- exprs(sce)[match(imprinted, rowData(sce)$ensembl_gene_id),]
-pops <- data.frame(Cell=colnames(sce), Type=all.pheno)
-
-pvals <- c()
-for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
-current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="naive"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
-pvals[gene] <- current.test$p.value
-}
-p.adjust(pvals, method = 'holm')
-
-pvals <- c()
-for (gene in rownames(sce)[match(imprinted, rowData(sce)$ensembl_gene_id)]){
-  current.test <-  t.test(heat.imprint.vals[gene, pops$Type=="primed"], heat.imprint.vals[gene, pops$Type=="transition"], var.equal = TRUE, paired=FALSE)
-  pvals[gene] <- current.test$p.value
-}
-p.adjust(pvals, method = 'holm')
 ```
 
 # Wrapping up
@@ -333,6 +332,5 @@ p.adjust(pvals, method = 'holm')
 We save our object for later use and report the session information.
 
 ```{r}
-saveRDS(sce_naive, file="sce_naive.rds")
 sessionInfo()
 ```
