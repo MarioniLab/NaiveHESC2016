@@ -176,8 +176,10 @@ We repeat the dose with mouse ESCs, after identifying the homologous genes for a
 
 ```{r homomouse}
 library(biomaRt)
-human.mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-mouse.mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl") 
+human.mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl",
+    host="aug2017.archive.ensembl.org") # Ensembl version 90.
+mouse.mart <- useMart("ensembl", dataset = "mmusculus_gene_ensembl",
+    host="aug2017.archive.ensembl.org")
 
 naive.ensembl <- rowData(sce)$ensembl_gene_id[match(naive.markers, rownames(sce))]
 naive.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
@@ -217,8 +219,21 @@ We convert the gene symbols to Ensembl IDs.
 
 ```{r}
 gene.symbols <- sub("_.*", "", rownames(mouse.counts))
-library(EnsDb.Mmusculus.v79)
-to.ensembl <- mapIds(EnsDb.Mmusculus.v79, keys=gene.symbols, keytype="SYMBOL", column="GENEID")
+
+# Caching to avoid expensive re-download.
+library(BiocFileCache)
+bmcache <- BiocFileCache("biomart", ask = FALSE)
+loc <- bfcquery(bmcache, "mm10.ensGene", exact=TRUE)$rpath
+if (length(loc)==0L) {
+    mm.ensembl <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 
+        'external_gene_name', 'entrezgene'), filters="external_gene_name", 
+        values=gene.symbols, mart=mouse.mart) 
+    saveRDS(mm.ensembl, file=bfcnew(bmcache, "mm10.ensGene"))
+} else {
+    mm.ensembl <- readRDS(loc)
+}
+
+to.ensembl <- mm.ensembl$ensembl_gene_id[match(gene.symbols, mm.ensembl$external_gene_name)]
 to.ensembl[is.na(to.ensembl)] <- ""
 ```
 
