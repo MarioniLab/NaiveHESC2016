@@ -1,9 +1,9 @@
 ---
 title: "Single-cell RNA-seq of naive/primed embryonic stem cells: differential variability" 
 author: Tobias Messmer and Aaron Lun
-date: 13 November 2017
+date: "`r Sys.Date()`"
 output: 
-  html_document:
+  BiocStyle::html_document:
     toc: true
     toc_float: true
     depth: 3
@@ -16,36 +16,33 @@ output:
 ```{r, echo=FALSE, results="hide"}
 dir.create("figure-correlations/", showWarning=FALSE)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-correlations/")
-options(bitmapType="cairo", width=100)
-library(BiocParallel)
-register(SerialParam())
-set.seed(100)
 ```
 
 # Data preparation
 
 As both our populations appear to be quite homogenous, we can use them for calculating correlations between specific genes of interest.
-Before we can do this, we have to load in the previously (diff.Rmd) prepared single-cell-experiment (sce) objects, 
-which have both been batch corrected separately. As a reminder; the transition cells are excluded from the naive population to prevent that this population-based variability distorts the results.
+We set up the two populations, starting with the naive population _sans_ the transition cells:
 
-```{r loadfiles}
+```{r}
 library(scran)
+groups <- read.table("results-transition/groups.tsv",
+            header=TRUE, stringsAsFactors=FALSE)
+is.transition <- groups$Cell[groups$Type=="transition"]
 
-sce <- readRDS(file = file.path("results-diff", "sce_all_diff.rds"))
-sce_naive <- readRDS(file = file.path("results-diff", "sce_naive_diff.rds"))
-sce_primed <- readRDS(file = file.path("results-diff", "sce_primed_diff.rds"))
-lin.markers <-  readRDS(file = file.path('results-diff', 'lin.markers.rds'))
+sce_naive <- readRDS("results-naive/sce_naive.rds")
+sce_naive <- sce_naive[,!colnames(sce_naive) %in% is.transition]
+sce_naive <- normalize(sce_naive)
+table(sce_naive$batch)
 ```
 
-Let's set up the output directory.
+... and then the primed population.
 
-```{r makedir}
-resdir <- "results-correlations"
-dir.create(resdir, showWarning=FALSE)
+```{r}
+sce_primed <- readRDS("results-primed/sce_primed.rds")
+table(sce_primed$batch)
 ```
 
-In particular, we want to check for correlations between Ferdinand's hand-curated markers and various epigenetic modifiers/readers of interest.
-First we load in the new data.
+We also load in the lists of interesting genes, including Ferdinand's hand-picked markers:
 
 ```{r loadlists}
 library(org.Hs.eg.db)
@@ -57,9 +54,12 @@ inPresentSet <- function(present, desired) {
 markers <- read.csv("../data/marker/ferd_marker_set.csv", stringsAsFactors = FALSE, header = FALSE)
 head(markers)
 chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, markers[,1])
-markers <-  markers[markers$V1 %in% rownames(sce)[chosen_markers],]
-colnames(markers) <- c('Symbol','Function')
+length(chosen_markers)
+```
 
+... and for epigenetic readers and modifiers:
+
+```{r}
 epi_modifier <- read.csv("../data/marker/epigen_modifiers.csv", stringsAsFactors = FALSE, header = FALSE)
 head(epi_modifier)
 epi_modifier <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_modifier[,1])
@@ -71,296 +71,200 @@ epi_reader <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, epi_reader[,1])
 length(epi_reader)
 ```
 
-Before exploring the data, we export the complete list that contains all the epigenetic readers and modifiers.
+Finally, we set up the output directory.
 
-```{r exportlists}
-all_reader <- data.frame(Symbol = rownames(sce[epi_reader,]), Function = 'epi_reader')
-all_modifier <- data.frame(Symbol = rownames(sce[epi_modifier,]), Function = 'epi_modifier')
-whole.list <- rbind(markers, all_reader, all_modifier)
-write.table(file=file.path(resdir, "epimarker.tsv"), whole.list, sep="\t", quote=FALSE, row.names= F) 
+```{r makedir}
+resdir <- "results-correlations"
+dir.create(resdir, showWarning=FALSE)
 ```
 
-# Epigenetic regulation
+# Correlations between markers and epigenetic readers 
 
-First of all, we can check again whether the populations cluster if we use only markers for core_pluripotency, naive_pluripotency, primed_pluripotency, formative_pluripotency, mesoderm, ectoderm, trophectoderm or endoderm.
+## In naive pluripotency
 
-We do this first for the naive poputlation, then for the primed population.
-
-```{r naive.pca.single.corr, fig.width=20, fig.height=20}
-library(ggplot2)
-library(scater)
-fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
-
-all.pca <- list(unique(markers[,2]))
-all.tsne <- list(unique(markers[,2]))
-
-for (marker.type in unique(markers[,2])){
-  marker.set <- rownames(sce_naive[rownames(sce_naive) %in% markers[markers[,2]==marker.type,1],])
-  
-  sce_naive <- runPCA(sce_naive, exprs_values="norm_exprs", feature_set = marker.set)
-  sce_naive <- runTSNE(sce_naive, exprs_values="norm_exprs", feature_set = marker.set, perplexity=30)
-  
-  all.pca[[marker.type]] <- plotPCA(sce_naive, colour_by = markers[markers[,2]==marker.type,1][1]) + fontsize
-  all.tsne[[marker.type]] <- plotTSNE(sce_naive, colour_by='batch') + fontsize
-}
-
-do.call(multiplot, c(all.pca, list(cols=2)))
-do.call(multiplot, c(all.tsne, list(cols=2)))
-```
-
-We now do the same thing for the primed population. 
-
-```{r primed.pca.single.corr, fig.width=20, fig.height=20}
-all.pca <- list(unique(markers[,2]))
-all.tsne <- list(unique(markers[,2]))
-
-for (marker.type in unique(markers[,2])){
-  marker.set <- rownames(sce_primed[rownames(sce_primed) %in% markers[markers[,2]==marker.type,1],])
-  
-  sce_primed <- runPCA(sce_primed, exprs_values="norm_exprs", feature_set = marker.set)
-  sce_primed <- runTSNE(sce_primed, exprs_values="norm_exprs", feature_set = marker.set, perplexity=30)
-  
-  all.pca[[marker.type]] <- plotPCA(sce_primed, colour_by = markers[markers[,2]==marker.type,1][1]) + fontsize
-  all.tsne[[marker.type]] <- plotTSNE(sce_primed,colour_by= 'batch') + fontsize
-}
-  
-do.call(multiplot, c(all.pca, list(cols=2)))
-do.call(multiplot, c(all.tsne, list(cols=2)))
-```
-
-
-# Correlations between specific chosen markers and epigenetic modifiers
-
-We now check for correlations between the markers and epigenetic modifiers.
-We first block on the batch of origin and we compute a null distribution to avoid redundant work.
-We then separate the markers into the specific type and assess the correlations of epigenetic modifiers to these markers, respectively.
-As Per.gene = TRUE, the result will be a list of the strongest correlated markers, that we will later use to compute the strongest paired gene-to-gene correlations.
-The correlation of for each subset of markers will be exported as tables and stored in a list.
-Finally, we print the statistics of the correlations.
-
-We begin with the naive population.
+We consider all correlations between the markers and epigenetic readers in naive cells.
+This is done while blocking on the batch of origin to ensure that the batch does not drive correlations.
 
 ```{r}
-ii <- 1
-naive_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_epi <- list(unique(markers[,2]))
-
-for (marker.type in unique(markers[,2])){
-  current.markers <- markers[markers[,2] == marker.type,]
-  chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
-
-  design <- model.matrix(~sce_naive$batch)
-  null.dist <- correlateNull(iters=1e6, design=design)
-  vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist, per.gene=TRUE,
-    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
-  sig.count <- sum(vs.mod$FDR <= 0.05)
-
-  gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_epi.tsv.gz")), open="wb")
-  #write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
-  close(gzout)
-  
-  naive_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  naive_epi[[marker.type]] <- vs.mod
-  
-  ii <- ii+1
-}
-print(naive_epi_stat)
+set.seed(100)
+library(scran)
+cor.read_naive <- correlatePairs(sce_naive, block=sce_naive$batch, 
+    pairings=list(chosen_markers, epi_reader))
+table(Sig=cor.read_naive$FDR <= 0.05, Limited=cor.read_naive$limited)
 ```
 
-We do it for both the naive and the primed population and then combine the two lists.
+We can examine the distribution of significant markers.
 
 ```{r}
-ii <- 1
-primed_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_epi <- list(unique(markers[,2]))
-
-for (marker.type in unique(markers[,2])){
-  current.markers <- markers[markers[,2] == marker.type,]
-  chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
-
-  design <- model.matrix(~sce_primed$batch)
-  null.dist <- correlateNull(iters=1e6, design=design)
-  vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, per.gene = TRUE,
-    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
-  sig.count <- sum(vs.mod$FDR <= 0.05)
-
-  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_epi.tsv.gz")), open="wb")
-  #write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
-  close(gzout)
-  
-  primed_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  primed_epi[[marker.type]] <- vs.mod
-  
-  ii <- ii+1
+CHECK_LINEAGE <- function(genes, sig) {
+    in.all <- markers[,1] %in% genes
+    in.sig <- markers[,1] %in% genes[sig]
+    lineage <- factor(markers[,2])
+    data.frame(Detected=as.integer(table(lineage[in.sig])), 
+        Total=as.integer(table(lineage[in.all])),
+        row.names=levels(lineage))
 }
-print(primed_epi_stat)
+
+CHECK_LINEAGE(cor.read_naive$gene1, cor.read_naive$FDR <= 0.05)
 ```
 
-We now merge the correlations for all the markers and both condition into one dataframe.
-We then sort the data frame (based on FDR) for the top N highest correlated lineage genes and epigenetic genes.
-This identifies the highest correlated gene pair of each data set. 
+## In primed pluripotency
+
+Same again for primed cells.
 
 ```{r}
-naive_mat <- data.frame()
-primed_mat <- data.frame()
-for (marker.type in unique(markers[,2])){
-  naive_mat <- rbind(naive_mat, naive_epi[[marker.type]])
-  primed_mat <- rbind(primed_mat, primed_epi[[marker.type]])
-}
+set.seed(100)
+cor.read_primed <- correlatePairs(sce_primed, block=sce_primed$batch, 
+    pairings=list(chosen_markers, epi_reader))
+table(Sig=cor.read_primed$FDR <= 0.05, Limited=cor.read_primed$limited)
+```
 
-# Combine to one membrane to identify the strongest correlations
-combined_mat <- rbind(naive_mat, primed_mat)
-combined_mat <- combined_mat[order(-abs(combined_mat$rho)),]
-combined_mat <- combined_mat[1:10000,]
+We can examine the distribution of significant markers.
 
-#Identify markers
-current.markers <- rownames(sce[rownames(sce) %in% markers$Symbol,])
+```{r}
+CHECK_LINEAGE(cor.read_primed$gene1, cor.read_primed$FDR <= 0.05)
+```
+
+## Comparing the pairs
+
+We can examine the difference between the correlations more visually.
+The naive correlations are more spread out than the primed correlations.
+
+```{r}
+op <- order(cor.read_primed$gene1, cor.read_primed$gene2)
+on <- order(cor.read_naive$gene1, cor.read_naive$gene2)
+smoothScatter(cor.read_naive$rho[on], cor.read_primed$rho[op],
+    xlab="Naive rho", ylab="Primed rho")
+abline(a=0, b=1, col="red")
+```
+
+# Correlations between markers and epigenetic modifiers 
+
+## In naive pluripotency
+
+We consider all correlations between the markers and epigenetic modifiers in naive cells.
+
+```{r}
+set.seed(100)
+library(scran)
+cor.mod_naive <- correlatePairs(sce_naive, block=sce_naive$batch, 
+    pairings=list(chosen_markers, epi_modifier))
+table(Sig=cor.mod_naive$FDR <= 0.05, Limited=cor.mod_naive$limited)
+```
+
+We can examine the distribution of significant markers.
+
+```{r}
+CHECK_LINEAGE(cor.mod_naive$gene1, cor.mod_naive$FDR <= 0.05)
+```
+
+## In primed pluripotency
+
+Same again for primed cells.
+
+```{r}
+set.seed(100)
+cor.mod_primed <- correlatePairs(sce_primed, block=sce_primed$batch, 
+    pairings=list(chosen_markers, epi_modifier))
+table(Sig=cor.mod_primed$FDR <= 0.05, Limited=cor.mod_primed$limited)
+```
+
+We can examine the distribution of significant markers.
+
+```{r}
+CHECK_LINEAGE(cor.mod_primed$gene1, cor.mod_primed$FDR <= 0.05)
+```
+
+## Comparing the pairs
+
+We can examine the difference between the correlations more visually.
+The naive correlations are more spread out than the primed correlations.
+
+```{r}
+op <- order(cor.mod_primed$gene1, cor.mod_primed$gene2)
+on <- order(cor.mod_naive$gene1, cor.mod_naive$gene2)
+smoothScatter(cor.mod_naive$rho[on], cor.mod_primed$rho[op],
+    xlab="Naive rho", ylab="Primed rho")
+abline(a=0, b=1, col="red")
+```
+
+# Picking the top gene pairs 
+
+We need to pick a set of 25 markers and 25 readers/writers that have the strongest correlations across all comparisons.
+We do so by merging all the previous results and taking the first 25 genes of each category (readers and writers are bundled together here).
+It is important to merge both the naive and primed results to reduce any preference for strong correlations in one condition.
+
+```{r}
+altogether <- rbind(cor.mod_naive, cor.read_naive, cor.mod_primed, cor.read_primed)
+altogether <- altogether[order(altogether$p.value, abs(altogether$rho)),]   
 restrict.size <- 25
-lineage.names <- unique(combined_mat$gene[combined_mat$gene %in% current.markers])[1:restrict.size]
-epi.names <- unique(combined_mat$gene[combined_mat$gene %in% rownames(sce[c(epi_modifier, epi_reader),])])[1:restrict.size]
+top.markers <- unique(altogether$gene1)[seq_len(restrict.size)]
+top.markers
+top.epi <- unique(altogether$gene2)[seq_len(restrict.size)]
+top.epi
 ```
 
-
-Now we need to correalte the pairs again with per.gene=FALSE to get paired gene correlations.
+We create a matrix of these correlations in the naive population.
+For simplicity, we'll just recompute them in `correlatePairs`, rather than trying to extract them manually.
 
 ```{r}
-ii <- 1
-naive_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-naive_epi <- list(unique(markers[,2]))
-
-for (marker.type in unique(markers[,2])){
-  current.markers <- markers[markers[,2] == marker.type,]
-  chosen_markers <- inPresentSet(rowData(sce_naive)$ensembl_gene_id, current.markers[,1])
-
-  design <- model.matrix(~sce_naive$batch)
-  null.dist <- correlateNull(iters=1e6, design=design)
-  vs.mod <- correlatePairs(sce_naive, design=design,    null.dist=null.dist,
-    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
-  sig.count <- sum(vs.mod$FDR <= 0.05)
-
-  gzout <- gzfile(file.path(resdir, paste0("naive_corr_", marker.type, "_vs_epi.tsv.gz")), open="wb")
-  write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
-  close(gzout)
-  
-  naive_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  naive_epi[[marker.type]] <- vs.mod
-  
-  ii <- ii+1
-}
-print(naive_epi_stat)
+set.seed(100)
+naive.out <- correlatePairs(sce_naive, block=sce_naive$batch,
+    pairings=list(top.markers, top.epi))
+naive_mat <- matrix(0, restrict.size, restrict.size)
+dimnames(naive_mat) <- list(top.markers, top.epi)
+naive_mat[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$rho
 ```
 
-Now we can repeat the same two steps with the primed population.
+We repeat this for the primed population.
 
 ```{r}
-ii <- 1
-primed_epi_stat <- data.frame(marker=unique(markers[,2]), total.markers = NA, total.corrs = NA, sig.corrs = NA)
-primed_epi <- list(unique(markers[,2]))
-
-for (marker.type in unique(markers[,2])){
-  current.markers <- markers[markers[,2] == marker.type,]
-  chosen_markers <- inPresentSet(rowData(sce_primed)$ensembl_gene_id, current.markers[,1])
-
-  design <- model.matrix(~sce_primed$batch)
-  null.dist <- correlateNull(iters=1e6, design=design)
-  vs.mod <- correlatePairs(sce_primed, design=design,    null.dist=null.dist, 
-    pairings=list(chosen_markers, c(epi_modifier, epi_reader)))
-  sig.count <- sum(vs.mod$FDR <= 0.05)
-
-  gzout <- gzfile(file.path(resdir, paste0("primed_corr_", marker.type, "_vs_epi.tsv.gz")), open="wb")
-  write.table(file=gzout, vs.mod, sep="\t", quote=FALSE, col.names=NA)
-  close(gzout)
-  
-  primed_epi_stat[ii,c(2,3,4)] <- c(length(chosen_markers), dim(vs.mod)[1], sig.count)
-  primed_epi[[marker.type]] <- vs.mod
-  
-  ii <- ii+1
-}
-print(primed_epi_stat)
+set.seed(100)
+primed.out <- correlatePairs(sce_primed, block=sce_primed$batch,
+    pairings=list(top.markers, top.epi))
+primed_mat <- matrix(0, restrict.size, restrict.size)
+dimnames(primed_mat) <- list(top.markers, top.epi)
+primed_mat[cbind(primed.out$gene1, primed.out$gene2)] <- primed.out$rho
 ```
 
-Finally, we can use the best correlated genes to chose the NxN gene-to-gene pairs that are strongest correlated.
-For this, we create a new data frame with the correlations of these chosen epigenetic markers as rows and the chosen lineage markers as columns  for naive and primed (respectively) .
-The cells contain the correlations between each respective gene pair.
-
+We then construct trees to order genes along the sides of a heatmap.
+Note that we use information from both naive and primed conditions to avoid biasing our visualization.
 
 ```{r}
-naive_mat <- data.frame()
-primed_mat <- data.frame()
-for (marker.type in unique(markers[,2])){
-  naive_mat <- rbind(naive_mat, naive_epi[[marker.type]])
-  primed_mat <- rbind(primed_mat, primed_epi[[marker.type]])
-}
+row_tree <- hclust(dist(cbind(naive_mat, primed_mat)))
+col_tree <- hclust(dist(t(rbind(naive_mat, primed_mat))))
 
-#Create an empty matrix with the size of all possible correlations between Epi-markers and lineage markers
-current_mat1 <- current_mat2 <- pvals1 <- pvals2 <- pvals <- matrix(nrow=length(lineage.names), ncol = length(epi.names))
-rownames(current_mat1) <- lineage.names
-colnames(current_mat1) <- epi.names
-rownames(current_mat2) <- lineage.names
-colnames(current_mat2) <- epi.names
-rownames(pvals1) <- lineage.names
-colnames(pvals1) <- epi.names
-rownames(pvals2) <- lineage.names
-colnames(pvals2) <- epi.names
+naive_mat <- naive_mat[row_tree$order, col_tree$order]
+saveRDS(file=file.path(resdir, "naive_mat.rds"), naive_mat)
+primed_mat <- primed_mat[row_tree$order, col_tree$order]
+saveRDS(file=file.path(resdir, "primed_mat.rds"), primed_mat)
+```
 
-for (lin in lineage.names){ #Sorts for gene combinations is in the list
-  for (epi in epi.names){
-      if (any(naive_mat$gene1 == lin & naive_mat$gene2 == epi)){
-        current_mat1[lin, epi] <- naive_mat$rho[which(naive_mat$gene1 == lin & naive_mat$gene2 == epi)[1]]
-        pvals1[lin, epi] <- naive_mat$FDR[which(naive_mat$gene1 == lin & naive_mat$gene2 == epi)[1]] < 0.05
-      }
-      else if (any(naive_mat$gene2 == lin & naive_mat$gene1 == epi)){
-        current_mat1[lin, epi] <- naive_mat$rho[which(naive_mat$gene2 == lin & naive_mat$gene1 == epi)[1]]
-        pvals1[lin, epi] <- naive_mat$FDR[which(naive_mat$gene2 == lin & naive_mat$gene1 == epi)[1]] < 0.05
-      }
-  else {current_mat1[lin, epi] <- 0; pvals1[lin, epi] <- FALSE}  # assuming that there is 0 correlation if the gene combination doesn't show up
-  }
-}
- 
- 
-for (lin in lineage.names){ #Sorts for gene combinations is in the list
-  for (epi in epi.names){
-      if (any(primed_mat$gene1 == lin & primed_mat$gene2 == epi)){
-        current_mat2[lin, epi] <- primed_mat$rho[which(primed_mat$gene1 == lin & primed_mat$gene2 == epi)[1]]
-        pvals2[lin, epi] <- primed_mat$FDR[which(primed_mat$gene1 == lin & primed_mat$gene2 == epi)[1]] < 0.05
+Now, visualizing for naive cells:
 
-      }
-      else if (any(primed_mat$gene2 == lin & primed_mat$gene1 == epi)){
-        current_mat2[lin, epi] <- primed_mat$rho[which(primed_mat$gene2 == lin & primed_mat$gene1 == epi)[1]]
-        pvals2[lin, epi] <- primed_mat$FDR[which(primed_mat$gene2 == lin & primed_mat$gene1 == epi)[1]] < 0.05
-      }
-  else {current_mat2[lin, epi] <- 0; pvals2[lin, epi] <- FALSE}  # assuming that there is 0 correlation if the gene combination doesn't show up
-  }
-}
-
-heat.dists <- dist(current_mat1)
-heat.tree <- hclust(heat.dists)
-
-heat.dist2 <- dist(t(current_mat1))
-heat.tree2 <- hclust(heat.dist2)
-
-pvals <- matrix(nrow=length(lineage.names), ncol = length(epi.names), 1)
-pvals[pvals1==TRUE & pvals2==TRUE] <- 2 #significant in both
-pvals[pvals1==TRUE & pvals2==FALSE] <- 3 #significant in naive
-pvals[pvals1==FALSE & pvals2==TRUE] <- 4 #signifcant in primed
-
+```{r}
 library(pheatmap)
-
-pheatmap(current_mat1, breaks=seq(-0.5, 0.5, length.out=101), main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
-pheatmap(current_mat2, breaks=seq(-0.5, 0.5, length.out=101), main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
-         treeheight_row = 0, treeheight_col = 0, cluster_rows = heat.tree, cluster_cols = heat.tree2)
-
-plot(current_mat1, current_mat2, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', col = pvals, pch=16)
-
-saveRDS(current_mat1, file = file.path(resdir, 'naive.epi.Rds'))
-saveRDS(current_mat2, file = file.path(resdir, 'primed.epi.Rds'))
-saveRDS(pvals, file = file.path(resdir, 'fdr.corr.Rds'))
+limited <- naive_mat
+limited[limited < -0.5] <- -0.5
+limited[limited > 0.5] <- 0.5
+pheatmap(limited, breaks=seq(-0.5, 0.5, length.out=101), 
+    main = 'naive', color = colorRampPalette(c("navy", "white", "orangered"))(101),
+    treeheight_row = 0, treeheight_col = 0, cluster_rows = FALSE, cluster_cols = FALSE)
 ```
 
-Printing session information.
+... and also for primed cells.
 
 ```{r}
-gc()
+limited <- primed_mat
+limited[limited < -0.5] <- -0.5
+limited[limited > 0.5] <- 0.5
+pheatmap(limited, breaks=seq(-0.5, 0.5, length.out=101), 
+    main = 'primed', color = colorRampPalette(c("navy", "white", "orangered"))(101),
+    treeheight_row = 0, treeheight_col = 0, cluster_rows = FALSE, cluster_cols = FALSE)
+```
+
+# Session information
+
+```{r}
 sessionInfo()
 ```
