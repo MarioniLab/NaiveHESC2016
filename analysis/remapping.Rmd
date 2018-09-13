@@ -117,6 +117,8 @@ write.table(file=file.path(resdir, "own_coords.tsv"), collected, col.names=NA, s
 
 # Mapping of Petropoulos human ESCs
 
+## On the naive-primed axis
+
 We read in the counts for the Petropoulos hESCs.
 
 ```{r petroin}
@@ -162,6 +164,54 @@ for (stage in c("E3", "E4", "E4.late", "E5.early", "E5", "E6", "E7")) {
     plot(naive.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
         xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
     abline(0,1, col = "red")
+}
+```
+
+## For the transition population
+
+For comparison, we do the same thing with the transition population, comparing to the naive state.
+First we use the same criterion defined above to identify transition markers.
+Note that, technically, the naive proportions contain some transition cells, so some correction is required.
+
+```{r}
+ids <- read.table("results-transition/groups.tsv", header=TRUE)
+trans.cells <- with(ids, Cell[Type=="transition"])
+trans.prop <- nexprs(sce, subset_col=trans.cells, byrow=TRUE)/length(trans.cells)
+naive.cells2 <- with(ids, Cell[Type=="naive"])
+naive.prop2 <- nexprs(sce, subset_col=naive.cells2, byrow=TRUE)/length(naive.cells2)
+
+trans.genes <- read.table("results-transition/markers_unique_trans.tsv")
+trans.markers <- rownames(trans.genes)[
+    trans.genes$vsNaive > 5 & trans.genes$vsPrimed > 5 & 
+    p.adjust(trans.genes$P.Value, method="BH") <= 0.05
+]
+trans.markers <- intersect(trans.markers,
+    names(trans.prop)[trans.prop > 0.25 & naive.prop2 < 0.25 & primed.prop < 0.25])
+length(trans.markers)    
+```
+
+We then compute the number of transition markers that are expressed in each cell.
+
+```{r}
+trans.exprs <- norm.petro.counts[intersect(rownames(norm.petro.counts), trans.markers),]
+trans.num <- colMeans(trans.exprs >= threshold)
+write.table(file=file.path(resdir, "petro_coords_trans.tsv"),
+    data.frame(stage=stages, naive=naive.num, transition=trans.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+We plot all stages separately to identify if there is a shift in the transition-ness of cells over time.
+
+```{r petrotrans, fig.height=15, width=6}
+par(mfrow=c(4,2))
+for (stage in c("E3", "E4", "E4.late", "E5.early", "E5", "E6", "E7")) {
+    current <- stages==stage
+    plot(trans.num[current], naive.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of transition genes", ylab = "Proportion of naive genes")
+    abline(0,1, col = "red")
+#    plot(trans.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+#        xlab = "Proportion of transition genes", ylab = "Proportion of primed genes")
+#    abline(0,1, col = "red")
 }
 ```
 
@@ -268,7 +318,7 @@ rm(mouse.counts, norm.mouse.counts)
 gc()
 ```
 
-## Mapping of Nakamura monkey ESCs
+# Mapping of Nakamura monkey ESCs
 
 Finally, we load in the monkey data.
 We remove some rows that contain missing values.
