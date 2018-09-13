@@ -187,7 +187,8 @@ We make a heatmap to visualize the expression of these candidates.
 ```{r heatNvPvT}
 use.markers <- unique(c(rownames(collected$naive)[1:50], rownames(collected$primed)[1:50]))
 o <- order(all.pheno)
-top.exprs <- norm_exprs(sce)[use.markers,o,drop=FALSE]
+top.exprs <- exprs(sce)[use.markers,o,drop=FALSE]
+top.exprs <- removeBatchEffect(top.exprs, sce$batch)
 heat.vals <- top.exprs - rowMeans(top.exprs)
 
 library(pheatmap)
