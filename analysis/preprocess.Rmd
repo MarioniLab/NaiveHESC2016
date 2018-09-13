@@ -94,30 +94,22 @@ gc()
 ## Adding feature-level annotation 
 
 Next, we add information such as gene symbols and chromosome locations.
-We download human Ensembl annotation from BioMart.
+We download human Ensembl annotation from BioMart, using a caching approach to avoid an expensive download step after the first run.
 
-```{r, echo=FALSE, results="asis"}
+```{r}
 library(BiocFileCache)
-bfc <- BiocFileCache("biomart")
-out <- bfcquery(bfc, "hg38.ensGene")
-already.present <- nrow(out) > 0
-```
-
-```{r biomarting, eval=!already.present}
-library(biomaRt)
-ensembl <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset="hsapiens_gene_ensembl", 
-    host="aug2017.archive.ensembl.org") # Ensembl version 90.
-ensemblGenes <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 
-    'external_gene_name', 'entrezgene'), filters="ensembl_gene_id", 
-    values=gene.names, mart=ensembl) 
-```
-
-```{r, echo=FALSE}
-if (already.present) {
-    ensemblGenes <- readRDS(bfc[[out$rid[1]]])
+bmcache <- BiocFileCache("biomart", ask = FALSE)
+loc <- bfcquery(bmcache, "hg38.ensGene", exact=TRUE)$rpath
+if (length(loc)==0L) {
+    library(biomaRt)
+    ensembl <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset="hsapiens_gene_ensembl", 
+        host="aug2017.archive.ensembl.org") # Ensembl version 90.
+    ensemblGenes <- getBM(attributes=c('ensembl_gene_id',  'chromosome_name', 'gene_biotype', 
+        'external_gene_name', 'entrezgene'), filters="ensembl_gene_id", 
+        values=gene.names, mart=ensembl) 
+    saveRDS(ensemblGenes, file=bfcnew(bmcache, "hg38.ensGene"))
 } else {
-    rpath <- bfcnew(bfc, "hg38.ensGene", ext="rds")
-    saveRDS(file=rpath, ensemblGenes)
+    ensemblGenes <- readRDS(loc)
 }
 ```
 
