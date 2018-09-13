@@ -1,6 +1,5 @@
 *.html
 *.rds
-*.md
 .DS_Store
 figure-*
 results-*
