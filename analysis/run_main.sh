@@ -9,5 +9,5 @@ echo "rmarkdown::render('primed_analysis.Rmd', output_file = 'primed_analysis.ht
 echo "rmarkdown::render('diff.Rmd', output_file = 'diff.html')" | R --no-save --vanilla
 echo "rmarkdown::render('correlations.Rmd', output_file = 'correlations.html')" | R --no-save --vanilla
 echo "rmarkdown::render('remapping.Rmd', output_file = 'remapping.html')" | R --no-save --vanilla
-echo "rmarkdown::render('qualitycheck.Rmd', output_file = 'qualitycheck.html')" | R --no-save --vanilla
+#echo "rmarkdown::render('qualitycheck.Rmd', output_file = 'qualitycheck.html')" | R --no-save --vanilla
 
