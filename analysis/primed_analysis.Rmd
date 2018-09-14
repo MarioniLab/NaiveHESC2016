@@ -30,11 +30,9 @@ sce_primed <- sce[,colData(sce)$phenotype=="primed"]
 dim(sce_primed)
 ```
 
-We adjust the `batch` factor to get rid of the now-unnecessary "naive" level. 
-We also re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
+We re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
 
 ```{r}
-sce_primed$batch <- factor(sce_primed$batch)
 sce_primed <- normalize(sce_primed)
 ```
 
@@ -103,7 +101,8 @@ plotExpression(sce_primed, rownames(hvg.out_primed)[1:10], point_alpha=0.05,
 # Performing dimensionality reduction
 
 We remove the batch effect prior to performing dimensionality reduction.
-This needs to be repeated as the batch effect for the primed-only cells may be different from the batch effect of the entire data set.
+The old `norm_exprs` is not sufficient as the batch effect for the primed-only cells may be different from the batch effect of the entire data set.
+Note that we're dealing with one phenotype here so there's no need for `design=`.
 
 ```{r}
 library(limma)
