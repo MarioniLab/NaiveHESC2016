@@ -6,6 +6,8 @@
 */logs
 */bam
 */fastq
+*.gz
+*.txt.1
 real-2677_20161024/count_me.R
 real-2678_20161024/count_me.R
 real-2739_20161024/count_me.R
