@@ -2,7 +2,7 @@ source("Figures/central.R")
 
 # Loading in the expression values.
 library(scater)
-sce <- readRDS("analysis/sce_all.rds")
+sce <- readRDS("analysis/results-preprocess/sce_all.rds")
 pops <- read.table(file.path("analysis/results-transition", "groups.tsv"), stringsAsFactors=FALSE, header=TRUE)
 m <- match(colnames(sce), pops$Cell)
 pops <- pops[m,]

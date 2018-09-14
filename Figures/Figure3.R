@@ -93,7 +93,7 @@ dev.off()
 library(pheatmap)
 library(gridExtra)
 
-naive.epi.heat <- readRDS('analysis/results-correlations/naive.epi.Rds')
+naive.epi.heat <- readRDS('analysis/results-correlations/naive_mat.Rds')
 
 heat.dists <- dist(naive.epi.heat)
 heat.tree <- hclust(heat.dists)
@@ -112,7 +112,7 @@ dev.off()
 
 # 3D
 
-primed.epi.heat <- readRDS('analysis/results-correlations/primed.epi.Rds')
+primed.epi.heat <- readRDS('analysis/results-correlations/primed_mat.Rds')
 
 primed.epi.heat[which(primed.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
 primed.epi.heat[which(primed.epi.heat< (-0.5), arr.ind = TRUE)] <- -0.5   ##to save each plot into a list. note the [[4]]
@@ -125,9 +125,16 @@ dev.off()
 ### Supplements
 
 # Figure S3A
+sce <- readRDS("analysis/results-preprocess/sce_all.rds")
+pops <- read.table(file.path("analysis/results-transition", "groups.tsv"), stringsAsFactors=FALSE, header=TRUE)
+sce$phenotype <- pops$Type
+sce_naive <- sce[,sce$phenotype == 'naive']
+sce_primed <- sce[,sce$phenotype == 'primed']
 
-naive.plot <- readRDS("analysis/results-diff/naive_plot.Rds")
-primed.plot <- readRDS("analysis/results-diff/primed_plot.rds")
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16), title = element_text(size=12))
+naive.plot <- plotPCA(sce_naive, colour_by = "CDK1") + fontsize
+primed.plot <- plotPCA(sce_primed, colour_by = "CDK1") + fontsize
+
 
 pdf(file=file.path(figdir, "s3a.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)

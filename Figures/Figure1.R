@@ -1,7 +1,7 @@
 source("Figures/central.R")
 
 # Figure 1B
-sce <- readRDS("analysis/sce_all.rds")
+sce <- readRDS("analysis/results-preprocess/sce_all.rds")
 pcs <- readRDS(file.path("analysis/results-overall", "pcs.rds"))
 
 pdf(file=file.path(figdir, "1b.pdf"), width=9, height=8, useDingbats=FALSE)
@@ -59,7 +59,7 @@ dev.off()
 # Figure S1a
 library(scater)
 ugly1 <- plotColData(sce, x="sample", y="log10_total_counts")
-ugly2 <- plotColData(sce, x="sample", y="log10_total_features")
+ugly2 <- plotColData(sce, x="sample", y="log10_total_features_by_counts")
 ugly3 <- plotColData(sce, x="sample", y="pct_counts_ERCC")
 ugly4 <- plotColData(sce, x="sample", y="pct_counts_Mt")
 
