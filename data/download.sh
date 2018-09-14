@@ -1,8 +1,8 @@
 ## Downloading data generated from this study:
 
 cd all_counts/
-wget https://www.ebi.ac.uk/arrayexpress/files/E-MTAB-6819/E-MTAB-6819.sdrf.txt
-wget https://www.ebi.ac.uk/arrayexpress/files/E-MTAB-6819/E-MTAB-6819.processed.1.zip
+wget https://www.ebi.ac.uk/arrayexpress/files/E-MTAB-6819/E-MTAB-6819.sdrf.txt --no-check-certificate
+wget https://www.ebi.ac.uk/arrayexpress/files/E-MTAB-6819/E-MTAB-6819.processed.1.zip --no-check-certificate
 unzip E-MTAB-6819.processed.1.zip
 rm E-MTAB-6819.processed.1.zip
 cd -
@@ -13,7 +13,7 @@ cd other_counts/
 
 wget ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE100nnn/GSE100597/suppl/GSE100597%5Fcount%5Ftable%5FQC%5Ffiltered%2Etxt%2Egz # Mohammed
 
-wget https://www.ebi.ac.uk/arrayexpress/files/E-MTAB-3929/E-MTAB-3929.processed.1.zip # Petropoulos
+wget https://www.ebi.ac.uk/arrayexpress/files/E-MTAB-3929/E-MTAB-3929.processed.1.zip --no-check-certificate # Petropoulos
 mkdir E-MTAB-3929
 unzip E-MTAB-3929.processed.1.zip -d E-MTAB-3929
 rm E-MTAB-3929.processed.1.zip
