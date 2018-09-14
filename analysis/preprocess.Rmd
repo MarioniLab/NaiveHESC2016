@@ -377,6 +377,14 @@ Phenotype is the largest contributor (obviously) but the batch effect also needs
 plotExplanatoryVariables(sce, variables=c("phenotype", "batch")) + fontsize
 ```
 
+We can remove the batch effect by calling `removeBatchEffect` while considering the phenotype.
+
+```{r}
+norm_exprs(sce) <- removeBatchEffect(logcounts(sce),
+    design=model.matrix(~sce$phenotype), batch=sce$batch)
+assayNames(sce)    
+```
+
 # Wrapping up
 
 We save the object to file for use in downstream analyses.

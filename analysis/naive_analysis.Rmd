@@ -30,11 +30,9 @@ sce_naive <- sce[,colData(sce)$phenotype=="naive"]
 dim(sce_naive)
 ```
 
-We adjust the `batch` factor to get rid of the now-unnecessary "primed" level. 
-We also re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
+We re-normalize to rescale the size factors at unity, so that they are comparable between spike-ins and endogenous genes.
 
 ```{r}
-sce_naive$batch <- factor(sce_naive$batch)
 sce_naive <- normalize(sce_naive)
 ```
 
@@ -103,7 +101,8 @@ plotExpression(sce_naive, rownames(hvg.out_naive)[1:10], point_alpha=0.05,
 # Performing dimensionality reduction
 
 We remove the batch effect prior to performing dimensionality reduction.
-This needs to be repeated as the batch effect for the naive-only cells may be different from the batch effect of the entire data set.
+The old `norm_exprs` is not sufficient as the batch effect for the naive-only cells may be different from the batch effect of the entire data set.
+Note that there's no need for `design=` as we're dealing with one phenotype here.
 
 ```{r}
 library(limma)
