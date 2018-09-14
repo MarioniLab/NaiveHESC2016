@@ -111,7 +111,6 @@ dev.off()
 
 
 # 3D
-
 primed.epi.heat <- readRDS('analysis/results-correlations/primed_mat.Rds')
 
 primed.epi.heat[which(primed.epi.heat>0.5, arr.ind = TRUE)] <- 0.5
@@ -135,7 +134,6 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 naive.plot <- plotPCA(sce_naive, colour_by = "CDK1") + fontsize
 primed.plot <- plotPCA(sce_primed, colour_by = "CDK1") + fontsize
 
-
 pdf(file=file.path(figdir, "s3a.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
 plot_data <- ggplot_build(naive.plot)
@@ -155,14 +153,28 @@ dev.off()
 
 
 # Figure S3B
-colour.code <- readRDS('analysis/results-correlations/fdr.corr.Rds')
+naive.out <- readRDS('analysis/results-correlations/naive_out.Rds')
+primed.out <- readRDS('analysis/results-correlations/primed_out.Rds')
+
+naive.fdr <- primed.fdr <- colour.code <- naive.epi.heat
+naive.fdr[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$FDR
+primed.fdr[cbind(primed.out$gene1, primed.out$gene2)] <- primed.out$FDR
+
+fdr <- 0.05
+colour.code[,] <- 1 #insignificant
+colour.code[naive.fdr < fdr & primed.fdr < fdr] <- 2 #significant in both
+colour.code[naive.fdr < fdr & primed.fdr >= fdr] <- 3 #significant in naive
+colour.code[naive.fdr >= fdr & primed.fdr < fdr] <- 4 #signifcant in primed
 
 colour.scheme <- c('grey', 'black', naive.col, primed.col)
 colour.code <- colour.scheme[colour.code]
 
 pdf(file.path(figdir, "s3b.pdf"), width=10, height = 10, onefile=FALSE)
-plot(naive.epi.heat, primed.epi.heat, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations', ylab='Primed correlations', pch=16, col = colour.code)
-legend('topleft', legend = c('Total: 625', 'Sig in both: 15', 'Sig in naive: 282', 'Sig in primed: 4'), 
+plot(naive.epi.heat, primed.epi.heat, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations [rho]', ylab='Primed correlations [rho]', pch=16, col = colour.code)
+legend('topleft', legend = c(paste0('FDR > ', fdr,': ', sum(colour.code=='grey')), 
+                             paste0('Sig in both: ', sum(colour.code== 'black')), 
+                             paste0('Sig in naive: ', sum(colour.code== naive.col)),
+                             paste0('Sig in primed: ', sum(colour.code== primed.col))), 
        pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
 dev.off()
 

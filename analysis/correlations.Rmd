@@ -214,6 +214,7 @@ naive.out <- correlatePairs(sce_naive, block=sce_naive$batch,
 naive_mat <- matrix(0, restrict.size, restrict.size)
 dimnames(naive_mat) <- list(top.markers, top.epi)
 naive_mat[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$rho
+saveRDS(file=file.path(resdir, "naive_out.rds"), naive.out)
 ```
 
 We repeat this for the primed population.
@@ -225,6 +226,7 @@ primed.out <- correlatePairs(sce_primed, block=sce_primed$batch,
 primed_mat <- matrix(0, restrict.size, restrict.size)
 dimnames(primed_mat) <- list(top.markers, top.epi)
 primed_mat[cbind(primed.out$gene1, primed.out$gene2)] <- primed.out$rho
+saveRDS(file=file.path(resdir, "primed_out.rds"), primed.out)
 ```
 
 We then construct trees to order genes along the sides of a heatmap.
