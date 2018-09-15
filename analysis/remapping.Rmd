@@ -242,6 +242,12 @@ primed.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id"
     values = primed.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
 primed.mm.markers <- unique(primed.homo[,2])
 length(primed.mm.markers)
+
+trans.ensembl <- rowData(sce)$ensembl_gene_id[match(trans.markers, rownames(sce))]
+trans.homo <- getLDS(attributes ="ensembl_gene_id", filters = "ensembl_gene_id", 
+    values = trans.ensembl, mart = human.mart, attributesL="ensembl_gene_id", martL = mouse.mart)
+trans.mm.markers <- unique(trans.homo[,2])
+length(trans.mm.markers)
 ```
 
 We read in the mouse ESC data and pull out the counts.
@@ -294,6 +300,7 @@ naive.exprs <- norm.mouse.counts[to.ensembl %in% naive.mm.markers,]
 nrow(naive.exprs)
 primed.exprs <- norm.mouse.counts[to.ensembl %in% primed.mm.markers,]
 nrow(primed.exprs)
+
 naive.num <- colMeans(naive.exprs >= threshold)
 primed.num <- colMeans(primed.exprs >= threshold)
 write.table(file=file.path(resdir, "mouse_coords.tsv"), 
@@ -312,6 +319,35 @@ for (stage in unique(stages)) {
     abline(0,1, col = "red")
 }
 ```
+
+## For the transition population
+
+```{r mousetrans}
+trans.exprs <- norm.mouse.counts[to.ensembl %in% trans.mm.markers,]
+trans.num <- colMeans(trans.exprs >= threshold)
+write.table(file=file.path(resdir, "mouse_coords_trans.tsv"),
+    data.frame(stage=stages, naive=naive.num, transition=trans.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+We plot all stages separately to identify if there is a shift in the transition-ness of cells over time.
+
+```{r mouse.trans, fig.height=15, width=6}
+par(mfrow=c(2,5))
+for (stage in unique(stages)) {
+    current <- stages==stage
+    plot(trans.num[current], naive.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of transition genes", ylab = "Proportion of naive genes")
+    abline(0,1, col = "red")
+}
+for (stage in unique(stages)) {
+    current <- stages==stage
+    plot(trans.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of transition genes", ylab = "Proportion of primed genes")
+    abline(0,1, col = "red")
+}
+```
+
 
 ```{r, results="hide", echo=FALSE}
 rm(mouse.counts, norm.mouse.counts)
@@ -367,6 +403,38 @@ for (stage in sort(ustages)) {
     current <- stages==stage
     plot(naive.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
         xlab = "Proportion of naive genes", ylab = "Proportion of primed genes")
+    abline(0,1, col = "red")
+}
+```
+
+## Transition
+
+```{r mousetrans}
+trans.exprs <- norm.monkey.counts[gene.names %in% trans.markers,]
+trans.num <- colMeans(trans.exprs >= threshold)
+
+write.table(file=file.path(resdir, "monkey_coords_trans.tsv"),
+    data.frame(stage=stages, naive=naive.num, transition=trans.num), 
+    col.names=NA, sep="\t", quote=FALSE)
+```
+
+We plot all stages separately to identify if there is a shift in the transition-ness of cells over time.
+
+```{r mouse.trans, fig.height=15, width=6}
+par(mfrow=c(4,4))
+ustages <- stages[grep("^E", stages)]
+ustages <- ustages[!duplicated(ustages)]
+for (stage in sort(ustages)) {
+    current <- stages==stage
+    plot(trans.num[current], naive.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of transition genes", ylab = "Proportion of naive genes")
+    abline(0,1, col = "red")
+}
+
+for (stage in sort(ustages)) {
+    current <- stages==stage
+    plot(trans.num[current], primed.num[current], xlim = c(0,1), ylim = c(0,1), main = stage, pch=16,
+        xlab = "Proportion of transition genes", ylab = "Proportion of primed genes")
     abline(0,1, col = "red")
 }
 ```
