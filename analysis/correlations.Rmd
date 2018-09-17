@@ -265,6 +265,32 @@ pheatmap(limited, breaks=seq(-0.5, 0.5, length.out=101),
     treeheight_row = 0, treeheight_col = 0, cluster_rows = FALSE, cluster_cols = FALSE)
 ```
 
+```{r}
+
+naive.fdr <- primed.fdr <- colour.code <- naive_mat
+naive.fdr[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$FDR
+primed.fdr[cbind(primed.out$gene1, primed.out$gene2)] <- primed.out$FDR
+
+fdr <- 0.05
+colour.code[,] <- 1 #insignificant
+colour.code[naive.fdr < fdr & primed.fdr < fdr] <- 2 #significant in both
+colour.code[naive.fdr < fdr & primed.fdr >= fdr] <- 3 #significant in naive
+colour.code[naive.fdr >= fdr & primed.fdr < fdr] <- 4 #signifcant in primed
+
+colour.scheme <- c('grey', 'black', 'blue', 'red')
+colour.code <- colour.scheme[colour.code]
+
+plot(naive_mat, primed_mat, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations [rho]', ylab='Primed correlations [rho]', pch=16, col = colour.code)
+legend('topleft', legend = c(paste0('FDR > ', fdr,': ', sum(colour.code=='grey')), 
+                             paste0('Sig in both: ', sum(colour.code== 'black')), 
+                             paste0('Sig in naive: ', sum(colour.code== 'blue')),
+                             paste0('Sig in primed: ', sum(colour.code== 'red'))), 
+       pch = 16, col = c('grey', 'black', 'blue', 'red'), bty='n', cex=1.5)
+
+```
+
+
+
 # Session information
 
 ```{r}
