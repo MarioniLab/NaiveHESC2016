@@ -269,7 +269,6 @@ pheatmap(limited, breaks=seq(-0.5, 0.5, length.out=101),
 
 By plotting the rho-values of the naive and the primed correlations, we can visualize what in which populations there is more correlation between lineage and epigenetic marker genes.
 
-
 ```{r}
 naive.fdr <- primed.fdr <- colour.code <- naive_mat
 naive.fdr[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$FDR
