@@ -167,6 +167,33 @@ for (stage in c("E3", "E4", "E4.late", "E5.early", "E5", "E6", "E7")) {
 }
 ```
 
+```{r}
+geneOI = 'NANOG'
+ii <- 1
+plot(1, type="n", xlab="", ylab="", ylim=c(0, max(norm.petro.counts['NANOG',])), xlim=c(0, 8), xaxt='n', bty='n')
+stages <- c("E3", "E4", "E4.late", "E5.early", "E5", "E6", "E7")
+for (stage in stages) {
+    current <- stages==stage
+    points(rep(ii, length(norm.petro.counts[geneOI, sub("^(E[0-9]+(\\.(early|late))?)\\..*", "\\1", colnames(norm.petro.counts)) == stage])), 
+           norm.petro.counts[geneOI, sub("^(E[0-9]+(\\.(early|late))?)\\..*", "\\1", colnames(norm.petro.counts)) == stage],  pch=16, main = geneOI)
+    ii <- ii+1
+}
+axis(1,at = 1:7, labels= c("E3", "E4", "E4.late", "E5.early", "E5", "E6", "E7"), col = "white")
+
+
+cnts.pr.stg <- list()
+for (stage in stages) {
+  cnts.pr.stg[[stage]] <- norm.petro.counts[geneOI, sub("^(E[0-9]+(\\.(early|late))?)\\..*", "\\1", colnames(norm.petro.counts)) == stage]
+}
+library('ggplot2')
+ggplot2.violinplot(data=cnts.pr.stg[["E3"]])
+
+p <- ggplot(as.data.frame(exprs = cnts.pr.stg[["E3"]]), aes(x=stages[1], y=exprs)) + geom_violin()
+
+vioplot(cnts.pr.stg[["E3"]], cnts.pr.stg[["E4"]], cnts.pr.stg[["E4.late"]], cnts.pr.stg[["E5.early"]], cnts.pr.stg[["E5"]], cnts.pr.stg[["E6"]], cnts.pr.stg[["E7"]], names= stages, col="gold")
+
+```
+
 ## For the transition population
 
 For comparison, we do the same thing with the transition population, comparing to the naive state.
