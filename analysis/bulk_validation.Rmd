@@ -43,20 +43,21 @@ dir.create(resdir, showWarning=FALSE)
 
 First, read in the data.
 
-```{r bulk.in}
+```{r pastor.in}
 pastor16 <- read.table(file.path("../data/other_counts", "bulkRNA", "Pastor2016_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
 gene.names <- pastor16$Probe
 pastor16 <- as.matrix(pastor16[,14:19])
 rownames(pastor16) <- gene.names
 keep <- rowSums(is.na(pastor16))==0
 pastor16 <- pastor16[keep,]
+pastor16 <- pastor16[-which(duplicated(rownames(pastor16))),]
 dim(pastor16)
 ```
 
 Next, we test for differences in expression between the naive and primed conditions.
 This is done using _edgeR_, after summing all cells within each batch to create a pseudo-bulk sample.
 
-```{r desetup}
+```{r pastor.de}
 library(edgeR)
 y <- DGEList(pastor16)
 ptype <- factor(c('Primed', 'Primed', 'Primed', 'Naive', 'Naive', 'Naive'))
@@ -67,25 +68,26 @@ y <- calcNormFactors(y)
 y <- estimateDisp(y, design_pheno)
 fit <- glmQLFit(y, design_pheno, robust=TRUE)
 con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
-res <- glmQLFTest(fit, contrast=con)
+res <- glmTreat(fit, contrast=con, lfc = 0.5)
 DE_pastor <- topTags(res, n=Inf)$table
 #DE_pastor <- DEmarkers[DEmarkers$FDR <= 0.05,]
 ```
 
 We now repeat the same pipeline for the other data sets as well.
 
-```{r}
+```{r theu.in}
 theunissen16 <- read.table(file.path("../data/other_counts", "bulkRNA", "Theunissen2016_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
 gene.names <- theunissen16$Probe
 theunissen16 <- as.matrix(theunissen16[,14:23])
 rownames(theunissen16) <- gene.names
 keep <- rowSums(is.na(theunissen16))==0
 theunissen16 <- theunissen16[keep,]
+theunissen16 <- theunissen16[-which(duplicated(rownames(theunissen16))),]
 dim(theunissen16)
 ```
 
 
-```{r}
+```{r theu.de}
 y <- DGEList(theunissen16)
 ptype <- factor(c('Primed', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Primed', 'Primed', 'Primed'))
 design_pheno <- model.matrix(~0 + ptype) 
@@ -95,7 +97,7 @@ y <- calcNormFactors(y)
 y <- estimateDisp(y, design_pheno)
 fit <- glmQLFit(y, design_pheno, robust=TRUE)
 con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
-res <- glmQLFTest(fit, contrast=con)
+res <- glmTreat(fit, contrast=con, lfc = 0.5)
 summary(decideTestsDGE(res))
 DE_theunissen <- topTags(res, n=Inf)$table
 #DE_theunissen <- DEmarkers[DEmarkers$FDR <= 0.05,]
@@ -103,7 +105,7 @@ DE_theunissen <- topTags(res, n=Inf)$table
 
 Now that we have the DE genes of the bulk RNA sets, we can load in our identified markers and plot them.
 
-```{r}
+```{r heatmap}
 naive.markers <- readRDS(file=file.path('results-remapping', "naive_markers.rds"))
 primed.markers <- readRDS(file=file.path('results-remapping', "primed_markers.rds"))
 
@@ -126,5 +128,30 @@ library(pheatmap)
 anno <- data.frame(Marker = c(rep('naive', length(naive.markers)), rep('primed', length(primed.markers))))
 rownames(anno) <- c(naive.markers, primed.markers)
 pheatmap(rbind(naive_mat, primed_mat), annotation_row = anno, cluster_cols = FALSE)
-
 ```
+
+```{r volcano}
+par(mfrow=c(1,2))
+plot(DE_pastor$logFC, -log10(DE_pastor$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'Pastor, 2016', xlim = c(-11, 11))
+points(DE_pastor[naive.markers,]$logFC, -log10(DE_pastor[naive.markers,]$PValue), pch = 16, cex = 1.5, col = 'orange')
+points(DE_pastor[primed.markers,]$logFC, -log10(DE_pastor[primed.markers,]$PValue), pch = 16, cex = 1.5, col = 'royalblue1')
+max.pval <- min(-log10(DE_pastor[DE_pastor$FDR < 0.05,]$PValue))
+lines(x = c(-11, 11), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = -9, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+
+de.in.both <- rownames(DE_pastor[rownames(DE_pastor[DE_pastor$FDR < 0.05,]) %in% c(naive.markers, primed.markers),])
+#points(DE_pastor[de.in.both,]$logFC, -log10(DE_pastor[de.in.both,]$PValue), pch = 16, cex = 1.5, col = 'red')
+
+
+plot(DE_theunissen$logFC, -log10(DE_theunissen$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'Theunissen, 2016', xlim = c(-15, 15))
+points(DE_theunissen[naive.markers,]$logFC, -log10(DE_theunissen[naive.markers,]$PValue), pch = 16, cex = 1.5, col = 'orange')
+points(DE_theunissen[primed.markers,]$logFC, -log10(DE_theunissen[primed.markers,]$PValue), pch = 16, cex = 1.5, col = 'royalblue1')
+max.pval <- min(-log10(DE_theunissen[DE_theunissen$FDR < 0.05,]$PValue))
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = -12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+
+
+de.in.both <- rownames(DE_theunissen[rownames(DE_theunissen[DE_theunissen$FDR < 0.05,]) %in% c(naive.markers, primed.markers),])
+#points(DE_theunissen[de.in.both,]$logFC, -log10(DE_theunissen[de.in.both,]$PValue), pch = 16, cex = 1.5, col = 'red')
+```
+
