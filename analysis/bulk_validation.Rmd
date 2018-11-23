@@ -1,0 +1,142 @@
+---
+title: "Single-cell RNA-seq Analysis of naive/primed embryonic stem cells: remapping naivete"
+author: Tobias Messmer and Aaron Lun
+date: "`r Sys.Date()`"
+output: 
+  BiocStyle::html_document:
+    toc: true
+    toc_float: true
+    depth: 3
+    number_sections: true
+    theme: united 
+    highlight: tango 
+    fig_caption: false
+---
+
+```{r, echo=FALSE, results="hide"}
+dir.create("figure-bulk/", showWarning=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figure-bulk/")
+options(bitmapType="cairo", width=100)
+```
+
+# Locating ESCs according to their naive/primed-ness
+
+Finally, we want to validate the markers that we identified in ... in other cell lines.
+For this, we used published bulkRNA seq data sets of naive and primed hESCs.
+
+- Human ESCs:
+    - __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
+    - __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
+- Mouse ESCs:
+    - __Publication:__ Mohammed et al. (2017), _Cell Reports_. Single-Cell Landscape of Transcriptional Heterogeneity and Cell Fate Decisions during Mouse Early Gastrulation
+    - __Data source:__ `GSE100597_count_table_QC_filtered.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE100597
+
+
+The aim is to identify differentially expressed genes in those data sets and see if we have them as well.
+
+```{r}
+resdir <- "results-bulk"
+dir.create(resdir, showWarning=FALSE)
+```
+
+# Data input
+
+First, read in the data.
+
+```{r bulk.in}
+pastor16 <- read.table(file.path("../data/other_counts", "bulkRNA", "Pastor2016_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
+gene.names <- pastor16$Probe
+pastor16 <- as.matrix(pastor16[,14:19])
+rownames(pastor16) <- gene.names
+keep <- rowSums(is.na(pastor16))==0
+pastor16 <- pastor16[keep,]
+dim(pastor16)
+```
+
+Next, we test for differences in expression between the naive and primed conditions.
+This is done using _edgeR_, after summing all cells within each batch to create a pseudo-bulk sample.
+
+```{r desetup}
+library(edgeR)
+y <- DGEList(pastor16)
+```
+
+We construct a new design matrix for the summed samples.
+
+```{r}
+ptype <- factor(c('Primed', 'Primed', 'Primed', 'Naive', 'Naive', 'Naive'))
+design_pheno <- model.matrix(~0 + ptype) 
+```
+
+We run through _edgeR_'s analysis pipeline. 
+We first filter out low-abundance genes, as we did not perform any filtering on `sce` during preprocessing.
+
+```{r}
+keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+y <- y[keep,]
+summary(keep)
+```
+
+First, we normalize the samples using the TMM method.
+
+```{r}
+y <- calcNormFactors(y)
+y$samples
+```
+
+We estimate the negative binomial dispersion, which represents the variability between replicates.
+For true bulk RNA-seq experiments, we'd expect BCV values around 0.1 or lower, though the values here will be higher as they are derived from noisier single-cell values.
+
+```{r nbdisp}
+y <- estimateDisp(y, design_pheno)  
+plotBCV(y)
+```
+
+We fit a generalized linear model, with estimates of the quasi-likelihood dispersion to account for gene-specific variability.
+
+```{r qldisp}
+fit <- glmQLFit(y, design_pheno, robust=TRUE)
+plotQLDisp(fit)
+```
+
+Finally, we set up contrasts between the primed and naive population.
+We use the QL F-test to test for significant differences in expression.
+
+```{r ftrest}
+con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
+res <- glmQLFTest(fit, contrast=con)
+summary(decideTestsDGE(res))
+DEmarkers <- topTags(res, n=Inf)$table
+DE_pastor <- DEmarkers[DEmarkers$FDR <= 0.05,]
+```
+
+We now repeat the same pipeline for the other data sets as well.
+
+```{r}
+theunissen16 <- read.table(file.path("../data/other_counts", "bulkRNA", "Theunissen2016_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
+gene.names <- theunissen16$Probe
+theunissen16 <- as.matrix(theunissen16[,14:23])
+rownames(theunissen16) <- gene.names
+keep <- rowSums(is.na(theunissen16))==0
+theunissen16 <- theunissen16[keep,]
+dim(theunissen16)
+
+y <- DGEList(theunissen16)
+```
+
+
+
+```{r}
+ptype <- factor(c('Primed', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Primed', 'Primed', 'Primed'))
+design_pheno <- model.matrix(~0 + ptype) 
+keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+y <- y[keep,]
+y <- calcNormFactors(y)
+y <- estimateDisp(y, design_pheno)
+fit <- glmQLFit(y, design_pheno, robust=TRUE)
+con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
+res <- glmQLFTest(fit, contrast=con)
+summary(decideTestsDGE(res))
+DEmarkers <- topTags(res, n=Inf)$table
+is.sig <- DEmarkers$FDR <= 0.05
+```
