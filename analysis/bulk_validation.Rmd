@@ -59,55 +59,17 @@ This is done using _edgeR_, after summing all cells within each batch to create 
 ```{r desetup}
 library(edgeR)
 y <- DGEList(pastor16)
-```
-
-We construct a new design matrix for the summed samples.
-
-```{r}
 ptype <- factor(c('Primed', 'Primed', 'Primed', 'Naive', 'Naive', 'Naive'))
 design_pheno <- model.matrix(~0 + ptype) 
-```
-
-We run through _edgeR_'s analysis pipeline. 
-We first filter out low-abundance genes, as we did not perform any filtering on `sce` during preprocessing.
-
-```{r}
 keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
 y <- y[keep,]
-summary(keep)
-```
-
-First, we normalize the samples using the TMM method.
-
-```{r}
 y <- calcNormFactors(y)
-y$samples
-```
-
-We estimate the negative binomial dispersion, which represents the variability between replicates.
-For true bulk RNA-seq experiments, we'd expect BCV values around 0.1 or lower, though the values here will be higher as they are derived from noisier single-cell values.
-
-```{r nbdisp}
-y <- estimateDisp(y, design_pheno)  
-plotBCV(y)
-```
-
-We fit a generalized linear model, with estimates of the quasi-likelihood dispersion to account for gene-specific variability.
-
-```{r qldisp}
+y <- estimateDisp(y, design_pheno)
 fit <- glmQLFit(y, design_pheno, robust=TRUE)
-plotQLDisp(fit)
-```
-
-Finally, we set up contrasts between the primed and naive population.
-We use the QL F-test to test for significant differences in expression.
-
-```{r ftrest}
 con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
 res <- glmQLFTest(fit, contrast=con)
-summary(decideTestsDGE(res))
-DEmarkers <- topTags(res, n=Inf)$table
-DE_pastor <- DEmarkers[DEmarkers$FDR <= 0.05,]
+DE_pastor <- topTags(res, n=Inf)$table
+#DE_pastor <- DEmarkers[DEmarkers$FDR <= 0.05,]
 ```
 
 We now repeat the same pipeline for the other data sets as well.
@@ -120,13 +82,11 @@ rownames(theunissen16) <- gene.names
 keep <- rowSums(is.na(theunissen16))==0
 theunissen16 <- theunissen16[keep,]
 dim(theunissen16)
-
-y <- DGEList(theunissen16)
 ```
 
 
-
 ```{r}
+y <- DGEList(theunissen16)
 ptype <- factor(c('Primed', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Primed', 'Primed', 'Primed'))
 design_pheno <- model.matrix(~0 + ptype) 
 keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
@@ -137,6 +97,34 @@ fit <- glmQLFit(y, design_pheno, robust=TRUE)
 con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
 res <- glmQLFTest(fit, contrast=con)
 summary(decideTestsDGE(res))
-DEmarkers <- topTags(res, n=Inf)$table
-is.sig <- DEmarkers$FDR <= 0.05
+DE_theunissen <- topTags(res, n=Inf)$table
+#DE_theunissen <- DEmarkers[DEmarkers$FDR <= 0.05,]
+```
+
+Now that we have the DE genes of the bulk RNA sets, we can load in our identified markers and plot them.
+
+```{r}
+naive.markers <- readRDS(file=file.path('results-remapping', "naive_markers.rds"))
+primed.markers <- readRDS(file=file.path('results-remapping', "primed_markers.rds"))
+
+naive.markers <- naive.markers[naive.markers %in% rownames(DE_pastor) & naive.markers %in% rownames(DE_theunissen)]
+primed.markers <- primed.markers[primed.markers %in% rownames(DE_pastor) & primed.markers %in% rownames(DE_theunissen)]
+
+bound <- 10
+
+naive_mat <- data.frame(Pastor = DE_pastor[naive.markers,]$logFC, Theunissen = DE_theunissen[naive.markers,]$logFC)
+rownames(naive_mat) <- naive.markers
+naive_mat[which(naive_mat>=bound, arr.ind = TRUE)] <- bound
+naive_mat[which(naive_mat< (-bound), arr.ind = TRUE)] <- -bound
+
+primed_mat <- data.frame(Pastor = DE_pastor[primed.markers,]$logFC, Theunissen = DE_theunissen[primed.markers,]$logFC)
+rownames(primed_mat) <- primed.markers 
+primed_mat[which(primed_mat>=bound, arr.ind = TRUE)] <- bound
+primed_mat[which(primed_mat< (-bound), arr.ind = TRUE)] <- -bound
+
+library(pheatmap)
+anno <- data.frame(Marker = c(rep('naive', length(naive.markers)), rep('primed', length(primed.markers))))
+rownames(anno) <- c(naive.markers, primed.markers)
+pheatmap(rbind(naive_mat, primed_mat), annotation_row = anno, cluster_cols = FALSE)
+
 ```
