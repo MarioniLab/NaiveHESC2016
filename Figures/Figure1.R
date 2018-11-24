@@ -92,3 +92,40 @@ for (ptype in c("naive", "primed")) {
   }
 }
 dev.off()
+
+#Figure S1C: Proteomics
+
+# Figure S1d
+DE_pastor <- readRDS(file = file.path('analysis/results-bulk', 'de_pastor.rds'))
+DE_theunissen <- readRDS(file = file.path('analysis/results-bulk', 'de_theunissen.rds'))
+
+naive.markers <- rownames(de.res[de.res$logFC > 10 & de.res$FDR <= 0.05,])
+primed.markers <- rownames(de.res[de.res$logFC < -10 & de.res$FDR <= 0.05,])
+
+naive.markers <- naive.markers[naive.markers %in% rownames(DE_pastor) & naive.markers %in% rownames(DE_theunissen)]
+primed.markers <- primed.markers[primed.markers %in% rownames(DE_pastor) & primed.markers %in% rownames(DE_theunissen)]
+
+pdf(file=file.path(figdir, "s1d.pdf"),width = 12, height = 6, useDingbats=FALSE)
+
+layout(cbind(1,2,3), width=c(5,5,1))
+par(mar=c(5.1, 4.2, 4.1, 1.1))
+plot(DE_pastor$logFC, -log10(DE_pastor$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'Pastor, 2016', xlim = c(-11, 11))
+points(DE_pastor[naive.markers,]$logFC, -log10(DE_pastor[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
+points(DE_pastor[primed.markers,]$logFC, -log10(DE_pastor[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
+max.pval <- min(-log10(DE_pastor[DE_pastor$FDR < 0.05,]$PValue))
+lines(x = c(-11, 11), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = -9, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+
+plot(DE_theunissen$logFC, -log10(DE_theunissen$PValue), pch = 16, xlab = 'Log FC', ylab = '', bty = 'n', main = 'Theunissen, 2016', xlim = c(-15, 15))
+points(DE_theunissen[naive.markers,]$logFC, -log10(DE_theunissen[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
+points(DE_theunissen[primed.markers,]$logFC, -log10(DE_theunissen[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
+max.pval <- min(-log10(DE_theunissen[DE_theunissen$FDR < 0.05,]$PValue))
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = -12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+
+par(mar=c(5.1, 0.1, 4.1, 0.1))
+plot.new()
+legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch=16, cex=1.5, bty='n')
+
+dev.off()
+
