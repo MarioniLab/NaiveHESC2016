@@ -70,7 +70,8 @@ fit <- glmQLFit(y, design_pheno, robust=TRUE)
 con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
 res <- glmTreat(fit, contrast=con, lfc = 0.5)
 DE_pastor <- topTags(res, n=Inf)$table
-#DE_pastor <- DEmarkers[DEmarkers$FDR <= 0.05,]
+
+saveRDS(DE_pastor, file = file.path(resdir, 'de_pastor.rds'))
 ```
 
 We now repeat the same pipeline for the other data sets as well.
@@ -100,7 +101,8 @@ con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
 res <- glmTreat(fit, contrast=con, lfc = 0.5)
 summary(decideTestsDGE(res))
 DE_theunissen <- topTags(res, n=Inf)$table
-#DE_theunissen <- DEmarkers[DEmarkers$FDR <= 0.05,]
+
+saveRDS(DE_theunissen, file = file.path(resdir, 'de_theunissen.rds'))
 ```
 
 Now that we have the DE genes of the bulk RNA sets, we can load in our identified markers and plot them.
