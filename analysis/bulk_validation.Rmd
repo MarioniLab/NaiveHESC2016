@@ -1,5 +1,5 @@
 ---
-title: "Single-cell RNA-seq Analysis of naive/primed embryonic stem cells: remapping naivete"
+title: "Single-cell RNA-seq Analysis of naive/primed embryonic stem cells: marker validation in public bulk RNA data"
 author: Tobias Messmer and Aaron Lun
 date: "`r Sys.Date()`"
 output: 
@@ -19,50 +19,55 @@ knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, fig.path="figur
 options(bitmapType="cairo", width=100)
 ```
 
-# Locating ESCs according to their naive/primed-ness
+# Validation of naive and primed markers in RNA-seq data from other cell lines
 
-Finally, we want to validate the markers that we identified in ... in other cell lines.
-For this, we used published bulkRNA seq data sets of naive and primed hESCs.
+Finally, we want to validate in other cell lines the markers that we identified by differential expression analysis between our naive and primed cells.
+For this, we use the following published bulkRNA seq data sets of naive and primed hESCs:
 
-- Human ESCs:
-    - __Publication:__ Petropoulos et al. (2016), _Cell_. Single-cell RNA-seq reveals lineage and X chromosome dynamics in human preimplantation embryos. 
-    - __Data source:__ `E-MTAB-3929.processed.1.zip` at http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3929
-- Mouse ESCs:
-    - __Publication:__ Mohammed et al. (2017), _Cell Reports_. Single-Cell Landscape of Transcriptional Heterogeneity and Cell Fate Decisions during Mouse Early Gastrulation
-    - __Data source:__ `GSE100597_count_table_QC_filtered.txt.gz` at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE100597
+- Pastor et al. (2016), _Cell Stem Cell_. Naive Human Pluripotent Cells Feature a Methylation Landscape Devoid of Blastocyst or Germline Memory. 
+- Theunissen et al. (2016), _Cell Stem Cell_. Molecular Criteria for Defining the Naive Human Pluripotent State.
+- Guo et al. (2017), _ Development _. Epigenetic resetting of human pluripotency. 
 
-
-The aim is to identify differentially expressed genes in those data sets and see if we have them as well.
+The aim is to identify differentially expressed genes in those data sets and to then assess how many of our previously identified naive and primed markers overlay with those respective DE genes.
 
 ```{r}
 resdir <- "results-bulk"
 dir.create(resdir, showWarning=FALSE)
 ```
 
-# Data input
+# Calculating differentially expressed genes.
 
-First, read in the data.
+## Pastor et al., 2016
+
+First, we read in the data and pre-filter the gene set.
 
 ```{r pastor.in}
 pastor16 <- read.table(file.path("../data/other_counts", "bulkRNA", "Pastor2016_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
 gene.names <- pastor16$Probe
-pastor16 <- as.matrix(pastor16[,14:19])
+pastor16 <- as.matrix(pastor16[,14:19]) #Selecting only the columns containing counts
 rownames(pastor16) <- gene.names
-keep <- rowSums(is.na(pastor16))==0
+keep <- rowSums(pastor16, na.rm = TRUE)>0  #Remove genes without any count
 pastor16 <- pastor16[keep,]
-pastor16 <- pastor16[-which(duplicated(rownames(pastor16))),]
+pastor16 <- pastor16[-which(duplicated(rownames(pastor16))),] #Remove duplicated gene names
 dim(pastor16)
 ```
 
-Next, we test for differences in expression between the naive and primed conditions.
-This is done using _edgeR_, after summing all cells within each batch to create a pseudo-bulk sample.
+Next, we test for differences in expression between the naive and primed conditions using _edgeR_.
+For this, we first create a design model based on the phenotype of each sample and remove genes with low average CPMs.
 
-```{r pastor.de}
+```{r pastor.model}
 library(edgeR)
 y <- DGEList(pastor16)
 ptype <- factor(c('Primed', 'Primed', 'Primed', 'Naive', 'Naive', 'Naive'))
-design_pheno <- model.matrix(~0 + ptype) 
+design_pheno <- model.matrix(~0 + ptype)
 keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+table(keep)
+```
+
+We then normalized using _edgeR_'s normalization factors and compute the differentially expressed genes between the naive and primed condition.
+The resulting DE genes are saved for later usage.
+
+```{r pastor.de}
 y <- y[keep,]
 y <- calcNormFactors(y)
 y <- estimateDisp(y, design_pheno)
@@ -74,25 +79,31 @@ DE_pastor <- topTags(res, n=Inf)$table
 saveRDS(DE_pastor, file = file.path(resdir, 'de_pastor.rds'))
 ```
 
+## Theunissen et al., 2016
+
 We now repeat the same pipeline for the other data sets as well.
+First, Theunissen et al., 2016.
 
 ```{r theu.in}
 theunissen16 <- read.table(file.path("../data/other_counts", "bulkRNA", "Theunissen2016_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
 gene.names <- theunissen16$Probe
-theunissen16 <- as.matrix(theunissen16[,14:23])
+theunissen16 <- as.matrix(theunissen16[,14:23]) #Selecting only the columns containing counts
 rownames(theunissen16) <- gene.names
-keep <- rowSums(is.na(theunissen16))==0
+keep <- rowSums(pastor16, na.rm = TRUE)>0 #Remove genes without any count
 theunissen16 <- theunissen16[keep,]
-theunissen16 <- theunissen16[-which(duplicated(rownames(theunissen16))),]
+theunissen16 <- theunissen16[-which(duplicated(rownames(theunissen16))),] #Remove duplicated gene names
 dim(theunissen16)
 ```
 
-
-```{r theu.de}
+```{r theu.model}
 y <- DGEList(theunissen16)
 ptype <- factor(c('Primed', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Naive', 'Primed', 'Primed', 'Primed'))
 design_pheno <- model.matrix(~0 + ptype) 
 keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+table(keep)
+```
+
+```{r theu.de}
 y <- y[keep,]
 y <- calcNormFactors(y)
 y <- estimateDisp(y, design_pheno)
@@ -105,55 +116,208 @@ DE_theunissen <- topTags(res, n=Inf)$table
 saveRDS(DE_theunissen, file = file.path(resdir, 'de_theunissen.rds'))
 ```
 
-Now that we have the DE genes of the bulk RNA sets, we can load in our identified markers and plot them.
+## Guo et al., 2017.
 
-```{r heatmap}
-naive.markers <- readRDS(file=file.path('results-remapping', "naive_markers.rds"))
-primed.markers <- readRDS(file=file.path('results-remapping', "primed_markers.rds"))
+Finally, we also repeat this for the Guo data set.
 
-naive.markers <- naive.markers[naive.markers %in% rownames(DE_pastor) & naive.markers %in% rownames(DE_theunissen)]
-primed.markers <- primed.markers[primed.markers %in% rownames(DE_pastor) & primed.markers %in% rownames(DE_theunissen)]
+```{r guo.in}
+guo17 <- read.table(file.path("../data/other_counts", "bulkRNA", "Guo2017_rawReadcountRNAseq.txt"), sep = "\t", header = TRUE)
+guo17 <- guo17[-which(duplicated(guo17$Probe)),] #Remove duplicated gene names
+gene.names <- guo17$Probe
+rownames(guo17) <- gene.names
+```
 
+There's two cell lines in this set: HNES and Shef7; which we have to analyse them separately from each other.
+
+## HNES1
+
+```{r hnes.in}
+hnes <- as.matrix(guo17[,c(32:34, 26:28)]) #Selecting only the columns containing the relevant counts
+keep <- rowSums(hnes, na.rm = TRUE)>0 #Remove genes without any count
+hnes <- hnes[keep,]
+dim(hnes)
+```
+
+```{r hnes.model}
+y <- DGEList(hnes)
+ptype <- factor(c('Naive', 'Naive', 'Naive', 'Primed', 'Primed', 'Primed'))
+design_pheno <- model.matrix(~0 + ptype) 
+keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+table(keep)
+```
+
+```{r hnes.de}
+y <- y[keep,]
+y <- calcNormFactors(y)
+y <- estimateDisp(y, design_pheno)
+fit <- glmQLFit(y, design_pheno, robust=TRUE)
+con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
+res <- glmTreat(fit, contrast=con, lfc = 0.5)
+summary(decideTestsDGE(res))
+DE_hnes <- topTags(res, n=Inf)$table
+
+saveRDS(DE_hnes, file = file.path(resdir, 'de_guo_hnes1.rds'))
+```
+
+## Shef7
+
+```{r shef.in}
+shef <- as.matrix(guo17[,c(23:25, 35:37)]) #Selecting only the columns containing the relevant counts
+keep <- rowSums(shef, na.rm = TRUE)>0 #Remove genes without any count
+shef <- shef[keep,]
+dim(shef)
+```
+
+```{r shef.model}
+y <- DGEList(shef)
+ptype <- factor(c('Naive', 'Naive', 'Naive', 'Primed', 'Primed', 'Primed'))
+design_pheno <- model.matrix(~0 + ptype) 
+keep <- aveLogCPM(y) > aveLogCPM(5, mean(y$samples$lib.size))
+table(keep)
+```
+
+```{r shef.de}
+y <- y[keep,]
+y <- calcNormFactors(y)
+y <- estimateDisp(y, design_pheno)
+fit <- glmQLFit(y, design_pheno, robust=TRUE)
+con <- makeContrasts(ptypeNaive - ptypePrimed, levels = design_pheno)
+res <- glmTreat(fit, contrast=con, lfc = 0.5)
+summary(decideTestsDGE(res))
+DE_shef <- topTags(res, n=Inf)$table
+
+saveRDS(DE_shef, file = file.path(resdir, 'de_guo_shef7.rds'))
+```
+
+# DE gene visualization and marker validation
+
+Now that we have the DE genes of the bulk RNA sets, we can load in the calculated DE-genes to then validate their expression in the bulk sets. 
+We read them in and filter them for only the genes that also exist in all other data sets.
+
+```{r markers.in}
+de.genes <- read.table(file = file.path('results-overall', 'de.tsv'),sep = "\t", header = TRUE, row.names = 1)
+naive.set <- de.genes[de.genes$logFC > 0 & de.genes$FDR <= 0.05,]
+primed.set <- de.genes[de.genes$logFC < 0 & de.genes$FDR <= 0.05,] 
+
+naive.markers <- rownames(naive.set)[1:200]
+primed.markers <- rownames(primed.set)[1:200]
+
+shared.naive.markers <- naive.markers[naive.markers %in% rownames(DE_pastor) & naive.markers %in% rownames(DE_theunissen) & naive.markers %in% rownames(DE_hnes) & naive.markers %in% rownames(DE_shef)]
+shared.primed.markers <- primed.markers[primed.markers %in% rownames(DE_pastor) & primed.markers %in% rownames(DE_theunissen) & primed.markers %in% rownames(DE_hnes) & primed.markers %in% rownames(DE_shef)]
+```
+
+## Heatmap
+
+Finally, we can visualize the logFC of our markers between the naive and primed conditions of the other data sets in a heatmap.
+This gives a first estimate whether there's a similar expression trend.
+
+```{r de.heatmap}
 bound <- 10
 
-naive_mat <- data.frame(Pastor = DE_pastor[naive.markers,]$logFC, Theunissen = DE_theunissen[naive.markers,]$logFC)
-rownames(naive_mat) <- naive.markers
+naive_mat <- data.frame(Pastor = DE_pastor[shared.naive.markers,]$logFC, Theunissen = DE_theunissen[shared.naive.markers,]$logFC, Guo.HNES = DE_hnes[shared.naive.markers,]$logFC, Guo.SHEF = DE_shef[shared.naive.markers,]$logFC)
+rownames(naive_mat) <- shared.naive.markers
 naive_mat[which(naive_mat>=bound, arr.ind = TRUE)] <- bound
 naive_mat[which(naive_mat< (-bound), arr.ind = TRUE)] <- -bound
 
-primed_mat <- data.frame(Pastor = DE_pastor[primed.markers,]$logFC, Theunissen = DE_theunissen[primed.markers,]$logFC)
-rownames(primed_mat) <- primed.markers 
+primed_mat <- data.frame(Pastor = DE_pastor[shared.primed.markers,]$logFC, Theunissen = DE_theunissen[shared.primed.markers,]$logFC, Guo.HNES = DE_hnes[shared.primed.markers,]$logFC, Guo.SHEF = DE_shef[shared.primed.markers,]$logFC)
+rownames(primed_mat) <- shared.primed.markers 
 primed_mat[which(primed_mat>=bound, arr.ind = TRUE)] <- bound
 primed_mat[which(primed_mat< (-bound), arr.ind = TRUE)] <- -bound
 
 library(pheatmap)
-anno <- data.frame(Marker = c(rep('naive', length(naive.markers)), rep('primed', length(primed.markers))))
-rownames(anno) <- c(naive.markers, primed.markers)
+anno <- data.frame(Marker = c(rep('naive', length(shared.naive.markers)), rep('primed', length(shared.primed.markers))))
+rownames(anno) <- c(shared.naive.markers, shared.primed.markers)
 pheatmap(rbind(naive_mat, primed_mat), annotation_row = anno, cluster_cols = FALSE)
 ```
 
-```{r volcano}
-par(mfrow=c(1,2))
+## Volcano plots
+
+To be able to assess more relevant changes in expression, we should not only look at the logFC but also at the statistical significane of the change (indicated by the P-Val). 
+Thus, we use volcano plots, in which all naive and primed markers that are found in our data set as well are coloured accordingly.
+Again, this is being done for all three data sets.
+
+```{r pastor.volcano}
 plot(DE_pastor$logFC, -log10(DE_pastor$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'Pastor, 2016', xlim = c(-11, 11))
 points(DE_pastor[naive.markers,]$logFC, -log10(DE_pastor[naive.markers,]$PValue), pch = 16, cex = 1.5, col = 'orange')
 points(DE_pastor[primed.markers,]$logFC, -log10(DE_pastor[primed.markers,]$PValue), pch = 16, cex = 1.5, col = 'royalblue1')
 max.pval <- min(-log10(DE_pastor[DE_pastor$FDR < 0.05,]$PValue))
 lines(x = c(-11, 11), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
 text(x = -9, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+```
 
-de.in.both <- rownames(DE_pastor[rownames(DE_pastor[DE_pastor$FDR < 0.05,]) %in% c(naive.markers, primed.markers),])
-#points(DE_pastor[de.in.both,]$logFC, -log10(DE_pastor[de.in.both,]$PValue), pch = 16, cex = 1.5, col = 'red')
-
-
+```{r theu.volcano}
 plot(DE_theunissen$logFC, -log10(DE_theunissen$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'Theunissen, 2016', xlim = c(-15, 15))
 points(DE_theunissen[naive.markers,]$logFC, -log10(DE_theunissen[naive.markers,]$PValue), pch = 16, cex = 1.5, col = 'orange')
 points(DE_theunissen[primed.markers,]$logFC, -log10(DE_theunissen[primed.markers,]$PValue), pch = 16, cex = 1.5, col = 'royalblue1')
 max.pval <- min(-log10(DE_theunissen[DE_theunissen$FDR < 0.05,]$PValue))
 lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
 text(x = -12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
-
-
-de.in.both <- rownames(DE_theunissen[rownames(DE_theunissen[DE_theunissen$FDR < 0.05,]) %in% c(naive.markers, primed.markers),])
-#points(DE_theunissen[de.in.both,]$logFC, -log10(DE_theunissen[de.in.both,]$PValue), pch = 16, cex = 1.5, col = 'red')
 ```
 
+```{r hnes.volcano}
+plot(DE_hnes$logFC, -log10(DE_hnes$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'HNES1 (Guo, 2017)', xlim = c(-15, 15))
+points(DE_hnes[naive.markers,]$logFC, -log10(DE_hnes[naive.markers,]$PValue), pch = 16, cex = 1.5, col = 'orange')
+points(DE_hnes[primed.markers,]$logFC, -log10(DE_hnes[primed.markers,]$PValue), pch = 16, cex = 1.5, col = 'royalblue1')
+max.pval <- min(-log10(DE_hnes[DE_hnes$FDR < 0.05,]$PValue))
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = -12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+```
+
+```{r shef.volcano}
+plot(DE_shef$logFC, -log10(DE_shef$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'SHEF7 (Guo, 2017)', xlim = c(-15, 15))
+points(DE_shef[naive.markers,]$logFC, -log10(DE_shef[naive.markers,]$PValue), pch = 16, cex = 1.5, col = 'orange')
+points(DE_shef[primed.markers,]$logFC, -log10(DE_shef[primed.markers,]$PValue), pch = 16, cex = 1.5, col = 'royalblue1')
+max.pval <- min(-log10(DE_shef[DE_shef$FDR < 0.05,]$PValue))
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = -12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+```
+
+# Identifying intersecting markers
+
+Last, we want to create a list with all interesecting markers genes by performing an intersection-union test.
+For each gene, we take the largest p-value across all three comparisons. 
+
+```{r intersect.fc}
+common.genes <- intersect(rownames(DE_pastor), intersect(rownames(DE_theunissen), intersect(rownames(DE_shef), rownames(de.genes))))
+
+all.up <- common.genes[DE_pastor[common.genes,]$logFC > 0 & DE_theunissen[common.genes,]$logFC > 0 
+                       & de.genes[common.genes,]$logFC > 0 &  DE_shef[common.genes,]$logFC > 0]
+all.down <- common.genes[DE_pastor[common.genes,]$logFC < 0 & DE_theunissen[common.genes,]$logFC < 0 
+                         & de.genes[common.genes,]$logFC < 0 & DE_shef[common.genes,]$logFC > 0]
+
+max.pvals <- cbind(H9NK2 = de.genes[c(all.up, all.down),]$PValue, UCLA1 = DE_pastor[c(all.up, all.down),]$PValue, 
+                   WIBR3 = DE_theunissen[c(all.up, all.down),]$PValue, SHEF7 = DE_shef[c(all.up, all.down),]$PValue)
+max.pvals <- apply(max.pvals[,1:4], 1, max)
+```
+
+If the signs of the log-fold changes are not the same, the P-values is set to 1.
+We create a table that contains the log-fold changes from each comparison and add the p-value that was just computed.
+
+```{r intersect.pval}
+de_list <- data.frame(H9NK2 = de.genes[common.genes,]$logFC, 
+                      UCLA1 = DE_pastor[common.genes,]$logFC, 
+                      WIBR3 = DE_theunissen[common.genes,]$logFC, 
+                      SHEF7 = DE_shef[common.genes,]$logFC,
+                      row.names = common.genes)
+
+de_list <- cbind(de_list, PVal = rep(1, length(common.genes)))
+de_list[c(all.up, all.down), 'PVal'] <- max.pvals
+```
+
+Finally, we correct the p-values for multiple testing using Benjamini-Hochberg, order the table for increasing FDR and export the table.
+
+```{r intersect.exp}
+p.adjusted <- p.adjust(de_list$PVal, method = 'BH')
+de_list <- cbind(de_list, FDR = p.adjusted)
+de_list <- de_list[order(de_list$FDR),]
+write.table(de_list, file = file.path(resdir, 'overlapping_markers.tsv'), sep="\t", quote=FALSE, col.names=NA)
+head(de_list)
+```
+
+# Wrapping up
+
+To wrap this story up, we report the session information.
+
+```{r end}
+sessionInfo()
+```
