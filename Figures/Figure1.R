@@ -96,36 +96,53 @@ dev.off()
 #Figure S1C: Proteomics
 
 # Figure S1d
-DE_pastor <- readRDS(file = file.path('analysis/results-bulk', 'de_pastor.rds'))
-DE_theunissen <- readRDS(file = file.path('analysis/results-bulk', 'de_theunissen.rds'))
+de.genes <- read.table(file = file.path('analysis/results-overall', 'de.tsv'),sep = "\t", header = TRUE, row.names = 1)
+naive.set <- de.genes[de.genes$logFC > 0 & de.genes$FDR <= 0.05,]
+primed.set <- de.genes[de.genes$logFC < 0 & de.genes$FDR <= 0.05,] 
 
-naive.markers <- rownames(de.res[de.res$logFC > 10 & de.res$FDR <= 0.05,])
-primed.markers <- rownames(de.res[de.res$logFC < -10 & de.res$FDR <= 0.05,])
+naive.set <- rownames(naive.set)[1:200]
+primed.set <- rownames(primed.set)[1:200]
 
-naive.markers <- naive.markers[naive.markers %in% rownames(DE_pastor) & naive.markers %in% rownames(DE_theunissen)]
-primed.markers <- primed.markers[primed.markers %in% rownames(DE_pastor) & primed.markers %in% rownames(DE_theunissen)]
 
-pdf(file=file.path(figdir, "s1d.pdf"),width = 12, height = 6, useDingbats=FALSE)
-
-layout(cbind(1,2,3), width=c(5,5,1))
+pdf(file=file.path(figdir, "s1d.pdf"),width = 15, height = 6, useDingbats=FALSE)
+layout(cbind(1,2,3,4), width=c(5,5,5,1))
 par(mar=c(5.1, 4.2, 4.1, 1.1))
-plot(DE_pastor$logFC, -log10(DE_pastor$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'Pastor, 2016', xlim = c(-11, 11))
+
+DE_pastor <- readRDS(file = file.path('analysis/results-bulk', 'de_pastor.rds'))
+naive.markers <- naive.set[naive.set %in% rownames(DE_pastor)]
+primed.markers <- primed.set[primed.set %in% rownames(DE_pastor)]
+
+plot(DE_pastor$logFC, -log10(DE_pastor$PValue), pch = 16, xlab = 'Log FC', ylab = '- Log10(Pval)', bty = 'n', main = 'UCLA1 (Pastor, 2016)', xlim = c(-11, 11))
 points(DE_pastor[naive.markers,]$logFC, -log10(DE_pastor[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
 points(DE_pastor[primed.markers,]$logFC, -log10(DE_pastor[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
 max.pval <- min(-log10(DE_pastor[DE_pastor$FDR < 0.05,]$PValue))
 lines(x = c(-11, 11), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
-text(x = -9, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+text(x = 8.75, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
 
-plot(DE_theunissen$logFC, -log10(DE_theunissen$PValue), pch = 16, xlab = 'Log FC', ylab = '', bty = 'n', main = 'Theunissen, 2016', xlim = c(-15, 15))
+DE_theunissen <- readRDS(file = file.path('analysis/results-bulk', 'de_theunissen.rds'))
+naive.markers <- naive.set[naive.set %in% rownames(DE_theunissen)]
+primed.markers <- primed.set[primed.set %in% rownames(DE_theunissen)]
+
+plot(DE_theunissen$logFC, -log10(DE_theunissen$PValue), pch = 16, xlab = 'Log FC', ylab = '', bty = 'n', main = 'WIBR3 (Theunissen, 2016)', xlim = c(-15, 15))
 points(DE_theunissen[naive.markers,]$logFC, -log10(DE_theunissen[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
 points(DE_theunissen[primed.markers,]$logFC, -log10(DE_theunissen[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
 max.pval <- min(-log10(DE_theunissen[DE_theunissen$FDR < 0.05,]$PValue))
 lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
-text(x = -12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+text(x = 12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+
+DE_guo <- readRDS(file = file.path('analysis/results-bulk', 'de_guo_shef7.rds'))
+naive.markers <- naive.set[naive.set %in% rownames(DE_guo)]
+primed.markers <- primed.set[primed.set %in% rownames(DE_guo)]
+
+plot(DE_guo$logFC, -log10(DE_guo$PValue), pch = 16, xlab = 'Log FC', ylab = '', bty = 'n', main = 'SHEF7 (Guo, 2017)', xlim = c(-15, 15))
+points(DE_guo[naive.markers,]$logFC, -log10(DE_guo[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
+points(DE_guo[primed.markers,]$logFC, -log10(DE_guo[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
+max.pval <- min(-log10(DE_guo[DE_guo$FDR < 0.05,]$PValue))
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
+text(x = 12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
 
 par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
 legend("topleft", legend=c("Naive", "Primed"), col=c(naive.col, primed.col), pch=16, cex=1.5, bty='n')
-
 dev.off()
 
