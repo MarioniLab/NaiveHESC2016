@@ -445,7 +445,7 @@ de.list <- data.frame(
     H9NK2 = de.genes[common.genes,]$logFC, 
     UCLA1 = de.tab.pastor[common.genes,]$logFC, 
     WIBR3 = de.tab.theunissen[common.genes,]$logFC, 
-    SHEF7 = de.tab.guo.shef[common.genes,]$logFC,
+    SHEF7 = de.tab.guo_shef7[common.genes,]$logFC,
     PValue = max.pvals,
     row.names = common.genes)
 ```
