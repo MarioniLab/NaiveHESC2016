@@ -116,8 +116,7 @@ plot(DE_pastor$logFC, -log10(DE_pastor$PValue), pch = 16, xlab = 'Log FC', ylab 
 points(DE_pastor[naive.markers,]$logFC, -log10(DE_pastor[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
 points(DE_pastor[primed.markers,]$logFC, -log10(DE_pastor[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
 max.pval <- min(-log10(DE_pastor[DE_pastor$FDR < 0.05,]$PValue))
-lines(x = c(-11, 11), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
-text(x = 8.75, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+lines(x = c(-11, 11), y = c(max.pval, max.pval), col = 'grey60', lty = 2, lwd = 3)
 
 DE_theunissen <- readRDS(file = file.path('analysis/results-bulk', 'de_theunissen.rds'))
 naive.markers <- naive.set[naive.set %in% rownames(DE_theunissen)]
@@ -127,8 +126,7 @@ plot(DE_theunissen$logFC, -log10(DE_theunissen$PValue), pch = 16, xlab = 'Log FC
 points(DE_theunissen[naive.markers,]$logFC, -log10(DE_theunissen[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
 points(DE_theunissen[primed.markers,]$logFC, -log10(DE_theunissen[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
 max.pval <- min(-log10(DE_theunissen[DE_theunissen$FDR < 0.05,]$PValue))
-lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
-text(x = 12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'grey60', lty = 2, lwd = 3)
 
 DE_guo <- readRDS(file = file.path('analysis/results-bulk', 'de_guo_shef7.rds'))
 naive.markers <- naive.set[naive.set %in% rownames(DE_guo)]
@@ -138,8 +136,7 @@ plot(DE_guo$logFC, -log10(DE_guo$PValue), pch = 16, xlab = 'Log FC', ylab = '', 
 points(DE_guo[naive.markers,]$logFC, -log10(DE_guo[naive.markers,]$PValue), pch = 16, cex = 1.5, col = naive.col)
 points(DE_guo[primed.markers,]$logFC, -log10(DE_guo[primed.markers,]$PValue), pch = 16, cex = 1.5, col = primed.col)
 max.pval <- min(-log10(DE_guo[DE_guo$FDR < 0.05,]$PValue))
-lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'red', lty = 2, lwd = 3)
-text(x = 12, y = max.pval, labels = 'FDR < 0.05', pos = 1, col = 'red')
+lines(x = c(-15, 15), y = c(max.pval, max.pval), col = 'grey60', lty = 2, lwd = 3)
 
 par(mar=c(5.1, 0.1, 4.1, 0.1))
 plot.new()
