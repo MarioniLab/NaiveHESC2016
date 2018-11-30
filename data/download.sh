@@ -29,12 +29,11 @@ cd -
 
 ## Downloading the bulk RNA-seq data
 
-mkdir bulk_counts/
-cd bulk_counts/
+cd other_counts/
 
-wget https://jmlab-gitlab.cruk.cam.ac.uk/aaron/NaiveHESC2016-DataFiles/raw/master/bulk/Guo2017_rawReadcountRNAseq.txt
-wget https://jmlab-gitlab.cruk.cam.ac.uk/aaron/NaiveHESC2016-DataFiles/raw/master/bulk/Pastor2016_rawReadcountRNAseq.txt.gz
-wget https://jmlab-gitlab.cruk.cam.ac.uk/aaron/NaiveHESC2016-DataFiles/raw/master/bulk/Theunissen2016_rawReadcountRNAseq.txt.gz
+wget https://jmlab-gitlab.cruk.cam.ac.uk/publications/NaiveHESC2016-DataFiles/raw/master/bulk/Guo2017_rawReadcountRNAseq.txt
+wget https://jmlab-gitlab.cruk.cam.ac.uk/publications/NaiveHESC2016-DataFiles/raw/master/bulk/Pastor2016_rawReadcountRNAseq.txt.gz
+wget https://jmlab-gitlab.cruk.cam.ac.uk/publications/NaiveHESC2016-DataFiles/raw/master/bulk/Theunissen2016_rawReadcountRNAseq.txt.gz
 
 cd -
 
