@@ -151,36 +151,9 @@ legend$vp$y <- unit(.5, "npc")
 grid.draw(legend)
 dev.off()
 
-
 # Figure S3B
-naive.out <- readRDS('analysis/results-correlations/naive_out.Rds')
-primed.out <- readRDS('analysis/results-correlations/primed_out.Rds')
-
-naive.fdr <- primed.fdr <- colour.code <- naive.epi.heat
-naive.fdr[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$FDR
-primed.fdr[cbind(primed.out$gene1, primed.out$gene2)] <- primed.out$FDR
-
-fdr <- 0.05
-colour.code[,] <- 1 #insignificant
-colour.code[naive.fdr < fdr & primed.fdr < fdr] <- 2 #significant in both
-colour.code[naive.fdr < fdr & primed.fdr >= fdr] <- 3 #significant in naive
-colour.code[naive.fdr >= fdr & primed.fdr < fdr] <- 4 #signifcant in primed
-
-colour.scheme <- c('grey', 'black', naive.col, primed.col)
-colour.code <- colour.scheme[colour.code]
-
-pdf(file.path(figdir, "s3b.pdf"), width=10, height = 10, onefile=FALSE)
-plot(naive.epi.heat, primed.epi.heat, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations [rho]', ylab='Primed correlations [rho]', pch=16, col = colour.code)
-legend('topleft', legend = c(paste0('FDR > ', fdr,': ', sum(colour.code=='grey')), 
-                             paste0('Sig in both: ', sum(colour.code== 'black')), 
-                             paste0('Sig in naive: ', sum(colour.code== naive.col)),
-                             paste0('Sig in primed: ', sum(colour.code== primed.col))), 
-       pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
-dev.off()
-
-# Figure S3C
 tsne4 <- readRDS("analysis/results-diff/naive_tsne4.Rds")
-pdf(file=file.path(figdir, "s3c.pdf"), width=10, useDingbats=FALSE)
+pdf(file=file.path(figdir, "s3b.pdf"), width=10, useDingbats=FALSE)
 par(mfrow=c(1,2), mar = c(5.1, 5.1, 4.1, 4.1), las = 1)
 plot_data <- ggplot_build(tsne4)
 plot(plot_data$data[[1]]$x, plot_data$data[[1]]$y, main = 'naive', col = plot_data$data[[1]]$fill, 
@@ -197,3 +170,30 @@ legend$vp$x <- unit(.95, "npc")
 legend$vp$y <- unit(.5, "npc")
 grid.draw(legend)
 dev.off()
+
+# Figure S3C
+naive.out <- readRDS('analysis/results-correlations/naive_out.Rds')
+primed.out <- readRDS('analysis/results-correlations/primed_out.Rds')
+
+naive.fdr <- primed.fdr <- colour.code <- naive.epi.heat
+naive.fdr[cbind(naive.out$gene1, naive.out$gene2)] <- naive.out$FDR
+primed.fdr[cbind(primed.out$gene1, primed.out$gene2)] <- primed.out$FDR
+
+fdr <- 0.05
+colour.code[,] <- 1 #insignificant
+colour.code[naive.fdr < fdr & primed.fdr < fdr] <- 2 #significant in both
+colour.code[naive.fdr < fdr & primed.fdr >= fdr] <- 3 #significant in naive
+colour.code[naive.fdr >= fdr & primed.fdr < fdr] <- 4 #signifcant in primed
+
+colour.scheme <- c('grey', 'black', naive.col, primed.col)
+colour.code <- colour.scheme[colour.code]
+
+pdf(file.path(figdir, "s3c.pdf"), width=10, height = 10, onefile=FALSE)
+plot(naive.epi.heat, primed.epi.heat, xlim = c(-0.5, 0.5) , ylim = c(-0.5, 0.5), xlab = 'Naive correlations [rho]', ylab='Primed correlations [rho]', pch=16, col = colour.code)
+legend('topleft', legend = c(paste0('FDR > ', fdr,': ', sum(colour.code=='grey')), 
+                             paste0('Sig in both: ', sum(colour.code== 'black')), 
+                             paste0('Sig in naive: ', sum(colour.code== naive.col)),
+                             paste0('Sig in primed: ', sum(colour.code== primed.col))), 
+       pch = 16, col = c('grey', 'black', naive.col, primed.col), bty='n', cex=1.5)
+dev.off()
+
