@@ -1,11 +1,19 @@
 # Naive and primed pluripotency in human ESCs
 
-This repository contains analysis code for the hESC analysis project with Ferdinand von Meyenn and Wolf Reik.
+## Overview
+
+This repository provides the code for the paper **Transcriptional heterogeneity in naive and primed human pluripotent stem cells at single-cell resolution**,
+by [Messmer _et al._ (2019)](https://doi.org/10.1016/j.celrep.2018.12.099).
+
+## Generating the results
+
 To reproduce the analyses from count matrices:
 
 1. Enter `data/` and run `download.sh` to download all relevant count tables.
 2. Enter `analysis/` and run `run_main.sh` to compile all of the analysis scripts.
 3. Enter `figures/` and run `make_figures.sh` to create all of the figures used in the manuscript.
+
+## Realigning the sequence data
 
 To reproduce the analyses from the FASTQ files:
 
